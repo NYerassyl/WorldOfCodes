@@ -64,7 +64,7 @@ export async function createFriendlyInvite(prisma, userId) {
     await tx.friendBattle.create({ data: { matchId: created.id, inviteCode, createdById: userId,
       expiresAt: new Date(Date.now() + 30 * 60_000) } });
     return created;
-  });
+  }, { isolationLevel: 'Serializable' });
   return { matchId: match.id, inviteCode, expiresInSeconds: 1800 };
 }
 
@@ -73,7 +73,7 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
     throw new AppError(400, 'INVALID_INVITE', 'A valid invite code is required');
   }
   try {
-    return await prisma.$transaction(async tx => {
+    const result = await prisma.$transaction(async tx => {
       // Re-read invitation state inside the transaction to avoid stale preflight data.
       const invite = await tx.friendBattle.findUnique({
         where: { inviteCode: inviteCode.trim().toUpperCase() },
@@ -83,7 +83,12 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
         throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
       }
       if (invite.expiresAt <= new Date()) {
-        throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
+        await tx.match.updateMany({
+          where: { id: invite.matchId, type: 'FRIENDLY', status: 'PENDING' },
+          data: { status: 'EXPIRED', completedAt: new Date() }
+        });
+        await tx.friendBattle.delete({ where: { id: invite.id } });
+        return { expired: true };
       }
       if (invite.createdById === userId) {
         throw new AppError(409, 'CANNOT_JOIN_OWN_INVITE', 'You cannot join your own invite');
@@ -106,8 +111,10 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
         throw new AppError(409, 'INVITE_ALREADY_USED', 'This invite is no longer available');
       }
       await tx.friendBattle.delete({ where: { id: invite.id } });
-      return tx.match.findUnique({ where: { id: invite.matchId }, select: publicMatchSelect });
+      return { match: await tx.match.findUnique({ where: { id: invite.matchId }, select: publicMatchSelect }) };
     }, { isolationLevel: 'Serializable' });
+    if (result.expired) throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
+    return result.match;
   } catch (error) {
     if (error instanceof AppError) throw error;
     if (['P2002', 'P2034', 'P2025'].includes(error?.code)) {
