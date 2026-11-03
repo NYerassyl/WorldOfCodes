@@ -103,7 +103,10 @@ test('Socket.IO watches only participant matches and broadcasts friendly complet
       testCases: [{ argsJson: '[]', expectedJson: '1' }]
     }) },
     $transaction: async callback => callback({
-      match: { updateMany: async () => { status = 'COMPLETED'; return { count: 1 }; } },
+      match: {
+        findUnique: async () => ({ ...match, status }),
+        updateMany: async () => { status = 'COMPLETED'; return { count: 1 }; }
+      },
       matchPlayer: { updateMany: async () => ({ count: 1 }) }
     })
   };
