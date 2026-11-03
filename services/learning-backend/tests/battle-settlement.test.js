@@ -100,15 +100,15 @@ test('judge infrastructure failure does not create a winner or start settlement'
   assert.deepEqual(prisma.state.ratingUpdates, []);
 });
 
-test('a completed match cannot be settled again', async () => {
+test('a completed match rejects another submission without settling again', async () => {
   const prisma = createSubmitPrisma({ alreadyCompleted: true });
-  const result = await submitBattleSolution(prisma, {
-    matchId: 'match-1', userId: 'player-a', sourceCode: 'def solve(): return 1',
-    judge: async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 })
-  });
-  assert.equal(result.matchCompleted, true);
-  assert.equal(result.winnerId, 'player-b');
-  assert.equal(result.settled, false);
+  await assert.rejects(
+    submitBattleSolution(prisma, {
+      matchId: 'match-1', userId: 'player-a', sourceCode: 'def solve(): return 1',
+      judge: async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 })
+    }),
+    error => error.code === 'ACTIVE_MATCH_NOT_FOUND'
+  );
   assert.equal(prisma.state.transactions, 0);
   assert.deepEqual(prisma.state.ratingUpdates, []);
 });
