@@ -12,7 +12,6 @@ export function calculateElo(ratingA, ratingB, scoreA, kFactor = 32) {
       !Number.isFinite(kFactor) || kFactor <= 0) {
     throw new TypeError('Invalid rating input');
   }
-  const scoreB = 1 - scoreA;
   // The two players' changes must be exact opposites. Independent rounding can
   // otherwise create or destroy one rating point at half-point boundaries.
   const deltaA = Math.round(kFactor * (scoreA - expectedScore(ratingA, ratingB)));
