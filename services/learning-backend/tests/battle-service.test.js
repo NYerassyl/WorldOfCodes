@@ -113,7 +113,7 @@ test('friendly invite cannot be joined by its creator or after expiry', async ()
   };
   const makePrisma = invite => ({
     $transaction: callback => callback({
-      friendBattle: { findUnique: async () => invite },
+      friendBattle: { findUnique: async () => invite, delete: async () => ({}) },
       matchPlayer: { create: async () => assert.fail('must not add player') },
       match: { updateMany: async args => {
         assert.equal(args.where.status, 'PENDING');
