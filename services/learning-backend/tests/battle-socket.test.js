@@ -107,7 +107,7 @@ test('Socket.IO watches only participant matches and broadcasts friendly complet
       matchPlayer: { updateMany: async () => ({ count: 1 }) }
     })
   };
-  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer, submissionCooldownMs: 0 });
+  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer, submissionCooldownMs: 0, judge: async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 }) });
   const io = FakeSocketServer.instance;
   const socket = await io.connect(validToken);
   let watchAck;
