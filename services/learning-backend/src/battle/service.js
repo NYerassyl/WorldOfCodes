@@ -83,11 +83,6 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
         throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
       }
       if (invite.expiresAt <= new Date()) {
-        await tx.match.updateMany({
-          where: { id: invite.matchId, type: 'FRIENDLY', status: 'PENDING' },
-          data: { status: 'EXPIRED', completedAt: new Date() }
-        });
-        await tx.friendBattle.delete({ where: { id: invite.id } });
         throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
       }
       if (invite.createdById === userId) {
