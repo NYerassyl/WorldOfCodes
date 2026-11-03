@@ -220,7 +220,8 @@ model RewardLedger {
 }
 
 // Battle schema extension — fields proposed by GPT 3; match/rating business logic remains GPT 3's responsibility.
-// Enums and match-state transitions require GPT 3 sign-off before deployment.
+// GPT 3 approved enum values and lifecycle. Ranked creation must explicitly use ACTIVE;
+// friendly invitation creation may use the PENDING default, then join transitions to ACTIVE.
 model Match {
   id          String        @id @default(uuid())
   type        MatchType
@@ -237,6 +238,7 @@ model Match {
   @@index([problemId])
   @@index([winnerId])
   @@index([type, status])
+  @@index([status, type])
 }
 
 model MatchPlayer {

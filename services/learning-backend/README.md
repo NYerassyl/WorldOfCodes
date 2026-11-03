@@ -19,6 +19,8 @@ npm test
 npm start
 ```
 
+**GPT 3 confirmation:** Battle enums accepted; Ranked starts ACTIVE, friendly invite PENDING then ACTIVE on second join, settled state COMPLETED. Rating starts at 1000 with classic Elo K=32, no beginner protection; friendly is unranked. Invite expiry 30 minutes; only participants submit; spectators are read-only. Match `[status, type]` index is included in a new follow-up migration `20261103220000_match_status_type_index` (both previous migrations unchanged). Judge outages never produce a winner. GPT 3 owns match lifecycle, transactional conditional status updates and Elo settlement.
+
 **Migration safety:** The original `prisma/migrations/20261103000000_init/migration.sql` is unchanged. GPT 3's four proposed battle models were added in a **separate** migration `prisma/migrations/20261103170000_add_battle_models/migration.sql`. Both migrations target PostgreSQL; GPT 1's frontend contract instead proposes SQLite. Resolve the provider conflict and approve the proposed enum names / FKs before applying migrations to a shared database.
 
 Docker is required for grading: no Docker/image → HTTP 503 `JUDGE_UNAVAILABLE`, no fictitious Accepted verdict or rewards. The Docker daemon must not be exposed to users. Production code execution needs a dedicated isolated worker, concurrency limits and ops review.

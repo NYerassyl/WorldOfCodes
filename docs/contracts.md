@@ -75,7 +75,7 @@ Model design from GPT 3's supplied request, implemented in `services/learning-ba
 | `Rating` | `userId String @id` | User 1:1; `points Int @default(1000)`, `wins/losses/draws Int @default(0)`, `updatedAt @updatedAt` |
 | `FriendBattle` | `id String @id @default(uuid())`, unique `matchId`, unique `inviteCode` | Required `matchId → Match.id`, `createdById → User.id`; required `expiresAt`, `createdAt @default(now())` |
 
-**Enums proposed, NOT yet verified against GPT 3 runtime code:**
+**Enums approved by GPT 3 in the supplied integration reply (runtime code verification still pending):**
 - `MatchType: RANKED | FRIENDLY`
 - `MatchStatus: PENDING | ACTIVE | COMPLETED | CANCELLED | EXPIRED`
 - `MatchPlayer.verdict` reuses nullable `SubmissionStatus: ACCEPTED | WRONG_ANSWER | RUNTIME_ERROR | TIME_LIMIT`. Judge infrastructure failure (503) must never be treated as a valid verdict.
@@ -84,4 +84,11 @@ Model design from GPT 3's supplied request, implemented in `services/learning-ba
 
 **Service invariants not guaranteed by these FKs:** winner must be a MatchPlayer, FRIENDLY-only FriendBattle, seat range/1v1 capacity, invites expiration, only ranked matches update Rating, and idempotent/transactional settlement; GPT 3 must enforce these. MatchPlayer nullable rating fields allow no rating changes for FRIENDLY.
 
-**Stack conflict:** `feat/frontend/docs/contracts.md` proposes **Prisma + SQLite** while `feat/learning-backend` uses **Prisma + PostgreSQL**. These migration files are PostgreSQL-only. GPT 1 must choose the shared provider and approve a unified migration before applying it. The GPT 3 battle branch was not accessible among current branches, so precise enum values cannot be verified against its runtime code.
+**GPT 3-confirmed battle rules (implementation owned by GPT 3):**
+- **Lifecycle:** RANKED matches are created with `status: ACTIVE` explicitly (the schema's general default remains PENDING); friendly invitations are created with `status: PENDING`, transition to ACTIVE when the second participant joins, and settled matches transition to COMPLETED. CANCELLED and EXPIRED remain supported values.
+- **Rating:** initial 1000, classic Elo with `K = 32` and no beginner protection in the MVP. Friendly battles never modify Rating. Completion and rating changes must occur in **one transaction**; a conditional status update must prevent duplicate settlement.
+- **Invitation / permissions:** 30-minute expiry; exactly two participants after joining; only participants may submit; spectators cannot modify results. Duplicate accepted submissions must not settle twice. Judge infrastructure failure must not create a winner.
+- **Indexes:** preserve `[type, status]`; add `[status, type]` for the requested match queries, and retain existing `[userId]` on MatchPlayer, `[expiresAt]` on FriendBattle, plus the specified unique constraints.
+- **New migration policy:** initial `20261103000000_init` and existing `20261103170000_add_battle_models` remain unchanged. A follow-up migration adds the extra index.
+
+**Stack conflict:** `feat/frontend/docs/contracts.md` proposes **Prisma + SQLite** while `feat/learning-backend` uses **Prisma + PostgreSQL**. These migration files are PostgreSQL-only. GPT 1 must choose the shared provider and approve a unified migration before applying it. GPT 3 confirmed the proposed enum values and declared interface compatibility in chat; an actual Battle branch/runtime comparison is still pending.

@@ -97,3 +97,22 @@ test('enum names match the proposed migration', () => {
   assert.match(additive, /CREATE TYPE "MatchType" AS ENUM \('RANKED', 'FRIENDLY'\)/);
   assert.match(additive, /CREATE TYPE "MatchStatus" AS ENUM \('PENDING', 'ACTIVE', 'COMPLETED', 'CANCELLED', 'EXPIRED'\)/);
 });
+
+test('GPT 3 status/type index added without changing the original Battle index', () => {
+  const followUp = read('../prisma/migrations/20261103220000_match_status_type_index/migration.sql');
+  assert.match(model('Match'), /@@index\(\[type, status\]\)/);
+  assert.match(model('Match'), /@@index\(\[status, type\]\)/);
+  assert.match(additive, /CREATE INDEX "Match_type_status_idx" ON "Match"\("type", "status"\)/);
+  assert.match(followUp, /CREATE INDEX "Match_status_type_idx" ON "Match"\("status", "type"\)/);
+  assert.doesNotMatch(followUp, /ALTER TABLE|DROP TABLE|DROP INDEX/);
+});
+
+test('approved battle lifecycle and rating rules are documented for GPT 3', () => {
+  const contract = read('../../../docs/contracts.md');
+  assert.match(contract, /RANKED matches are created with `status: ACTIVE`/);
+  assert.match(contract, /friendly invitations are created with `status: PENDING`/);
+  assert.match(contract, /second participant joins/);
+  assert.match(contract, /K = 32/);
+  assert.match(contract, /30-minute expiry/);
+  assert.match(contract, /one transaction/);
+});

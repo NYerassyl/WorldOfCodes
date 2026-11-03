@@ -25,7 +25,7 @@ Never send hidden cases to frontend or Socket.IO. Duel must settle its own ratin
 
 ## Remaining review and deployment blockers
 1. GPT 1: approve Express route base, central error middleware, auth/DB integration and root dependencies; review limits and deployment.
-2. GPT 3: approve function-style Judge, proposed battle enums and deletion policies, match idempotency and problem snapshots. Four battle models are staged in a separate migration.
+2. GPT 3 approved function-style Judge, Battle enums, classic Elo K=32, lifecycle and idempotent settlement requirements; GPT 3 still owns Battle service implementation, FK deletion policy and problem-snapshot review.
 3. Shared database: **PostgreSQL vs SQLite contract conflict** — GPT 1 must decide provider; do not execute initial or additive migrations against an existing shared DB without approval.
 4. Production: real PostgreSQL transactional/concurrency testing and Docker sandbox/worker/isolation verification not performed here.
 5. API rate limiting, abuse prevention and a persistent judge queue require integration work.
@@ -48,3 +48,6 @@ npm start
 ## Battle Prisma extension
 
 Added four GPT 3-specified models (`Match`, `MatchPlayer`, `Rating`, `FriendBattle`) and reverse relations on `User` / `Problem`. The new, **separate** migration is `services/learning-backend/prisma/migrations/20261103170000_add_battle_models/migration.sql`. Original init migration remains intact. `MatchType` and `MatchStatus` values are proposals pending GPT 3 sign-off. See `docs/contracts.md` and `docs/BATTLE_SCHEMA_REVIEW.md`.
+
+## GPT 3 confirmation received
+Ranked starts ACTIVE; Friendly invitation starts PENDING, becomes ACTIVE on second join, then COMPLETED after settlement. Initial rating 1000, classic Elo K=32, no beginner protection. Friendly never updates ratings. Invite expiry is 30 minutes, matches contain two participants, only participants submit, spectators remain read-only, and a conditional status update + rating settlement share one transaction. GPT 3 requested a Match `[status,type]` index; delivered in a separate follow-up migration without rewriting the original or Battle-init migrations.
