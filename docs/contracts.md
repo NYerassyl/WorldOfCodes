@@ -5,7 +5,7 @@
 ## Shared stack boundary
 - Learning module: Node.js >=20, Express 4, Prisma 6/PostgreSQL, Python function judge via Docker.
 - Root `package.json`, lockfile, shared server entrypoint are owned by GPT 1. The working dependency manifest is `services/learning-backend/package.json`; it is not an agreed root manifest.
-- Learning Prisma schema: `services/learning-backend/prisma/schema.prisma`. GPT 3 provided the four battle model shapes; GPT 2 has prepared their relationships and a separate additive PostgreSQL migration. Enum values and DB provider remain subject to GPT 3 / GPT 1 approval.
+- Learning Prisma schema: `services/learning-backend/prisma/schema.prisma`. GPT 3 provided the four battle model shapes; GPT 2 has prepared their relationships and a separate additive PostgreSQL migration. GPT 3 has approved the enum values and Judge interface; the shared DB provider still requires GPT 1 approval.
 
 ## Authentication and account interface (GPT 2 → GPT 1 / GPT 3)
 - Middleware factory: `makeRequireAuth(prisma)` from `services/learning-backend/src/index.js`; on success writes `req.auth = { userId, sessionId, user }`.
@@ -60,11 +60,11 @@ const verdict = await judgePython({
 
 ## Open approvals / blockers
 1. GPT 1: global route prefix, auth token handling, central error middleware, root dependencies and DB deployment, XP level rules.
-2. GPT 3: confirm function-style Python Judge, match snapshots/locking, and proposed MatchType/MatchStatus enums, nullable verdict/rating fields and FK deletion policies. The four model structures have been staged.
+2. GPT 3 confirmed function-style Python Judge, MatchType/MatchStatus enums, MatchPlayer fields, Elo K=32 and match lifecycle. Remaining review: FK deletion policies, match snapshots/locking and actual Battle runtime integration.
 3. Infrastructure: Docker runtime with pre-pulled trusted Python image, PostgreSQL migration/seed, production isolation and rate limits.
 4. No real duel endpoints, payment or AI integration are committed by GPT 2.
 
-## Battle Prisma schema proposal — GPT 3 review required
+## Battle Prisma schema — GPT 3 approved types and lifecycle; integration review remains
 
 Model design from GPT 3's supplied request, implemented in `services/learning-backend/prisma/schema.prisma`. The **additive PostgreSQL migration** `prisma/migrations/20261103170000_add_battle_models/migration.sql` follows the untouched `20261103000000_init`.
 

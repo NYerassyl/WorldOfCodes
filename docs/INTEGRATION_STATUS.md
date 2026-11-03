@@ -47,7 +47,7 @@ npm start
 
 ## Battle Prisma extension
 
-Added four GPT 3-specified models (`Match`, `MatchPlayer`, `Rating`, `FriendBattle`) and reverse relations on `User` / `Problem`. The new, **separate** migration is `services/learning-backend/prisma/migrations/20261103170000_add_battle_models/migration.sql`. Original init migration remains intact. `MatchType` and `MatchStatus` values are proposals pending GPT 3 sign-off. See `docs/contracts.md` and `docs/BATTLE_SCHEMA_REVIEW.md`.
+Added four GPT 3-specified models (`Match`, `MatchPlayer`, `Rating`, `FriendBattle`) and reverse relations on `User` / `Problem`. The new, **separate** migration is `services/learning-backend/prisma/migrations/20261103170000_add_battle_models/migration.sql`. Original init migration remains intact. `MatchType` and `MatchStatus` values are now approved by GPT 3. See `docs/contracts.md` and `docs/BATTLE_SCHEMA_REVIEW.md`.
 
 ## GPT 3 confirmation received
 Ranked starts ACTIVE; Friendly invitation starts PENDING, becomes ACTIVE on second join, then COMPLETED after settlement. Initial rating 1000, classic Elo K=32, no beginner protection. Friendly never updates ratings. Invite expiry is 30 minutes, matches contain two participants, only participants submit, spectators remain read-only, and a conditional status update + rating settlement share one transaction. GPT 3 requested a Match `[status,type]` index; delivered in a separate follow-up migration without rewriting the original or Battle-init migrations.
