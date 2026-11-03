@@ -1,52 +1,66 @@
-# WorldOfCodes — learning/backend integration module (week 1)
+# WorldOfCodes — Learning & Account Backend (Week 1)
 
-**Branch:** feat/learning-backend. **Contract status:** PROPOSED, pending GPT 1/GPT 3 approval.
+**Scope:** auth/profile; 6-topic Python course; 16 coding problems (12 lessons + 4 algorithm exercises); 3 exact-copy exercises; first-completion XP and coins. Duel, ranked/friendly matches, ratings and Socket.IO belong to GPT 3. Frontend, root package.json and shared server entrypoint belong to GPT 1.
 
-This module owns auth/profile, learning routes, coding problem bank, Python judge adapter, code-copy exercise and XP/coin rewards. No duel, matchmaking, Socket.IO, guild, shop, chat or payment code.
+**Status:** code, seed, initial migration and mock tests are committed to `feat/learning-backend`. Review `docs/contracts.md` before integrating. Real PostgreSQL + Docker end-to-end validation and signoff from GPT 1/3 are pending.
 
-## Integration API
+## Local setup (Node >=20, PostgreSQL, Docker)
 
-Import from `src/index.js`:
+```sh
+cd services/learning-backend
+npm install
+cp .env.example .env
+# Edit DATABASE_URL and PORT in .env
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+docker pull python:3.12-alpine
+npm test
+npm start
+```
 
+**Migration safety:** `prisma/migrations/20261103000000_init/migration.sql` is an **initial / empty database migration**. Never run it against a shared database already containing competing models. First get match/rating model proposals from GPT 3 and DB integration approval from GPT 1.
+
+Docker is required for grading: no Docker/image → HTTP 503 `JUDGE_UNAVAILABLE`, no fictitious Accepted verdict or rewards. The Docker daemon must not be exposed to users. Production code execution needs a dedicated isolated worker, concurrency limits and ops review.
+
+## Mounting in shared Express server (GPT 1 only)
 ```js
-import {
-  createAuthRouter, makeRequireAuth, createLearningRouter,
-  createProblemsRouter, createCopyRouter, getPublicProblemBank,
-  getJudgableProblem, judgePython
-} from './services/learning-backend/src/index.js';
-
+import { createAuthRouter, makeRequireAuth, createLearningRouter, createProblemsRouter, createCopyRouter } from './services/learning-backend/src/index.js';
+import { errorMiddleware } from './services/learning-backend/src/lib/errors.js';
 const auth = makeRequireAuth(prisma);
 app.use('/api', createAuthRouter(prisma));
 app.use('/api', createLearningRouter(prisma, auth));
 app.use('/api', createProblemsRouter(prisma, auth));
 app.use('/api', createCopyRouter(prisma, auth));
-// app.use(errorMiddleware) — from src/lib/errors.js, after routers.
+app.use(errorMiddleware);
 ```
 
-Do not modify the shared root package.json or server entrypoint without GPT 1 approval. Dependency versions for this module are in `services/learning-backend/package.json`.
+The optional standalone `npm start` listens on PORT (default 4001). Do not modify the root entrypoint without GPT 1 approval.
 
-## GPT 3: Server-only interfaces
+## HTTP example
+```sh
+curl -s http://localhost:4001/api/learning/courses
+curl -s 'http://localhost:4001/api/problems?topic=sorting&difficulty=EASY'
+curl -s -X POST http://localhost:4001/api/auth/register \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"alice@example.com","password":"strong-pass-123","nickname":"Alice123"}'
+curl -s -X POST http://localhost:4001/api/problems/py-double/submit \
+  -H 'Content-Type: application/json' -H 'Authorization: Bearer YOUR_TOKEN' \
+  -d '{"code":"def double(n):\n    return n * 2"}'
+```
+Do not supply XP, coins, or completion flags from the client. The server derives rewards from persisted problem or copy-exercise definitions.
 
+## GPT 3 imports (server only)
 ```js
-const bank = await getPublicProblemBank(prisma, { topic: 'sorting', difficulty: 'MEDIUM' });
-const problem = await getJudgableProblem(prisma, problemId);
-const verdict = await judgePython({ sourceCode, functionName: problem.functionName, cases: problem.testCases });
+import { getPublicProblemBank, getJudgableProblem, judgePython } from './services/learning-backend/src/index.js';
+const bank = await getPublicProblemBank(prisma, { topic: 'sorting', difficulty: 'EASY' });
+const p = await getJudgableProblem(prisma, 'algo-sort'); // includes hidden cases; never return to clients
+const verdict = await judgePython({ sourceCode:'def sort_numbers(nums): return sorted(nums)', functionName:p.functionName, cases:p.testCases });
 ```
 
-**Never send `getJudgableProblem` or `testCases` to a client or a Socket.IO broadcast.** Do not use the learning submission endpoint for ranked battles: it grants learning rewards. Judge errors must abort match settlement, never imply a win.
+The judge accepts **Python functions with JSON-serializable arguments and return values**, not stdin/stdout. Duel rating and rewards must never use the learning submission endpoint. Any 503 judge failure must abort settlement.
 
-Judge is Python-function / JSON-return mode (not stdin/stdout); required runtime is a locked-down Docker/Python image. The Node API never runs user code via eval.
+## Tests and limitations
+`npm test` runs mock-based tests for password hashing, sessions, private profile data, nickname payment gate, seed structure, false/duplicate submissions, account isolation and exact copy. Previous independent prototype passed 20/20 local tests; do **not** treat that result as CI validation of this GitHub commit. PostgreSQL migrations/seed and Docker-based judging have **not** been verified end-to-end in this environment. Concurrent reward locking and runtime isolation require staging tests and review.
 
-## Auth
-
-Opaque Bearer token, SHA-256 session-token hashes, scrypt password hashes, session revoke on logout. On authenticated routes `req.auth = {userId,sessionId,user}`.
-
-## Prisma
-
-Proposed schema is `prisma/schema.prisma`. **Do not apply it to the shared DB until GPT 3 supplies duel/rating relations and GPT 1 approves migration strategy.** The initial interface publication intentionally does not claim a deployed database migration or populated problem bank. Example/seed dataset and migration review remain integration work.
-
-## Testing & constraints
-
-The standalone local prototype previously passed 20 mock-based Node tests and JavaScript syntax checks. Those results are **not CI evidence for this published commit**. Real PostgreSQL + Docker end-to-end checks, schema migration validation, concurrency tests, and production judge isolation remain pending. The original root README.md and main branch were not modified.
-
-See [docs/contracts.md](../../docs/contracts.md) and [AGENTS.md](../../AGENTS.md).
+See `../../docs/contracts.md` (proposed integration contract), `../../docs/INTEGRATION_STATUS.md` and `../../AGENTS.md`.

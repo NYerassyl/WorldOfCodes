@@ -1,33 +1,46 @@
-# Week-1 learning backend integration handoff
+# Integration status — Week 1 (learning backend)
 
-Published branch: `feat/learning-backend`.
+**Branch:** `feat/learning-backend`; **PR:** #2 (draft), target `main`.
 
-## Available now
-- `AGENTS.md` — ownership / no-conflict rules.
-- `docs/contracts.md` — detailed draft Auth, Problems Bank, Judge contracts.
-- `services/learning-backend/package.json` — local dependencies; root package.json is intentionally absent/owned by GPT 1.
-- `services/learning-backend/prisma/schema.prisma` — proposed shared User / Problem / learning schema.
-- `services/learning-backend/src/index.js` — public exports of auth, learning, problems, copy and judge.
-- Auth middleware: `makeRequireAuth(prisma)` sets `req.auth.userId`.
-- Problems: `getPublicProblemBank(prisma,filters)` returns public samples only; `getJudgableProblem(prisma,id)` returns hidden cases **server-side only**.
-- Judge: `judgePython({sourceCode,functionName,cases})` returns verdict or 503 on infrastructure failure.
+## Published and ready for code review
+- `AGENTS.md` — ownership boundaries.
+- `docs/contracts.md` — **proposed**, not yet approved, Auth/Problems Bank/Judge APIs.
+- `services/learning-backend/package.json` — service-local Node/Express/Prisma dependencies; root manifest intentionally unchanged.
+- `services/learning-backend/prisma/schema.prisma` and `prisma/migrations/20261103000000_init/migration.sql` — initial account/learning PostgreSQL design, not applied to the shared DB.
+- `services/learning-backend/prisma/seed.js`, `seedData.js` — one 6-topic Python course, 12 tutorial problems, 4 algorithm problems, 3 exact-copy exercises.
+- `services/learning-backend/src/index.js` exports Auth, Learning, Problems, Copy routers, `makeRequireAuth`, `getPublicProblemBank`, `getJudgableProblem` and `judgePython`.
+- `services/learning-backend/tests` — mock-based unit tests.
 
-## Blockers / requested reviews
-1. GPT 1 must confirm root server/Express mounting, rate limits, dependencies, central error middleware and DB setup.
-2. GPT 3 must approve the function-style Python judge and propose match/rating Prisma models plus idempotency and snapshot plan.
-3. Seed/migration integration is not finalized in this branch; do not run a production DB migration.
-4. These interfaces have **not yet been signed off by all agents**. Reconcile contract changes via PR review before merging.
-5. No claimed GitHub CI, real Docker judge acceptance tests, or real PostgreSQL transactional tests.
-
-## Minimal GPT 3 example
+## GPT 3 interfaces
 ```js
-import { getJudgableProblem, judgePython } from './services/learning-backend/src/index.js';
-const p = await getJudgableProblem(prisma, 'algo-sort'); // server-only
+const publicList = await getPublicProblemBank(prisma,{topic:'sorting',difficulty:'EASY'});
+const privateProblem = await getJudgableProblem(prisma,'algo-sort'); // includes hidden cases
 const verdict = await judgePython({
-  sourceCode: 'def sort_numbers(nums): return sorted(nums)',
-  functionName: p.functionName,
-  cases: p.testCases
+ sourceCode:'def sort_numbers(nums): return sorted(nums)',
+ functionName:privateProblem.functionName,
+ cases:privateProblem.testCases
 });
-// status ACCEPTED / WRONG_ANSWER / RUNTIME_ERROR / TIME_LIMIT;
-// judge infrastructure failure throws 503, do not score as victory.
+```
+Never send hidden cases to frontend or Socket.IO. Duel must settle its own ratings and never call the learning XP-awarding submission route. Judge infra errors throw 503.
+
+## Remaining review and deployment blockers
+1. GPT 1: approve Express route base, central error middleware, auth/DB integration and root dependencies; review limits and deployment.
+2. GPT 3: approve function-style Python judge and submit match/rating Prisma model requirements, match idempotency and version snapshots.
+3. Shared database: **do not execute initial migration against a populated shared schema**; reconcile duel models first.
+4. Production: real PostgreSQL transactional/concurrency testing and Docker sandbox/worker/isolation verification not performed here.
+5. API rate limiting, abuse prevention and a persistent judge queue require integration work.
+6. PR stays a draft; merge only after approvals and CI.
+
+## Local commands
+```sh
+cd services/learning-backend
+npm install
+cp .env.example .env
+# configure DATABASE_URL; initial empty database only
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+docker pull python:3.12-alpine
+npm test
+npm start
 ```
