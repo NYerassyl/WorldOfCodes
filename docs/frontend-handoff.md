@@ -52,5 +52,8 @@ Do not enable submit until the isolated code judge is available.
 
 npm test covers one-time rewards, independent rewards, exact typing and XP thresholds.
 npm run build performs strict TypeScript checking and the production bundle build.
-Browser QA should exercise lesson unlock/retry, reload persistence, profile rename,
-algorithm filtering, typing completion, demo arena cancel/timeout, and 390px/1440px layouts.
+Browser QA is automated in tests/browser-qa.mjs. With the dev server running on port 5180
+(`npm run dev -- --port 5180`), run `node tests/browser-qa.mjs`. It drives headless Chrome
+over CDP against a cleared demo localStorage and checks lesson unlock/retry, reload
+persistence, profile rename, algorithm filtering, typing completion, demo arena
+cancel/timeout, friendly room-code validation and 390px/1440px layouts.
