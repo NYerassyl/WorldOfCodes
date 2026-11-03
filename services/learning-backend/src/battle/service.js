@@ -163,7 +163,10 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
     throw new AppError(503, 'JUDGE_UNAVAILABLE', 'Judge returned an untrusted verdict');
   }
   if (verdict.status !== 'ACCEPTED') return { ...verdict, matchCompleted: false, winnerId: null };
-  const claimed = await prisma.$transaction(async tx => {
+  let claimed = false;
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      claimed = await prisma.$transaction(async tx => {
     // The match may complete while the external judge is running.
     const current = await tx.match.findUnique({ where: { id: matchId }, include: { players: true } });
     if (!current || current.status !== 'ACTIVE' || current.type !== match.type ||
@@ -182,7 +185,12 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
       return ended.count === 1;
     }
     return false;
-  }, { isolationLevel: 'Serializable' });
+      }, { isolationLevel: 'Serializable' });
+      break;
+    } catch (error) {
+      if (error?.code !== 'P2034' || attempt === 2) throw error;
+    }
+  }
   const latest = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, winnerId: true } });
   return { ...verdict, matchCompleted: latest?.status === 'COMPLETED', winnerId: latest?.winnerId || null, settled: claimed };
 }
