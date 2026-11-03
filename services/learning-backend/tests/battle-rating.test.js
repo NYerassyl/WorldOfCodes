@@ -20,3 +20,9 @@ test('draw preserves total rating', () => {
 test('rejects invalid scores', () => {
   assert.throws(() => calculateElo(1000, 1000, 0.25), TypeError);
 });
+
+test('rejects non-finite ratings and invalid K factors', () => {
+  assert.throws(() => expectedScore(Number.NaN, 1000), TypeError);
+  assert.throws(() => calculateElo(1000, 1000, 1, 0), TypeError);
+  assert.throws(() => calculateElo(1000, Infinity, 1), TypeError);
+});
