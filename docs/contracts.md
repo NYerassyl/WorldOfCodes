@@ -2,7 +2,10 @@
 
 Status: establish the concrete schemas and payloads before parallel implementation.
 
-Proposed stack: React + TypeScript, Express, Socket.IO, Prisma + SQLite.
+Shared stack decision: React + TypeScript, Node.js + Express, Socket.IO, PostgreSQL + Prisma.
+The SQLite proposal is superseded. See [integration-decisions.md](integration-decisions.md)
+for GPT 1 decisions and the accepted route shapes. Schema approval, battle sign-off and
+real integration testing are still required before merge or migration.
 Do not scaffold conflicting stacks independently.
 
 ## Shared rules
