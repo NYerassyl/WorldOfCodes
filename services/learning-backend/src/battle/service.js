@@ -26,6 +26,15 @@ async function pickProblem(prisma) {
   return choices[Math.floor(Math.random() * choices.length)].id;
 }
 
+async function getBattleProblem(prisma, problemId) {
+  const selectedProblemId = problemId || await pickProblem(prisma);
+  const problem = await getJudgableProblem(prisma, selectedProblemId);
+  if (problem.language !== 'python' || !Array.isArray(problem.testCases) || !problem.testCases.length) {
+    throw new AppError(503, 'BATTLE_PROBLEM_UNAVAILABLE', 'Selected problem cannot be judged');
+  }
+  return selectedProblemId;
+}
+
 async function ensureRating(tx, userId) {
   return tx.rating.upsert({ where: { userId }, create: { userId }, update: {} });
 }
@@ -35,11 +44,7 @@ export async function createMatch(prisma, { userIds, type = 'RANKED', problemId 
   if (!Array.isArray(userIds) || userIds.length !== 2 || !userIds[0] || !userIds[1] || userIds[0] === userIds[1]) {
     throw new AppError(400, 'INVALID_PLAYERS', 'A battle requires two different players');
   }
-  const selectedProblemId = problemId || await pickProblem(prisma);
-  const problem = await getJudgableProblem(prisma, selectedProblemId);
-  if (problem.language !== 'python' || !problem.testCases.length) {
-    throw new AppError(503, 'BATTLE_PROBLEM_UNAVAILABLE', 'Selected problem cannot be judged');
-  }
+  const selectedProblemId = await getBattleProblem(prisma, problemId);
   return prisma.$transaction(async tx => {
     if (type === 'RANKED') await Promise.all(userIds.map(id => ensureRating(tx, id)));
     const match = await tx.match.create({ data: {
@@ -51,7 +56,7 @@ export async function createMatch(prisma, { userIds, type = 'RANKED', problemId 
 }
 
 export async function createFriendlyInvite(prisma, userId) {
-  const problemId = await pickProblem(prisma);
+  const problemId = await getBattleProblem(prisma);
   const inviteCode = randomBytes(6).toString('base64url').toUpperCase();
   const match = await prisma.$transaction(async tx => {
     const created = await tx.match.create({ data: { type: 'FRIENDLY', status: 'PENDING', problemId, startedAt: null,
@@ -74,7 +79,15 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
         where: { inviteCode: inviteCode.trim().toUpperCase() },
         include: { match: { include: { players: true } } }
       });
-      if (!invite || invite.expiresAt <= new Date()) {
+      if (!invite) {
+        throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
+      }
+      if (invite.expiresAt <= new Date()) {
+        await tx.match.updateMany({
+          where: { id: invite.matchId, type: 'FRIENDLY', status: 'PENDING' },
+          data: { status: 'EXPIRED', completedAt: new Date() }
+        });
+        await tx.friendBattle.delete({ where: { id: invite.id } });
         throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
       }
       if (invite.createdById === userId) {
@@ -137,10 +150,11 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
   const match = await prisma.match.findFirst({ where: { id: matchId, status: 'ACTIVE', players: { some: { userId } } }, include: { players: true } });
   if (!match) throw new AppError(404, 'ACTIVE_MATCH_NOT_FOUND', 'Active battle not found');
   if (match.players.length !== 2) throw new AppError(409, 'MATCH_NOT_READY', 'Battle is waiting for the second player');
-    const player = match.players.find(p => p.userId === userId);
+  const player = match.players.find(p => p.userId === userId);
+  if (!player) throw new AppError(404, 'ACTIVE_MATCH_NOT_FOUND', 'Active battle not found');
   if (player.submittedAt) throw new AppError(409, 'ALREADY_SOLVED', 'You have already submitted an accepted solution');
   const problem = await getJudgableProblem(prisma, match.problemId);
-  if (problem.language !== 'python') throw new AppError(503, 'JUDGE_UNAVAILABLE', 'No judge for this language');
+  if (problem.language !== 'python' || !Array.isArray(problem.testCases) || !problem.testCases.length) throw new AppError(503, 'JUDGE_UNAVAILABLE', 'No usable judge is available for this problem');
   // Judge failures propagate. They never become a win or a stored ACCEPTED verdict.
   const verdict = await judge({ sourceCode, functionName: problem.functionName, cases: problem.testCases });
   if (!['ACCEPTED', 'WRONG_ANSWER', 'RUNTIME_ERROR', 'TIME_LIMIT'].includes(verdict?.status)) {
