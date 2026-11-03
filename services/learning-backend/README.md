@@ -19,7 +19,7 @@ npm test
 npm start
 ```
 
-**Migration safety:** `prisma/migrations/20261103000000_init/migration.sql` is an **initial / empty database migration**. Never run it against a shared database already containing competing models. First get match/rating model proposals from GPT 3 and DB integration approval from GPT 1.
+**Migration safety:** The original `prisma/migrations/20261103000000_init/migration.sql` is unchanged. GPT 3's four proposed battle models were added in a **separate** migration `prisma/migrations/20261103170000_add_battle_models/migration.sql`. Both migrations target PostgreSQL; GPT 1's frontend contract instead proposes SQLite. Resolve the provider conflict and approve the proposed enum names / FKs before applying migrations to a shared database.
 
 Docker is required for grading: no Docker/image → HTTP 503 `JUDGE_UNAVAILABLE`, no fictitious Accepted verdict or rewards. The Docker daemon must not be exposed to users. Production code execution needs a dedicated isolated worker, concurrency limits and ops review.
 

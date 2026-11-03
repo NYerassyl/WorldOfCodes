@@ -5,7 +5,7 @@
 ## Shared stack boundary
 - Learning module: Node.js >=20, Express 4, Prisma 6/PostgreSQL, Python function judge via Docker.
 - Root `package.json`, lockfile, shared server entrypoint are owned by GPT 1. The working dependency manifest is `services/learning-backend/package.json`; it is not an agreed root manifest.
-- Learning Prisma schema: `services/learning-backend/prisma/schema.prisma`. GPT 3 must propose additional match/rating models **before a shared schema migration is merged**.
+- Learning Prisma schema: `services/learning-backend/prisma/schema.prisma`. GPT 3 provided the four battle model shapes; GPT 2 has prepared their relationships and a separate additive PostgreSQL migration. Enum values and DB provider remain subject to GPT 3 / GPT 1 approval.
 
 ## Authentication and account interface (GPT 2 → GPT 1 / GPT 3)
 - Middleware factory: `makeRequireAuth(prisma)` from `services/learning-backend/src/index.js`; on success writes `req.auth = { userId, sessionId, user }`.
@@ -56,10 +56,32 @@ const verdict = await judgePython({
 - Progress and rewards use transactions + unique DB constraints for replay protection.
 
 ## Prisma models owned by GPT 2
-`User`, `AuthSession`, `Course`, `Topic`, `Lesson`, `Problem`, `TestCase`, `Submission`, `ProblemCompletion`, `LessonProgress`, `CopyExercise`, `CopyAttempt`, `CopyCompletion`, `RewardLedger`. GPT 3's match and ranking models are **not yet included**; propose relationships and unique constraints first.
+`User`, `AuthSession`, `Course`, `Topic`, `Lesson`, `Problem`, `TestCase`, `Submission`, `ProblemCompletion`, `LessonProgress`, `CopyExercise`, `CopyAttempt`, `CopyCompletion`, `RewardLedger`, plus the proposed GPT 3 models `Match`, `MatchPlayer`, `Rating`, `FriendBattle`. GPT 3 owns battle logic.
 
 ## Open approvals / blockers
 1. GPT 1: global route prefix, auth token handling, central error middleware, root dependencies and DB deployment, XP level rules.
-2. GPT 3: Python-function judge shape, queue/concurrency/fairness, match snapshotting, match/rating Prisma models.
+2. GPT 3: confirm function-style Python Judge, match snapshots/locking, and proposed MatchType/MatchStatus enums, nullable verdict/rating fields and FK deletion policies. The four model structures have been staged.
 3. Infrastructure: Docker runtime with pre-pulled trusted Python image, PostgreSQL migration/seed, production isolation and rate limits.
 4. No real duel endpoints, payment or AI integration are committed by GPT 2.
+
+## Battle Prisma schema proposal — GPT 3 review required
+
+Model design from GPT 3's supplied request, implemented in `services/learning-backend/prisma/schema.prisma`. The **additive PostgreSQL migration** `prisma/migrations/20261103170000_add_battle_models/migration.sql` follows the untouched `20261103000000_init`.
+
+| Model | Primary/unique keys | Relationships and fields |
+| --- | --- | --- |
+| `Match` | `id String @id @default(uuid())` | Required `problemId → Problem.id`, optional `winnerId → User.id`, `type MatchType`, `status MatchStatus @default(PENDING)`, optional `startedAt/completedAt`, `players`, optional `friendBattle` |
+| `MatchPlayer` | `@@id([matchId, userId])`, `@@unique([matchId, seat])` | Required refs to Match/User, `seat Int`, nullable `submittedAt`, `verdict SubmissionStatus?`, `ratingBefore/ratingDelta Int?` |
+| `Rating` | `userId String @id` | User 1:1; `points Int @default(1000)`, `wins/losses/draws Int @default(0)`, `updatedAt @updatedAt` |
+| `FriendBattle` | `id String @id @default(uuid())`, unique `matchId`, unique `inviteCode` | Required `matchId → Match.id`, `createdById → User.id`; required `expiresAt`, `createdAt @default(now())` |
+
+**Enums proposed, NOT yet verified against GPT 3 runtime code:**
+- `MatchType: RANKED | FRIENDLY`
+- `MatchStatus: PENDING | ACTIVE | COMPLETED | CANCELLED | EXPIRED`
+- `MatchPlayer.verdict` reuses nullable `SubmissionStatus: ACCEPTED | WRONG_ANSWER | RUNTIME_ERROR | TIME_LIMIT`. Judge infrastructure failure (503) must never be treated as a valid verdict.
+
+**Foreign keys:** Match→Problem RESTRICT, Match→winner User SET NULL, MatchPlayer→Match CASCADE and →User RESTRICT, Rating→User CASCADE, FriendBattle→Match CASCADE and →creator User RESTRICT. Confirm these deletion policies with GPT 3.
+
+**Service invariants not guaranteed by these FKs:** winner must be a MatchPlayer, FRIENDLY-only FriendBattle, seat range/1v1 capacity, invites expiration, only ranked matches update Rating, and idempotent/transactional settlement; GPT 3 must enforce these. MatchPlayer nullable rating fields allow no rating changes for FRIENDLY.
+
+**Stack conflict:** `feat/frontend/docs/contracts.md` proposes **Prisma + SQLite** while `feat/learning-backend` uses **Prisma + PostgreSQL**. These migration files are PostgreSQL-only. GPT 1 must choose the shared provider and approve a unified migration before applying it. The GPT 3 battle branch was not accessible among current branches, so precise enum values cannot be verified against its runtime code.

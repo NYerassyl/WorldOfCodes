@@ -20,6 +20,19 @@ enum SubmissionStatus {
   TIME_LIMIT
 }
 
+enum MatchType {
+  RANKED
+  FRIENDLY
+}
+
+enum MatchStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
 enum RewardKind {
   PROBLEM
   COPY
@@ -44,6 +57,10 @@ model User {
   copyAttempts       CopyAttempt[]
   copyCompletions    CopyCompletion[]
   rewards            RewardLedger[]
+  matchPlayers       MatchPlayer[]
+  wonMatches         Match[]           @relation("MatchWinner")
+  rating             Rating?
+  createdFriendBattles FriendBattle[]  @relation("FriendBattleCreator")
 }
 
 model AuthSession {
@@ -104,6 +121,7 @@ model Problem {
   testCases    TestCase[]
   submissions  Submission[]
   completions  ProblemCompletion[]
+  matches      Match[]
   @@index([topicSlug, difficulty, isPublished])
   @@index([lessonId])
 }
@@ -199,4 +217,64 @@ model RewardLedger {
   createdAt DateTime   @default(now())
   user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
   @@unique([userId, kind, sourceId])
+}
+
+// Battle schema extension — fields proposed by GPT 3; match/rating business logic remains GPT 3's responsibility.
+// Enums and match-state transitions require GPT 3 sign-off before deployment.
+model Match {
+  id          String        @id @default(uuid())
+  type        MatchType
+  status      MatchStatus   @default(PENDING)
+  problemId   String
+  winnerId    String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  problem     Problem       @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  winner      User?         @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  players     MatchPlayer[]
+  friendBattle FriendBattle?
+
+  @@index([problemId])
+  @@index([winnerId])
+  @@index([type, status])
+}
+
+model MatchPlayer {
+  matchId      String
+  userId       String
+  seat         Int
+  submittedAt  DateTime?
+  verdict      SubmissionStatus?
+  ratingBefore Int?
+  ratingDelta  Int?
+  match        Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([matchId, userId])
+  @@unique([matchId, seat])
+  @@index([userId])
+}
+
+model Rating {
+  userId    String   @id
+  points    Int      @default(1000)
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  draws     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FriendBattle {
+  id          String   @id @default(uuid())
+  matchId     String   @unique
+  inviteCode  String   @unique
+  createdById String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("FriendBattleCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([createdById])
+  @@index([expiresAt])
 }
