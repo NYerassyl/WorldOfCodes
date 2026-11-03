@@ -192,6 +192,9 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
     }
   }
   const latest = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, winnerId: true } });
+  if (!claimed && latest?.status === 'ACTIVE') {
+    throw new AppError(409, 'SUBMISSION_ALREADY_PROCESSED', 'Another accepted submission was processed first');
+  }
   return { ...verdict, matchCompleted: latest?.status === 'COMPLETED', winnerId: latest?.winnerId || null, settled: claimed };
 }
 
