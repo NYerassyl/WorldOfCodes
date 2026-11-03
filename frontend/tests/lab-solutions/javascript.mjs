@@ -1,42 +1,100 @@
 export const solutions = {
-  "js-basics-lab": `function greet(name) {
-  return \`Hello, \${name}!\`;
+  "js-basics-lab": `const name = require("node:fs").readFileSync(0, "utf8").trim();
+
+function greet(who) {
+  return \`Hello, \${who}!\`;
 }
 
-console.log(greet("Ada"));`,
-  "js-control-lab": `let result = "";
-for (let n = 1; n <= 10; n++) {
+console.log(greet(name));`,
+  "js-control-lab": `const limit = Number(require("node:fs").readFileSync(0, "utf8").trim());
+
+const evens = [];
+for (let n = 1; n <= limit; n++) {
   if (n % 2 === 0) {
-    result += n + " ";
+    evens.push(n);
   }
 }
 
-console.log(result.trim());`,
-  "js-functions-lab": `function area(width, height) {
-  return width * height;
+console.log(evens.join(" "));`,
+  "js-functions-lab": `const [width, height] = require("node:fs")
+  .readFileSync(0, "utf8")
+  .trim()
+  .split(/\\s+/)
+  .map(Number);
+
+function area(w, h) {
+  return w * h;
 }
 
-console.log(area(4, 5));`,
-  "js-dom-lab": `const note = document.querySelector("#note");
+console.log(area(width, height));`,
+  "js-dom-lab": `const events = require("node:fs")
+  .readFileSync(0, "utf8")
+  .split("\\n")
+  .map((line) => line.trim())
+  .filter(Boolean);
+
+const note = {
+  textContent: "Todo",
+  classList: new Set(),
+  handler: null,
+  addEventListener(event, handler) {
+    if (event === "click") {
+      this.handler = handler;
+    }
+  },
+  click() {
+    if (this.handler) {
+      this.handler();
+    }
+  },
+};
 
 note.addEventListener("click", () => {
-  note.classList.toggle("done");
-  note.textContent = note.classList.contains("done") ? "Done" : "Todo";
-});`,
-  "js-async-lab": `const url = "/api/user";
+  if (note.classList.has("done")) {
+    note.classList.delete("done");
+    note.textContent = "Todo";
+  } else {
+    note.classList.add("done");
+    note.textContent = "Done";
+  }
+});
 
-async function loadUser() {
+for (const event of events) {
+  if (event === "click") {
+    note.click();
+  }
+}
+
+console.log(note.textContent);
+console.log(note.classList.has("done") ? "done" : "not done");`,
+  "js-async-lab": `const users = {
+  "/api/ada": { name: "Ada" },
+  "/api/grace": { name: "Grace" },
+};
+
+function fetchUser(url) {
+  return new Promise((resolve, reject) => {
+    setTimeout(() => {
+      if (users[url]) {
+        resolve({ ok: true, json: () => Promise.resolve(users[url]) });
+      } else {
+        reject(new Error("unknown user"));
+      }
+    }, 0);
+  });
+}
+
+const url = require("node:fs").readFileSync(0, "utf8").trim();
+
+async function loadUser(target) {
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Request failed with " + response.status);
-    }
-    const data = await response.json();
-    console.log(data.name);
+    const response = await fetchUser(target);
+    const user = await response.json();
+    console.log(user.name);
   } catch (error) {
     console.log("Could not load user:", error.message);
   }
 }
 
-loadUser();`,
+loadUser(url);`,
 };

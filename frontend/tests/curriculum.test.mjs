@@ -123,7 +123,9 @@ test("every lesson has expanded lecture material", () => {
   }
 });
 
-test("every lesson has a code lab with structural checks", () => {
+const runLanguages = new Set(["python", "javascript", "java", "cpp"]);
+
+test("every lab has executable tests", () => {
   for (const { language, lesson, lab } of allLabs) {
     const label = `${language.id}/${lesson.id}`;
     assert.ok(lab, `${label} lab`);
@@ -134,20 +136,63 @@ test("every lesson has a code lab with structural checks", () => {
     assert.ok(lab.starter.trim(), `${label} lab starter`);
     assert.ok(lab.hint.trim(), `${label} lab hint`);
     assert.ok(lab.explanation.trim(), `${label} lab explanation`);
-    assert.ok(
-      lab.checks.length >= 3 && lab.checks.length <= 5,
-      `${label} lab check count`,
-    );
-    for (const check of lab.checks) {
-      assert.ok(check.label.trim(), `${label} check label`);
-      assert.equal(typeof check.test, "function", `${label} check test`);
+    assert.ok(!("checks" in lab), `${label} must not keep regex checks`);
+
+    if (runLanguages.has(language.id)) {
+      assert.ok(Array.isArray(lab.tests), `${label} tests`);
+      assert.ok(
+        lab.tests.length >= 1 && lab.tests.length <= 2,
+        `${label} run test count`,
+      );
+      assert.ok(!lab.renderChecks, `${label} must not mix render checks`);
+      const labels = new Set();
+      for (const runTest of lab.tests) {
+        assert.ok(runTest.label.trim(), `${label} test label`);
+        assert.ok(!labels.has(runTest.label), `${label} duplicate test label`);
+        labels.add(runTest.label);
+        assert.equal(typeof runTest.stdin, "string", `${label} test stdin`);
+        assert.ok(
+          typeof runTest.expectedStdout === "string" &&
+            runTest.expectedStdout.trim(),
+          `${label} test expectedStdout`,
+        );
+      }
+    } else {
+      assert.ok(Array.isArray(lab.renderChecks), `${label} render checks`);
+      assert.ok(
+        lab.renderChecks.length >= 4 && lab.renderChecks.length <= 6,
+        `${label} render check count`,
+      );
+      assert.ok(!lab.tests, `${label} must not mix run tests`);
+      if (language.id === "css") {
+        assert.ok(lab.fixture?.trim(), `${label} css fixture`);
+      }
+      const labels = new Set();
+      for (const check of lab.renderChecks) {
+        assert.ok(check.label.trim(), `${label} check label`);
+        assert.ok(!labels.has(check.label), `${label} duplicate check label`);
+        labels.add(check.label);
+        assert.ok(check.selector.trim(), `${label} check selector`);
+        assert.notEqual(check.count, 0, `${label} cannot assert count 0`);
+        if (check.style) {
+          assert.ok(check.style.property.trim(), `${label} style property`);
+          assert.ok(check.style.value.trim(), `${label} style value`);
+        }
+        if (check.viewport !== undefined) {
+          assert.ok(
+            Number.isInteger(check.viewport) && check.viewport > 0,
+            `${label} check viewport`,
+          );
+        }
+      }
     }
   }
   const labIds = allLabs.map(({ lab }) => lab.id);
   assert.equal(new Set(labIds).size, labIds.length, "lab ids must be unique");
 });
 
-test("reference solutions pass every lab check", () => {
+test("every lab has a reference solution and no stale demo wording", () => {
+  const solutionIds = new Set();
   for (const { language, lesson, lab } of allLabs) {
     const label = `${language.id}/${lesson.id}`;
     const solutions = solutionModules[language.id]?.solutions;
@@ -157,25 +202,20 @@ test("reference solutions pass every lab check", () => {
       typeof solution === "string" && solution.trim(),
       `${label} solution`,
     );
-    const results = curriculum.runLabChecks(lab, solution);
-    assert.deepEqual(
-      results.filter((result) => !result.pass).map((result) => result.label),
-      [],
-      `${label} failing checks`,
-    );
+    assert.notEqual(solution, lab.starter, `${label} solution equals starter`);
+    solutionIds.add(lab.id);
   }
-});
-
-test("starter code and empty input do not already pass", () => {
-  for (const { language, lesson, lab } of allLabs) {
-    const label = `${language.id}/${lesson.id}`;
-    assert.ok(
-      curriculum.runLabChecks(lab, "").some((result) => !result.pass),
-      `${label} empty code passes`,
+  for (const [languageId, module] of Object.entries(solutionModules)) {
+    for (const id of Object.keys(module.solutions)) {
+      assert.ok(solutionIds.has(id), `${languageId} stale solution ${id}`);
+    }
+  }
+  for (const { lesson, lab } of allLabs) {
+    const labText = [lab.brief, lab.hint, lab.explanation].join("\n");
+    assert.doesNotMatch(
+      labText,
+      /structure check|not executed|nothing is sent/i,
     );
-    assert.ok(
-      curriculum.runLabChecks(lab, lab.starter).some((result) => !result.pass),
-      `${label} starter passes`,
-    );
+    assert.ok(lesson.lab);
   }
 });

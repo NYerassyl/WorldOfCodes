@@ -367,37 +367,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "js-basics-lab",
       title: "Write a greet helper",
       brief:
-        "In basics.js, declare a function named greet that accepts one parameter, a name. It must return a welcome sentence that includes that name rather than printing it. Then call greet with a name and print the returned value with console.log. The check inspects the structure of your code only.",
+        "In basics.js, read the name from stdin (one line), declare a function named greet that accepts that name as a parameter and returns a sentence in exactly this form: Hello, Ada! with a comma and an exclamation mark and no extra spaces. Then call greet and print the returned value with console.log. Your file really runs, twice, with two different names, and the printed output is compared line by line, so the sentence must be built from the input instead of being written out by hand.",
       file: "basics.js",
       starter:
-        '// TODO: write greet(name) that returns a welcome sentence.\n// Then print the result of calling it with console.log.\nconst name = "Ada";',
-      checks: [
+        '// Read the name from stdin (one line).\nconst name = require("node:fs").readFileSync(0, "utf8").trim();\n\n// TODO: write greet(name) that returns a sentence like Hello, Ada!\n// Then print the value that greet returns with console.log.',
+      tests: [
         {
-          label: "Declares a function named greet",
-          test: (code) =>
-            /function\s+greet\s*\(|(?:const|let|var)\s+greet\s*=\s*(?:function\s*)?\(?\s*[A-Za-z_$]/.test(
-              code,
-            ),
+          label: "Greets Ada",
+          stdin: "Ada\n",
+          expectedStdout: "Hello, Ada!",
         },
         {
-          label: "Accepts a name parameter",
-          test: (code) =>
-            /function\s+greet\s*\(\s*[A-Za-z_$][\w$]*\s*\)|(?:const|let|var)\s+greet\s*=\s*(?:function\s*)?\(?\s*[A-Za-z_$][\w$]*\s*\)?\s*(?:=>|\{)/.test(
-              code,
-            ),
-        },
-        {
-          label: "Returns a string greeting",
-          test: (code) => /return\s+[`"']/.test(code),
-        },
-        {
-          label: "Calls greet inside console.log",
-          test: (code) => /console\.log\s*\(\s*greet\s*\(/.test(code),
+          label: "Greets Grace",
+          stdin: "Grace\n",
+          expectedStdout: "Hello, Grace!",
         },
       ],
-      hint: "Return the sentence from the function, then wrap the call in console.log so the value becomes visible.",
+      hint: "Return the sentence from the function, then wrap the call in console.log so the value becomes visible. A template literal keeps the name inside a readable phrase instead of gluing pieces together with +.",
       explanation:
-        "A function that returns text can be reused in many places, while console.log is only about showing a value once. Building the sentence with a template literal keeps the name inside a readable phrase, and calling the function inside console.log both runs it and displays the result.",
+        "A function that returns text can be reused in many places, while console.log only shows a value once. Building the sentence with a template literal keeps the name inside a readable phrase, and calling the function inside console.log both runs it and displays the result. The runner executes your file once per input, so a hard-coded name passes no test while a sentence built from the parameter passes both.",
     },
   },
   "js-control": {
@@ -437,31 +425,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "js-control-lab",
       title: "Collect the even numbers",
       brief:
-        "In control.js, loop from 1 to 10 and build one string that contains only the even numbers, separated by spaces. Use a condition inside the loop to decide what to add to the result. Print the finished string with console.log once the loop has ended. The check reads structure, not output.",
+        "In control.js, read a whole number from stdin. Loop from 1 up to that number inclusive and build one string that contains only the even numbers, separated by single spaces and with no space before or after the list. Use a condition inside the loop to decide what to add, then print the finished string with console.log once the loop has ended. Your program is executed with two different limits and both outputs must match exactly.",
       file: "control.js",
       starter:
-        '// TODO: loop from 1 to 10, keep the even numbers and build one result string.\n// Then print the finished string with console.log.\nlet result = "";',
-      checks: [
+        '// Read the upper limit from stdin.\nconst limit = Number(require("node:fs").readFileSync(0, "utf8").trim());\n\n// TODO: loop from 1 to limit, keep only the even numbers in one result string\n// separated by single spaces, then print it with console.log.\nlet result = "";',
+      tests: [
         {
-          label: "Uses a for or while loop",
-          test: (code) => /\bfor\s*\(|\bwhile\s*\(/.test(code),
+          label: "Even numbers up to 10",
+          stdin: "10\n",
+          expectedStdout: "2 4 6 8 10",
         },
         {
-          label: "Checks a condition inside the loop",
-          test: (code) => /if\s*\(/.test(code),
-        },
-        {
-          label: "Builds the result with +=",
-          test: (code) => /\w+\s*\+=/.test(code),
-        },
-        {
-          label: "Prints the result with console.log",
-          test: (code) => /console\.log\s*\(/.test(code),
+          label: "Even numbers up to 7",
+          stdin: "7\n",
+          expectedStdout: "2 4 6",
         },
       ],
-      hint: "Decide the numbers with the remainder operator, and remember that the result string has to exist before the loop starts.",
+      hint: "Decide the numbers with the remainder operator, and remember that the result string has to exist before the loop starts. Appending a space after every number leaves a trailing space, so push the numbers into an array and join them with a single space at the end, or trim the result.",
       explanation:
-        "An accumulator declared before the loop keeps every accepted value in one place, so the result is complete when the loop ends. Checking the remainder with the modulus operator separates even numbers from odd ones without hard-coding a list, and printing after the loop shows the whole result rather than each step.",
+        "An accumulator declared before the loop keeps every accepted value in one place, so the result is complete when the loop ends. Checking the remainder with the modulus operator separates even numbers from odd ones without hard-coding a list, and printing after the loop shows the whole result rather than each step. Because the limit is read from stdin and the program is run twice, the loop has to use that number instead of a fixed 10.",
     },
   },
   "js-functions": {
@@ -502,42 +484,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "js-functions-lab",
       title: "Return the area",
       brief:
-        "In functions.js, write a function named area that takes two parameters, width and height, and returns their product. Call it with two numbers and print the returned value with console.log. The function itself must return the result rather than printing it. The check inspects structure only.",
+        "In functions.js, read two whole numbers from stdin on one line, separated by a space. Write a function named area that takes width and height and returns their product; the function must return the value and must not print anything itself. Call area with the two numbers you read and print the returned value with console.log. The file runs twice with different pairs of numbers, and the printed number must be exact, so the result has to be calculated.",
       file: "functions.js",
       starter:
-        '// TODO: write a function named area that takes width and height and returns their product.\n// Then call area with two numbers and print the result with console.log.\nconst unit = "cm";',
-      checks: [
+        '// Read two numbers from stdin, for example "4 5".\nconst [width, height] = require("node:fs")\n  .readFileSync(0, "utf8")\n  .trim()\n  .split(/\\s+/)\n  .map(Number);\n\n// TODO: write a function named area that returns width * height.\n// Then print area(width, height) with console.log.',
+      tests: [
         {
-          label: "Declares a function named area",
-          test: (code) =>
-            /function\s+area\s*\(|(?:const|let|var)\s+area\s*=\s*(?:function\s*)?\(/.test(
-              code,
-            ),
+          label: "Rectangle 4 by 5",
+          stdin: "4 5\n",
+          expectedStdout: "20",
         },
         {
-          label: "Takes two parameters",
-          test: (code) =>
-            /function\s+area\s*\(\s*[A-Za-z_$][\w$]*\s*,\s*[A-Za-z_$][\w$]*\s*\)|area\s*=\s*(?:function\s*)?\(?\s*[A-Za-z_$][\w$]*\s*,\s*[A-Za-z_$][\w$]*/.test(
-              code,
-            ),
-        },
-        {
-          label: "Returns the product of the parameters",
-          test: (code) =>
-            /return\s+[A-Za-z_$][\w$]*\s*\*\s*[A-Za-z_$][\w$]*/.test(code),
-        },
-        {
-          label: "Calls area with two numbers",
-          test: (code) => /\barea\s*\(\s*\d+\s*,\s*\d+\s*\)/.test(code),
-        },
-        {
-          label: "Logs the returned value",
-          test: (code) => /console\.log\s*\(/.test(code),
+          label: "Rectangle 7 by 3",
+          stdin: "7 3\n",
+          expectedStdout: "21",
         },
       ],
-      hint: "Keep the multiplication inside the function and return it, then let the console.log at the call site show the number.",
+      hint: "Keep the multiplication inside the function and return it, then let the console.log at the call site show the number. Use the two values you read from stdin as the arguments so the same file works for any rectangle.",
       explanation:
-        "Returning a value makes the function usable in expressions, tests and other functions, while printing locks the result to one place. Parameters keep the calculation general, so the same function handles any rectangle instead of one fixed pair of numbers.",
+        "Returning a value makes the function usable in expressions, tests and other functions, while printing locks the result to one place. Parameters keep the calculation general, so the same function handles any rectangle instead of one fixed pair of numbers. That is exactly what the two runs check: the number printed has to come from the arguments, not from a constant baked into the file.",
     },
   },
   "js-dom": {
@@ -578,35 +543,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "js-dom-lab",
       title: "Toggle a note",
       brief:
-        "In dom.js, select the element with the id note and add a click listener to it. Inside the listener, toggle a class named done on that same element, or update its textContent when it is clicked. The check inspects structure only, so no browser is needed.",
+        'Node has no document, so in dom.js you model the part of the DOM this lesson is about with a plain object. Build a note object with textContent starting as Todo, a classList held in a Set, an addEventListener("click", handler) method that remembers the handler, and a click() method that runs the remembered handler. The handler toggles a class named done and sets textContent to Done when the class is present, otherwise back to Todo. Read stdin as a list of click events, one per line, dispatch one click for each line, then print two lines: the final textContent, and then done when the class is present or not done when it is not. The file runs twice with a different number of clicks, so the state has to be updated by the handler instead of printed once.',
       file: "dom.js",
       starter:
-        '// TODO: select the element with id "note".\n// Add a click listener that toggles the "done" class on it.\nconst note = document.querySelector("#note");',
-      checks: [
+        '// Read the click events from stdin, one per line.\nconst events = require("node:fs")\n  .readFileSync(0, "utf8")\n  .split("\\n")\n  .map((line) => line.trim())\n  .filter(Boolean);\n\n// TODO: build the note object described in the brief: textContent, a classList Set,\n// addEventListener("click", handler) and click().\n// Dispatch one click per line in events, then print the final textContent\n// and then done or not done on the next line.',
+      tests: [
         {
-          label: "Selects an element from the document",
-          test: (code) =>
-            /document\.(?:querySelector|querySelectorAll|getElementById)\s*\(/.test(
-              code,
-            ),
+          label: "One click",
+          stdin: "click\n",
+          expectedStdout: "Done\ndone",
         },
         {
-          label: "Uses addEventListener",
-          test: (code) => /addEventListener\s*\(\s*["']click["']/.test(code),
-        },
-        {
-          label: "Passes a function or arrow callback",
-          test: (code) => /=>|function\s*\(/.test(code),
-        },
-        {
-          label: "Toggles a class or updates text",
-          test: (code) =>
-            /classList\.(?:toggle|add|remove)\s*\(|textContent\s*=/.test(code),
+          label: "Four clicks",
+          stdin: "click\nclick\nclick\nclick\n",
+          expectedStdout: "Todo\nnot done",
         },
       ],
-      hint: "The listener needs a function as its second argument, and the element you selected can be reused inside that function.",
+      hint: "The listener needs a function as its second argument and is stored for later, so click() decides when it runs. The element you created can be reused inside that function, which is what lets each click flip the same state back and forth.",
       explanation:
-        "A listener is registered once and runs on each click, so the same handler can flip the class back and forth. Keeping the visual change in a class means CSS owns the appearance, while the JavaScript only decides which state the element is in.",
+        "A listener is registered once and runs on each click, so the same handler can flip the class back and forth. Keeping the visual change in a class means CSS owns the appearance, while the JavaScript only decides which state the element is in. Toggling rather than adding explains why an even number of clicks ends where the note started, and why the program prints a different result for each run.",
     },
   },
   "js-async": {
@@ -647,38 +602,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "js-async-lab",
       title: "Load a user safely",
       brief:
-        "In async.js, write an async function named loadUser that awaits fetch for the given url, parses the response with json and prints the name field. Wrap the work in try/catch so a failure logs a message instead of crashing. Call loadUser at the end of the file. The check reads structure only.",
+        'In async.js the starter already provides fetchUser, a promise-based stand-in for fetch that resolves with a response whose json() method returns another promise, and rejects with Error("unknown user") for a url it does not know. Read a url from stdin, then write an async function named loadUser that awaits fetchUser(url), awaits the parsed body, and prints the name field. Wrap the work in try/catch so a failure prints Could not load user: followed by the error message, for example Could not load user: unknown user. Call loadUser(url) at the end. The file runs twice, once with a known url and once with an unknown one, and both outputs are compared exactly.',
       file: "async.js",
       starter:
-        '// TODO: write an async function called loadUser that awaits fetch, parses JSON and logs the name.\n// Wrap the work in try/catch so a failure is handled.\nconst url = "/api/user";',
-      checks: [
+        '// A stand-in for fetch so this lab runs without a network.\nconst users = {\n  "/api/ada": { name: "Ada" },\n  "/api/grace": { name: "Grace" },\n};\n\nfunction fetchUser(url) {\n  return new Promise((resolve, reject) => {\n    setTimeout(() => {\n      if (users[url]) {\n        resolve({ ok: true, json: () => Promise.resolve(users[url]) });\n      } else {\n        reject(new Error("unknown user"));\n      }\n    }, 0);\n  });\n}\n\n// Read the url from stdin (one line).\nconst url = require("node:fs").readFileSync(0, "utf8").trim();\n\n// TODO: write an async function loadUser(url) that awaits fetchUser(url),\n// reads the body with await response.json() and prints the name field.\n// Wrap the work in try/catch so a failure prints Could not load user: <message>.\n// Then call loadUser(url).',
+      tests: [
         {
-          label: "Declares an async function",
-          test: (code) =>
-            /async\s+function\s+\w+|(?:const|let|var)\s+\w+\s*=\s*async\s*\(/.test(
-              code,
-            ),
+          label: "Known user",
+          stdin: "/api/ada\n",
+          expectedStdout: "Ada",
         },
         {
-          label: "Waits for a promise with await",
-          test: (code) => /\bawait\s+/.test(code),
-        },
-        {
-          label: "Handles errors with try and catch",
-          test: (code) => /try\s*\{[\s\S]*catch\s*\(/.test(code),
-        },
-        {
-          label: "Parses the body with json()",
-          test: (code) => /\.json\s*\(\s*\)/.test(code),
-        },
-        {
-          label: "Calls loadUser at the top level",
-          test: (code) => /\n\s*loadUser\s*\(\s*\)\s*;/.test(code),
+          label: "Unknown user",
+          stdin: "/api/nobody\n",
+          expectedStdout: "Could not load user: unknown user",
         },
       ],
-      hint: "Every promise needs its own await, and the error-prone lines belong inside the try block so the catch can see their failures.",
+      hint: "Every promise needs its own await, so the response and the parsed body are two separate waits. Put both lines inside the try block, because a rejection skips straight to catch, and log the message from the error object.",
       explanation:
-        "await unwraps one promise at a time, so the response and the parsed body are two separate waits. A try/catch around both turns a network failure or a malformed body into a handled message, which keeps the rest of the page working instead of leaving an unhandled rejection.",
+        "await unwraps one promise at a time, so the response and the parsed body are two separate waits. A try/catch around both turns a rejected request or a malformed body into a handled message, which keeps the rest of the program working instead of leaving an unhandled rejection. The second run rejects on purpose, which is why only a real try/catch can produce the expected line.",
     },
   },
 };

@@ -371,38 +371,38 @@ export const extras: Record<string, LessonExtras> = {
       id: "html-basics-lab",
       title: "Draft a short introduction",
       brief:
-        "Write a small page in page.html that introduces you. It needs an h1 with your name, at least one paragraph of text, a link whose href points somewhere real, and an unordered list with at least two items. This is a structure check on the markup you type, so every element needs both an opening and a closing tag.",
+        "Write a small page in page.html that introduces you. It needs an h1 with your name, at least one paragraph of text, a link whose href points somewhere real, and an unordered list with at least two items. The page is rendered in a sandboxed preview and inspected as a real DOM, so every element needs both an opening and a closing tag.",
       file: "page.html",
       starter: `<!-- TODO: add an h1, a paragraph, a link and a list -->
 <h1></h1>
 `,
-      checks: [
+      renderChecks: [
         {
-          label: "Contains an h1 heading with text",
-          test: (code) => /<h1\b[^>]*>[\s\S]*?\S[\s\S]*?<\/h1>/i.test(code),
+          label: "Renders one h1 heading for the page title",
+          selector: "h1",
+          count: 1,
         },
         {
-          label: "Contains a paragraph with text",
-          test: (code) => /<p\b[^>]*>[\s\S]*?\S[\s\S]*?<\/p>/i.test(code),
+          label: "Renders a paragraph of text",
+          selector: "p",
         },
         {
-          label: "Contains a link with an href attribute",
-          test: (code) =>
-            /<a\b[^>]*\bhref\s*=\s*["'][^"']+["'][^>]*>[\s\S]*?<\/a>/i.test(
-              code,
-            ),
+          label: "The link carries an href destination",
+          selector: "a[href]",
+          attribute: "href",
         },
         {
-          label: "Contains an unordered list with two or more items",
-          test: (code) =>
-            /<ul\b[^>]*>[\s\S]*?<li\b[^>]*>[\s\S]*?<\/li>[\s\S]*?<li\b[^>]*>[\s\S]*?<\/li>[\s\S]*?<\/ul>/i.test(
-              code,
-            ),
+          label: "List items sit directly inside the unordered list",
+          selector: "ul > li",
+        },
+        {
+          label: "The unordered list holds at least two items",
+          selector: "ul > li:nth-child(2)",
         },
       ],
       hint: "Build it in order: heading, paragraph, link, then a ul whose li elements sit inside it.",
       explanation:
-        "An element is only complete when its closing tag is present, and list items belong inside the ul rather than after it. Writing the structure first means the browser and the checks see the same tree.",
+        "An element is only complete when its closing tag is present, and list items belong inside the ul rather than after it. Writing the structure first means the rendered preview and the checks see the same tree, because the checks inspect the DOM of a sandboxed preview instead of the text you typed.",
     },
   },
   "html-semantics": {
@@ -443,37 +443,42 @@ export const extras: Record<string, LessonExtras> = {
       id: "html-semantics-lab",
       title: "Map the page with landmarks",
       brief:
-        "Rebuild the starter div as a landmark structure. Wrap a page title and a nav inside a header, put the content in a main that contains at least one section, and close with a footer. Keep the text short, because the checks look for the elements and their nesting.",
+        "Rebuild the starter div with real landmark elements. Wrap a page title and a nav inside a header, put the content in a main that contains at least one section, and close with a footer. Keep the text short: the page is rendered in a sandboxed preview and inspected as a real DOM, so the checks look for real elements and their nesting.",
       file: "structure.html",
       starter: `<!-- TODO: replace this div with header, nav, main, section and footer -->
 <div class="page">
 </div>
 `,
-      checks: [
+      renderChecks: [
         {
-          label: "Contains a header element",
-          test: (code) => /<header\b[^>]*>[\s\S]*?<\/header>/i.test(code),
+          label: "Renders a header landmark",
+          selector: "header",
         },
         {
-          label: "Contains a nav element for navigation links",
-          test: (code) => /<nav\b[^>]*>[\s\S]*?<\/nav>/i.test(code),
+          label: "The navigation sits inside the header",
+          selector: "header nav",
         },
         {
-          label: "Contains a main element for the primary content",
-          test: (code) => /<main\b[^>]*>[\s\S]*?<\/main>/i.test(code),
+          label: "The navigation contains links",
+          selector: "header nav a",
         },
         {
-          label: "Contains a section element",
-          test: (code) => /<section\b[^>]*>[\s\S]*?<\/section>/i.test(code),
+          label: "Renders exactly one main landmark",
+          selector: "main",
+          count: 1,
         },
         {
-          label: "Contains a footer element",
-          test: (code) => /<footer\b[^>]*>[\s\S]*?<\/footer>/i.test(code),
+          label: "A section groups content inside main",
+          selector: "main section",
+        },
+        {
+          label: "Renders a footer landmark",
+          selector: "footer",
         },
       ],
       hint: "Open with header, put nav inside it, then main with a section, then footer.",
       explanation:
-        "Landmarks are what a screen reader lists when someone asks to move between regions, and that list is built from real elements only. A div with a class name is invisible to it.",
+        "Landmarks are what a screen reader lists when someone asks to move between regions, and that list is built from real elements only. The checks walk the rendered preview the same way, so a div with a class name does not count as a landmark.",
     },
   },
   "html-forms": {
@@ -514,45 +519,44 @@ export const extras: Record<string, LessonExtras> = {
       id: "html-forms-lab",
       title: "Label two fields and submit",
       brief:
-        "Create a form in form.html with a name field and an email field. Every input needs an id, and every label needs a for value that matches it. Finish with a button element whose type is submit.",
+        "Create a form in form.html with a name field and an email field. Every input needs an id, and every label needs a for value that matches it. Finish with a button element whose type is submit. The form is rendered in a sandboxed preview and inspected as a real DOM, so the labels, inputs and button must really sit inside the form element.",
       file: "form.html",
       starter: `<!-- TODO: add labels, inputs and a submit button -->
 <form>
 </form>
 `,
-      checks: [
+      renderChecks: [
         {
-          label: "Contains a form element",
-          test: (code) => /<form\b[^>]*>[\s\S]*?<\/form>/i.test(code),
+          label: "Renders exactly one form element",
+          selector: "form",
+          count: 1,
         },
         {
-          label: "Contains a label with a for attribute",
-          test: (code) =>
-            /<label\b[^>]*\bfor\s*=\s*["'][^"']+["'][^>]*>[\s\S]*?<\/label>/i.test(
-              code,
-            ),
+          label: "Each label names its field with a for attribute",
+          selector: "form label[for]",
+          attribute: "for",
         },
         {
-          label: "Contains an input with an id attribute",
-          test: (code) =>
-            /<input\b[^>]*\bid\s*=\s*["'][^"']+["'][^>]*>/i.test(code),
+          label: "Each input carries an id that a label can point at",
+          selector: "form input[id]",
+          attribute: "id",
         },
         {
-          label: "Contains an input with type email",
-          test: (code) =>
-            /<input\b[^>]*\btype\s*=\s*["']email["'][^>]*>/i.test(code),
+          label: "The email field uses type email",
+          selector: "form input[type='email']",
+          attribute: "type",
+          value: "email",
         },
         {
-          label: "Contains a submit button",
-          test: (code) =>
-            /<button\b[^>]*\btype\s*=\s*["']submit["'][^>]*>[\s\S]*?<\/button>/i.test(
-              code,
-            ),
+          label: "A submit button sends the form",
+          selector: "form button[type='submit']",
+          attribute: "type",
+          value: "submit",
         },
       ],
       hint: "Give the input an id first, then reuse that exact value in the for attribute of its label.",
       explanation:
-        "The for and id pair is the link between a label and a field; without it the text is merely nearby. A button with type submit is the control that actually sends the form.",
+        "The for and id pair is the link between a label and a field; without it the text is merely nearby. A button with type submit is the control that actually sends the form. The checks read these attributes from the rendered DOM, so a label or input placed outside the form is not counted.",
     },
   },
   "html-tables": {
@@ -593,40 +597,46 @@ export const extras: Record<string, LessonExtras> = {
       id: "html-tables-lab",
       title: "Build a scored table",
       brief:
-        "Build a table in table.html that lists two players and their points. Start with a caption, put one header row inside thead with th cells that use scope, and put the data rows inside tbody as td cells. Header and body rows must have the same number of columns.",
+        "Build a table in table.html that lists two players and their points. Start with a caption, put one header row inside thead with th cells that use scope, and put the data rows inside tbody as td cells. Header and body rows must have the same number of columns. The table is rendered in a sandboxed preview and inspected as a real DOM, so the grouping elements must actually wrap their rows.",
       file: "table.html",
       starter: `<!-- TODO: add a caption, a header row with scope and two data rows -->
 <table>
 </table>
 `,
-      checks: [
+      renderChecks: [
         {
-          label: "Contains a table element",
-          test: (code) => /<table\b[^>]*>[\s\S]*?<\/table>/i.test(code),
+          label: "Renders exactly one table element",
+          selector: "table",
+          count: 1,
         },
         {
-          label: "Contains a caption with text",
-          test: (code) =>
-            /<caption\b[^>]*>[\s\S]*?\S[\s\S]*?<\/caption>/i.test(code),
+          label: "The caption is a direct child of the table",
+          selector: "table > caption",
         },
         {
-          label: "Groups the header row inside thead",
-          test: (code) => /<thead\b[^>]*>[\s\S]*?<\/thead>/i.test(code),
+          label: "The header row names two columns",
+          selector: "table thead th",
+          count: 2,
         },
         {
-          label: "Uses a th cell with a column scope",
-          test: (code) =>
-            /<th\b[^>]*\bscope\s*=\s*["']col["'][^>]*>/i.test(code),
+          label: "Header cells declare a column scope",
+          selector: "table thead th[scope='col']",
+          attribute: "scope",
+          value: "col",
         },
         {
-          label: "Groups data rows inside tbody with td cells",
-          test: (code) =>
-            /<tbody\b[^>]*>[\s\S]*?<td\b[^>]*>[\s\S]*?<\/tbody>/i.test(code),
+          label: "Data cells use td inside tbody",
+          selector: "table tbody td",
+        },
+        {
+          label: "The body holds two rows of data",
+          selector: "table tbody tr",
+          count: 2,
         },
       ],
       hint: "The caption is the first child of the table, before thead.",
       explanation:
-        "caption and scope make a table readable without sight: the caption names the whole table and each scope value ties a header to its cells. Grouping rows in thead and tbody keeps that relationship explicit.",
+        "caption and scope make a table readable without sight: the caption names the whole table and each scope value ties a header to its cells. Grouping rows in thead and tbody keeps that relationship explicit, and the checks confirm it by walking the rendered table tree.",
     },
   },
   "html-page": {
@@ -667,7 +677,7 @@ export const extras: Record<string, LessonExtras> = {
       id: "html-page-lab",
       title: "Assemble a profile page",
       brief:
-        "Write a complete document in profile.html: a doctype on the first line, an html element with lang, and a head containing a title and a viewport meta tag. The body should hold a header, a main and a footer in that order. Add a skip link at the top of the body and an h1 inside main.",
+        "Write a complete document in profile.html: a doctype on the first line, an html element with lang, and a head containing a title and a viewport meta tag. The body should hold a header, a main and a footer in that order. Add a skip link at the top of the body and an h1 inside main. The document is rendered in a sandboxed preview and inspected as a real DOM, so the landmarks must appear in the body in the order you write them.",
       file: "profile.html",
       starter: `<!-- TODO: start with the doctype, then html, head and body -->
 <html>
@@ -677,38 +687,40 @@ export const extras: Record<string, LessonExtras> = {
   </body>
 </html>
 `,
-      checks: [
+      renderChecks: [
         {
-          label: "Starts with an HTML doctype",
-          test: (code) => /<!DOCTYPE\s+html>/i.test(code),
+          label: "The html element declares the page language",
+          selector: "html[lang]",
+          attribute: "lang",
         },
         {
-          label: "Declares a language on the html element",
-          test: (code) =>
-            /<html\b[^>]*\blang\s*=\s*["'][A-Za-z-]+["'][^>]*>/i.test(code),
+          label: "The head names the page with a title element",
+          selector: "head > title",
         },
         {
-          label: "Declares a viewport meta with the device width",
-          test: (code) =>
-            /<meta\b(?=[^>]*\bname\s*=\s*["']viewport["'])(?=[^>]*\bcontent\s*=\s*["'][^"']*width\s*=\s*device-width)[^>]*>/i.test(
-              code,
-            ),
+          label: "The head sets a viewport meta tag with content",
+          selector: "head > meta[name='viewport']",
+          attribute: "content",
         },
         {
-          label: "Names the page with a title element",
-          test: (code) => /<title\b[^>]*>[\s\S]*?<\/title>/i.test(code),
+          label:
+            "A skip link at the start of the body points at in-page content",
+          selector: "body > a[href^='#']",
+          attribute: "href",
         },
         {
-          label: "Places header before main and footer after it",
-          test: (code) =>
-            /<header\b(?=[\s\S]*<main\b[\s\S]*<\/main>[\s\S]*<footer\b)[\s\S]*<\/footer>/i.test(
-              code,
-            ),
+          label: "Header, main and footer render in source order",
+          selector: "header ~ main ~ footer",
+        },
+        {
+          label: "The h1 sits inside the main region",
+          selector: "main h1",
+          count: 1,
         },
       ],
       hint: "The head needs both a title element and a meta tag whose name is viewport.",
       explanation:
-        "The doctype and the head are handled before anything is drawn, which is why the title, the language and the viewport belong there. Landmarks in source order give the page a shape that both sighted and assistive users can follow.",
+        "The doctype and the head are handled before anything is drawn, which is why the title, the language and the viewport belong there. Landmarks in source order give the page a shape that both sighted and assistive users can follow, and the rendered preview is inspected as a DOM so the order of the regions is checked directly.",
     },
   },
 };

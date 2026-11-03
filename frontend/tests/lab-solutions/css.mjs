@@ -9,6 +9,7 @@ export const solutions = {
 #hero {
   color: #ffffff;
   background-color: #173e31;
+  padding: 24px;
 }
 
 .card p {
@@ -18,11 +19,11 @@ export const solutions = {
 `,
   "css-box-lab": `.card {
   box-sizing: border-box;
-  width: 100%;
-  max-width: 320px;
+  width: 320px;
   padding: 24px;
   border: 2px solid #d8ded8;
   margin: 0 auto 16px;
+  background-color: #f4efe5;
 }
 `,
   "css-flex-lab": `.toolbar {
@@ -31,7 +32,6 @@ export const solutions = {
   justify-content: center;
   align-items: center;
   gap: 12px;
-  min-height: 96px;
   background-color: #173e31;
 }
 `,
@@ -46,7 +46,11 @@ export const solutions = {
   grid-column: span 2;
 }
 `,
-  "css-responsive-lab": `img {
+  "css-responsive-lab": `body {
+  margin: 0;
+}
+
+img {
   max-width: 100%;
   height: auto;
 }
@@ -57,13 +61,12 @@ h1 {
 
 .cards {
   display: grid;
-  gap: 16px;
+  gap: 24px;
 }
 
 @media (min-width: 720px) {
   .cards {
     grid-template-columns: repeat(2, 1fr);
-    gap: 24px;
   }
 }
 `,

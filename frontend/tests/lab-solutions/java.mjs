@@ -1,17 +1,27 @@
 export const solutions = {
-  "java-basics-lab": `public class Basics {
+  "java-basics-lab": `import java.util.Scanner;
+
+public class Main {
     public static void main(String[] args) {
-        int level = 3;
-        double price = 4.5;
-        String name = "Ada";
-        System.out.println(name + " is on level " + level);
-        System.out.println("Price: " + price);
+        Scanner scanner = new Scanner(System.in);
+        String name = scanner.next();
+        int level = scanner.nextInt();
+        double price = scanner.nextDouble();
+
+        System.out.println("Player " + name + " is on level " + level + ".");
+        System.out.println("Next level: " + (level + 1));
+        System.out.println("Price: " + String.format("%.2f", price));
     }
 }
 `,
-  "java-control-lab": `public class Control {
+  "java-control-lab": `import java.util.Scanner;
+
+public class Main {
     public static void main(String[] args) {
-        for (int i = 1; i <= 5; i++) {
+        Scanner scanner = new Scanner(System.in);
+        int limit = scanner.nextInt();
+
+        for (int i = 1; i <= limit; i++) {
             if (i % 2 == 0) {
                 System.out.println(i + " is even");
             } else {
@@ -21,21 +31,32 @@ export const solutions = {
     }
 }
 `,
-  "java-methods-lab": `public class Methods {
+  "java-methods-lab": `import java.util.Scanner;
+
+public class Main {
     static int add(int a, int b) {
         return a + b;
     }
 
     public static void main(String[] args) {
-        int total = add(4, 5);
-        System.out.println("Total: " + total);
+        Scanner scanner = new Scanner(System.in);
+        int a = scanner.nextInt();
+        int b = scanner.nextInt();
+        System.out.println(a + " + " + b + " = " + add(a, b));
     }
 }
 `,
-  "java-oop-lab": `public class Oop {
+  "java-oop-lab": `import java.util.Scanner;
+
+public class Main {
     public static void main(String[] args) {
-        Person ada = new Person("Ada", 36);
-        System.out.println(ada.getName() + " is " + ada.getAge());
+        Scanner scanner = new Scanner(System.in);
+        String name = scanner.nextLine().trim();
+        int age = scanner.nextInt();
+
+        Person person = new Person(name, age);
+        System.out.println(person.getName() + " is " + person.getAge());
+        System.out.println("Next year: " + (person.getAge() + 1));
     }
 }
 
@@ -59,20 +80,27 @@ class Person {
 `,
   "java-collections-lab": `import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Scanner;
 
-public class Collections {
+public class Main {
     public static void main(String[] args) {
+        Scanner scanner = new Scanner(System.in);
+        String line = scanner.nextLine();
+        String name = scanner.nextLine();
+        int score = scanner.nextInt();
+
         ArrayList<String> skills = new ArrayList<>();
-        skills.add("Java");
-        skills.add("SQL");
-        for (String skill : skills) {
-            System.out.println(skill);
+        for (String skill : line.split(",")) {
+            skills.add(skill);
         }
 
         HashMap<String, Integer> scores = new HashMap<>();
-        scores.put("Ada", 10);
-        scores.put("Linus", 7);
-        System.out.println("Ada: " + scores.get("Ada"));
+        scores.put(name, score);
+
+        for (String skill : skills) {
+            System.out.println(skill);
+        }
+        System.out.println(name + " scored " + scores.get(name));
     }
 }
 `,

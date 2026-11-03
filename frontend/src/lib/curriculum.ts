@@ -22,9 +22,21 @@ export type Term = {
   meaning: string;
 };
 
-export type LabCheck = {
+export type LabTest = {
   label: string;
-  test: (code: string) => boolean;
+  stdin: string;
+  expectedStdout: string;
+};
+
+export type RenderCheck = {
+  label: string;
+  selector: string;
+  count?: number;
+  text?: string;
+  attribute?: string;
+  value?: string;
+  style?: { property: string; value: string };
+  viewport?: number;
 };
 
 export type Lab = {
@@ -33,9 +45,17 @@ export type Lab = {
   brief: string;
   file: string;
   starter: string;
-  checks: LabCheck[];
   hint: string;
   explanation: string;
+  tests?: LabTest[];
+  fixture?: string;
+  renderChecks?: RenderCheck[];
+};
+
+export type LabCheckResult = {
+  label: string;
+  pass: boolean;
+  detail?: string;
 };
 
 export type LessonExtras = {
@@ -2048,18 +2068,6 @@ export function lessonKey(languageId: string, lessonId: string) {
 
 export function labKey(languageId: string, lessonId: string, labId: string) {
   return `${languageId}:${lessonId}:${labId}`;
-}
-
-export type LabResult = { label: string; pass: boolean };
-
-export function runLabChecks(lab: Lab, code: string): LabResult[] {
-  return lab.checks.map((check) => {
-    try {
-      return { label: check.label, pass: check.test(code) };
-    } catch {
-      return { label: check.label, pass: false };
-    }
-  });
 }
 
 export function correctFor(

@@ -284,38 +284,27 @@ export const extras: Record<string, LessonExtras> = {
       id: "java-basics-lab",
       title: "Print your profile",
       brief:
-        "In Basics.java, create a public class named Basics with a main method. Declare an int for a level, a double for a price and a String for a name, then print at least two lines with System.out.println. This is a structure check: it looks for the class, the main method, the declarations and a println call, not at your exact wording.",
-      file: "Basics.java",
+        'Write Main.java with a public class named Main and a main method. Read three input lines with java.util.Scanner: a player name, a level as a whole number and a price as a decimal, and keep them in a String, an int and a double. Then print exactly three lines, Player Ada is on level 7., Next level: 8 and Price: 4.50, formatting the price with String.format("%.2f", price). Your program is executed twice with different input and both runs must match exactly.',
+      file: "Main.java",
       starter:
-        "public class Basics {\n    public static void main(String[] args) {\n        // TODO: declare an int, a double and a String, then print them\n    }\n}\n",
-      checks: [
+        "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        String name = scanner.next();\n        int level = scanner.nextInt();\n        double price = scanner.nextDouble();\n\n        // TODO: print the profile line, the next level and the formatted price\n        System.out.println(name);\n    }\n}\n",
+      tests: [
         {
-          label: "Declares a class named Basics",
-          test: (code) => /\bclass\s+Basics\b/.test(code),
+          label: "Input Ada / 7 / 4.5 prints the profile",
+          stdin: "Ada\n7\n4.5\n",
+          expectedStdout:
+            "Player Ada is on level 7.\nNext level: 8\nPrice: 4.50",
         },
         {
-          label: "Defines a main method",
-          test: (code) =>
-            /\bstatic\s+void\s+main\s*\(\s*String\s*\[\s*\]\s*\w+\s*\)/.test(
-              code,
-            ),
-        },
-        {
-          label: "Declares an int and a double variable",
-          test: (code) => /\bint\s+\w+\s*=[\s\S]*\bdouble\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Declares a String variable",
-          test: (code) => /\bString\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Prints output with println",
-          test: (code) => /System\s*\.\s*out\s*\.\s*println\s*\(/.test(code),
+          label: "Input Grace / 12 / 9.75 prints the profile",
+          stdin: "Grace\n12\n9.75\n",
+          expectedStdout:
+            "Player Grace is on level 12.\nNext level: 13\nPrice: 9.75",
         },
       ],
-      hint: "Inside main, start with int level = 3; then add the double and String lines before your println calls.",
+      hint: 'Scanner reads one value at a time, so next() takes the name, nextInt() the level and nextDouble() the price. Build each line by joining text and values with +, print level + 1 for the next level, and pass the price to String.format("%.2f", price) so it always shows two decimals.',
       explanation:
-        "Java needs a type in front of every variable, and println accepts text joined with +. Different types live happily in one program because each declaration fixes its own type.",
+        'Java needs a type in front of every variable, and Scanner converts each piece of input text into the type you ask for. println accepts text joined with +, and String.format("%.2f", price) pins the decimals, so the printed lines stay predictable instead of showing a floating-point tail.',
     },
   },
   "java-control": {
@@ -355,36 +344,26 @@ export const extras: Record<string, LessonExtras> = {
       id: "java-control-lab",
       title: "Label numbers even or odd",
       brief:
-        "In Control.java, create a public class named Control with a main method. Use a for loop that counts from 1 to 5 inclusive, and inside it use if / else with i % 2 to print whether each number is even or odd. This is a structure check for the loop, the condition and the else branch.",
-      file: "Control.java",
+        "Write Main.java with a public class named Main. Read one whole number from the input with java.util.Scanner and keep it as the limit. Use a for loop that counts from 1 up to and including the limit, and inside it use if / else with i % 2 to print one line per number, either 3 is odd or 4 is even. The program is executed twice with different limits and both runs must match exactly.",
+      file: "Main.java",
       starter:
-        "public class Control {\n    public static void main(String[] args) {\n        // TODO: loop from 1 to 5 and print even or odd for each number\n    }\n}\n",
-      checks: [
+        "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        int limit = scanner.nextInt();\n\n        for (int i = 1; i <= limit; i++) {\n            // TODO: decide even or odd with if / else and print the label\n            System.out.println(i);\n        }\n    }\n}\n",
+      tests: [
         {
-          label: "Declares a class named Control",
-          test: (code) => /\bclass\s+Control\b/.test(code),
+          label: "Limit 4 labels 1 to 4",
+          stdin: "4\n",
+          expectedStdout: "1 is odd\n2 is even\n3 is odd\n4 is even",
         },
         {
-          label: "Counts from 1 to 5 with a for loop",
-          test: (code) =>
-            /\bfor\s*\(\s*int\s+\w+\s*=\s*1\s*;\s*\w+\s*<=\s*5\s*;/.test(code),
-        },
-        {
-          label: "Tests even numbers with if",
-          test: (code) => /if\s*\([^)]*%\s*2\s*==\s*0\s*\)/.test(code),
-        },
-        {
-          label: "Adds an else branch",
-          test: (code) => /\}\s*else\s*\{/.test(code),
-        },
-        {
-          label: "Prints with println",
-          test: (code) => /System\s*\.\s*out\s*\.\s*println\s*\(/.test(code),
+          label: "Limit 7 labels 1 to 7",
+          stdin: "7\n",
+          expectedStdout:
+            "1 is odd\n2 is even\n3 is odd\n4 is even\n5 is odd\n6 is even\n7 is odd",
         },
       ],
-      hint: "Let i run from 1 while it is less than or equal to 5, then branch on i % 2 == 0 and let else handle the odd numbers.",
+      hint: 'Start the counter at 1 and keep it less than or equal to the limit, then test i % 2 == 0. Both branches print the number and their word: i + " is even" and i + " is odd".',
       explanation:
-        "A for loop handles a known count, and the remainder operator separates even from odd. The else branch guarantees that every number prints exactly one label.",
+        "A for loop handles a known count, and the remainder operator separates even from odd. The else branch guarantees that every number prints exactly one label, so the number of output lines always matches the limit.",
     },
   },
   "java-methods": {
@@ -424,38 +403,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "java-methods-lab",
       title: "Add with a helper method",
       brief:
-        "In Methods.java, create a public class named Methods. Add a static method named add that takes two int parameters and returns their sum, then call it from main with two numbers and print the result. This is a structure check for the method signature, the return statement, the call and the println.",
-      file: "Methods.java",
+        "Write Main.java with a public class named Main. Add a static method named add that takes two int parameters and returns their sum, then call it from main. Read two whole numbers from the input with java.util.Scanner and print exactly one line in the form 4 + 5 = 9. The program is executed twice with different numbers and both runs must match exactly.",
+      file: "Main.java",
       starter:
-        "public class Methods {\n    // TODO: add a static add method with two int parameters\n\n    public static void main(String[] args) {\n        // TODO: call add with two numbers and print the result\n    }\n}\n",
-      checks: [
+        'import java.util.Scanner;\n\npublic class Main {\n    // TODO: return the sum of a and b\n    static int add(int a, int b) {\n        return a;\n    }\n\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        int a = scanner.nextInt();\n        int b = scanner.nextInt();\n        System.out.println(a + " + " + b + " = " + add(a, b));\n    }\n}\n',
+      tests: [
         {
-          label: "Declares a class named Methods",
-          test: (code) => /\bclass\s+Methods\b/.test(code),
+          label: "Adding 4 and 5 prints 9",
+          stdin: "4\n5\n",
+          expectedStdout: "4 + 5 = 9",
         },
         {
-          label: "Defines a static method with two int parameters",
-          test: (code) =>
-            /\bstatic\s+int\s+\w+\s*\(\s*int\s+\w+\s*,\s*int\s+\w+\s*\)/.test(
-              code,
-            ),
-        },
-        {
-          label: "Returns a value",
-          test: (code) => /\breturn\b/.test(code),
-        },
-        {
-          label: "Calls the method with two numbers",
-          test: (code) => /\w+\s*\(\s*\d+\s*,\s*\d+\s*\)/.test(code),
-        },
-        {
-          label: "Prints the result",
-          test: (code) => /System\s*\.\s*out\s*\.\s*println\s*\(/.test(code),
+          label: "Adding 12 and 30 prints 42",
+          stdin: "12\n30\n",
+          expectedStdout: "12 + 30 = 42",
         },
       ],
-      hint: "The method goes above main, looks like static int add(int a, int b), and its body is a single return.",
+      hint: "The method goes above main, looks like static int add(int a, int b), and its body is a single return. Read both numbers with nextInt(), then build the line from a, b and the value the method hands back.",
       explanation:
-        "A return type and a parameter list form the method's contract, and main is just another caller. Keeping the calculation in add means you can reuse it without copying the arithmetic.",
+        "A return type and a parameter list form the method's contract, and main is just another caller. Keeping the arithmetic in add means the printed value has to come back through the return statement, so the same method would work for any pair of numbers.",
     },
   },
   "java-oop": {
@@ -495,39 +461,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "java-oop-lab",
       title: "Model a person",
       brief:
-        "In Oop.java, create a class named Person with the private fields name (String) and age (int), a constructor that takes both, and public getters getName() and getAge(). In main, build one Person and print its details. This is a structure check for the class, the private fields, the constructor and the getters.",
-      file: "Oop.java",
+        "Write Main.java with a public class named Main that holds main, plus a second class named Person in the same file. Person keeps a private String name and a private int age, receives both in its constructor, and exposes getName() and getAge(). Read a name and a whole-number age from the input, build one Person with new, then print exactly two lines, Ada is 36 and Next year: 37. The program is executed twice with different input and both runs must match exactly.",
+      file: "Main.java",
       starter:
-        "public class Oop {\n    public static void main(String[] args) {\n        // TODO: create a Person with new and print its details\n    }\n}\n\nclass Person {\n    // TODO: add private fields, a constructor and getters\n}\n",
-      checks: [
+        "import java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        String name = scanner.nextLine().trim();\n        int age = scanner.nextInt();\n\n        // TODO: build a Person with new, then print its details with the getters\n        System.out.println(name);\n    }\n}\n\nclass Person {\n    // TODO: add private fields, a constructor and getters\n}\n",
+      tests: [
         {
-          label: "Declares a class named Person",
-          test: (code) => /\bclass\s+Person\b/.test(code),
+          label: "Person Ada, 36 prints her details",
+          stdin: "Ada\n36\n",
+          expectedStdout: "Ada is 36\nNext year: 37",
         },
         {
-          label: "Keeps name and age private",
-          test: (code) =>
-            /private\s+String\s+\w+\s*;[\s\S]*private\s+int\s+\w+\s*;/.test(
-              code,
-            ),
-        },
-        {
-          label: "Defines a constructor taking a String and an int",
-          test: (code) =>
-            /Person\s*\(\s*String\s+\w+\s*,\s*int\s+\w+\s*\)/.test(code),
-        },
-        {
-          label: "Assigns fields with this",
-          test: (code) => /this\s*\.\s*\w+\s*=/.test(code),
-        },
-        {
-          label: "Provides a String getter for the name",
-          test: (code) => /String\s+getName\s*\(\s*\)/.test(code),
+          label: "Person Linus, 54 prints his details",
+          stdin: "Linus\n54\n",
+          expectedStdout: "Linus is 54\nNext year: 55",
         },
       ],
-      hint: "The constructor parameters can share the field names, as long as you write this.name = name and this.age = age.",
+      hint: "The constructor parameters can share the field names, as long as you write this.name = name and this.age = age. In main call person.getName() and person.getAge() instead of touching the fields, and add 1 to the age for the second line.",
       explanation:
-        "Private fields keep the object in charge of its own data, and the constructor is the one place that fills them at birth. Getters expose values for reading without letting callers change them directly.",
+        "Private fields keep the object in charge of its own data, and the constructor is the single place that fills them at birth. Getters expose values for reading without letting callers change them, so the printed lines come from what the object actually stores rather than from the input text.",
     },
   },
   "java-collections": {
@@ -568,36 +520,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "java-collections-lab",
       title: "Track skills and scores",
       brief:
-        "In Collections.java, create a public class named Collections with a main method. Build an ArrayList<String> of at least two skills and print each one in a loop, then store two entries in a HashMap<String, Integer> and read one back with get. This is a structure check for both declarations, an add call and a get call.",
-      file: "Collections.java",
+        "Write Main.java with a public class named Main. Read one line of comma-separated skills, add each of them to an ArrayList<String> and print every skill on its own line, then read a player name and a whole-number score, store that pair in a HashMap<String, Integer> with put, and print one last line such as Ada scored 10 built from scores.get(name). The program is executed twice with different input and both runs must match exactly.",
+      file: "Main.java",
       starter:
-        "import java.util.ArrayList;\nimport java.util.HashMap;\n\npublic class Collections {\n    public static void main(String[] args) {\n        // TODO: add skills to an ArrayList and scores to a HashMap\n    }\n}\n",
-      checks: [
+        'import java.util.ArrayList;\nimport java.util.HashMap;\nimport java.util.Scanner;\n\npublic class Main {\n    public static void main(String[] args) {\n        Scanner scanner = new Scanner(System.in);\n        String line = scanner.nextLine();\n        String name = scanner.nextLine();\n        int score = scanner.nextInt();\n\n        ArrayList<String> skills = new ArrayList<>();\n        HashMap<String, Integer> scores = new HashMap<>();\n\n        // TODO: add every comma-separated skill to the list, store the score under the name\n        System.out.println(line + " " + name + " " + score);\n    }\n}\n',
+      tests: [
         {
-          label: "Declares a class named Collections",
-          test: (code) => /\bclass\s+Collections\b/.test(code),
+          label: "Java and SQL for Ada with 10",
+          stdin: "Java,SQL\nAda\n10\n",
+          expectedStdout: "Java\nSQL\nAda scored 10",
         },
         {
-          label: "Creates an ArrayList of String",
-          test: (code) => /ArrayList\s*<\s*String\s*>\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Creates a HashMap of String to Integer",
-          test: (code) =>
-            /HashMap\s*<\s*String\s*,\s*Integer\s*>\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Adds an item to the list",
-          test: (code) => /\.\s*add\s*\(/.test(code),
-        },
-        {
-          label: "Reads a map value with get",
-          test: (code) => /\.\s*get\s*\(/.test(code),
+          label: "Three skills for Linus with 42",
+          stdin: "Python,Go,Rust\nLinus\n42\n",
+          expectedStdout: "Python\nGo\nRust\nLinus scored 42",
         },
       ],
-      hint: "Declare both collections with their type arguments, then call add twice on the list and put twice on the map before a final get.",
+      hint: 'nextLine() keeps the whole first line, so call split(",") on it and add each part. Loop over the ArrayList to print the skills in order, and print scores.get(name) rather than the score variable you just read.',
       explanation:
-        "The angle brackets tell the compiler what may enter each collection, so mistakes surface early. A list keeps order for looping, while a map trades order for fast lookup by key.",
+        "The angle brackets tell the compiler what may enter each collection, so mistakes surface early. A list keeps order for looping, while a map trades order for fast lookup by key, which is why the final line comes from get rather than from the value you read.",
     },
   },
 };

@@ -302,35 +302,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "cpp-basics-lab",
       title: "Print a typed player profile",
       brief:
-        "Inside main, declare a string called name, an int called level and a double called price, and give each one a value. Print all three with cout, finishing every line with endl. Include iostream for cout and string for the name, and keep the usual int main skeleton.",
+        "Inside main, declare a string called name, an int called level and a double called price, then read all three from std::cin in that order: the name first, the level second, the price third. Print each value on its own line with cout and endl, so the name, the number and the price come out one per line. Include iostream for cin and cout and string for the name, and keep the usual int main skeleton. Your program is executed against more than one input, and every printed line must match exactly.",
       file: "basics.cpp",
       starter:
-        "#include <iostream>\nusing namespace std;\n\nint main() {\n    // TODO: declare a string name, an int level and a double price,\n    // then print each one with cout and endl.\n    return 0;\n}",
-      checks: [
+        "#include <iostream>\n#include <string>\nusing namespace std;\n\nint main() {\n    string name;\n    int level = 0;\n    double price = 0.0;\n\n    // TODO: read name, level and price from cin, then print each value\n    // on its own line with cout and endl.\n    cout << name << endl;\n    return 0;\n}",
+      tests: [
         {
-          label: "Includes the iostream header",
-          test: (code) => /#\s*include\s*<iostream>/.test(code),
+          label: "Input Ada / 3 / 4.5 prints three lines",
+          stdin: "Ada\n3\n4.5\n",
+          expectedStdout: "Ada\n3\n4.5",
         },
         {
-          label: "Declares an int variable",
-          test: (code) => /\bint\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Declares a double variable",
-          test: (code) => /\bdouble\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Declares a string variable",
-          test: (code) => /\bstring\s+\w+\s*=/.test(code),
-        },
-        {
-          label: "Prints with cout and ends a line with endl",
-          test: (code) => /cout\s*<[\s\S]*\bendl\b/.test(code),
+          label: "Input Grace / 12 / 19.99 prints three lines",
+          stdin: "Grace\n12\n19.99\n",
+          expectedStdout: "Grace\n12\n19.99",
         },
       ],
-      hint: "Give every variable a type, a name and a value on one line, then send each name to cout in its own statement.",
+      hint: "One statement such as cin >> name >> level >> price fills all three variables, and each cout statement sends one value to its own line with endl.",
       explanation:
-        "Each declaration reserves a box of the named type and fills it with the starting value. cout uses that type to format the output, and endl finishes the line so the next print starts fresh.",
+        "Each declaration reserves a box of the named type and cin fills those boxes from the input in the order you list them. cout uses the type to format the value, so the int prints as digits while the double keeps its decimal digits, and endl finishes the line so the next print starts fresh.",
     },
   },
   "cpp-control": {
@@ -371,35 +361,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "cpp-control-lab",
       title: "Print even and odd numbers",
       brief:
-        "Write a for loop that counts from 1 to 5. Inside the loop use if / else to print whether the current number is even or odd, for example 2 even. Include iostream, print one line per number with cout and endl, and keep the work inside main.",
+        "Read two whole numbers from std::cin: a start and an end. Write a for loop that counts from start to end, including both ends. Inside the loop use if / else to print whether the current number is even or odd, for example 2 even, one line per number, finishing every line with endl. Include iostream and keep the work inside main. Your program is executed with different ranges, so the loop must really use the two numbers it reads.",
       file: "control.cpp",
       starter:
-        "#include <iostream>\nusing namespace std;\n\nint main() {\n    // TODO: loop from 1 to 5 and print whether each number is even or odd.\n    return 0;\n}",
-      checks: [
+        "#include <iostream>\nusing namespace std;\n\nint main() {\n    int start = 0;\n    int end = 0;\n    cin >> start >> end;\n\n    // TODO: loop from start to end and print whether each number is even or odd.\n    return 0;\n}",
+      tests: [
         {
-          label: "Includes the iostream header",
-          test: (code) => /#\s*include\s*<iostream>/.test(code),
+          label: "Range 1 to 5 labels every number",
+          stdin: "1 5\n",
+          expectedStdout: "1 odd\n2 even\n3 odd\n4 even\n5 odd",
         },
         {
-          label: "Uses a for loop",
-          test: (code) => /\bfor\s*\(/.test(code),
-        },
-        {
-          label: "Branches with if",
-          test: (code) => /\bif\s*\(/.test(code),
-        },
-        {
-          label: "Handles the other case with else",
-          test: (code) => /\belse\b/.test(code),
-        },
-        {
-          label: "Prints inside the loop with cout",
-          test: (code) => /cout\s*<</.test(code),
+          label: "Range 6 to 9 starts on an even number",
+          stdin: "6 9\n",
+          expectedStdout: "6 even\n7 odd\n8 even\n9 odd",
         },
       ],
-      hint: "A counter from 1 to 5 gives you each number; the remainder operator % tells you whether it divides evenly by 2.",
+      hint: "A counter from start to end gives you each number; the remainder operator % tells you whether it divides evenly by 2, and the else branch handles the rest.",
       explanation:
-        "The loop supplies each number in turn, and the if / else decides which message fits it. Only one branch runs per round, so every number produces exactly one line.",
+        "The loop supplies each number in turn, and the if / else decides which message fits it. Only one branch runs per round, so every number produces exactly one line, and the count depends on the range you read rather than a fixed list.",
     },
   },
   "cpp-functions": {
@@ -440,38 +420,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "cpp-functions-lab",
       title: "Write a sum function",
       brief:
-        "Define a function called sum that takes two int parameters and returns their total. Call it from main with two numbers, for example sum(3, 4), and print the result with cout and endl. Include iostream and do the printing in main, not inside the function.",
+        "Define a function called sum that takes two int parameters and returns their total. In main read two whole numbers from std::cin, call sum with them, and print the result with cout and endl. Include iostream and do the printing in main, not inside the function. Your program is executed with different pairs of numbers, so the sum must come from the values that were read.",
       file: "functions.cpp",
       starter:
-        "#include <iostream>\nusing namespace std;\n\n// TODO: define a function that adds two ints and returns the total.\n\nint main() {\n    // TODO: call sum from main with two numbers and print the result.\n    return 0;\n}",
-      checks: [
+        "#include <iostream>\nusing namespace std;\n\n// TODO: define a function that adds two ints and returns the total.\n\nint main() {\n    int a = 0;\n    int b = 0;\n    cin >> a >> b;\n\n    // TODO: call sum with a and b, then print the result with cout.\n    return 0;\n}",
+      tests: [
         {
-          label: "Includes the iostream header",
-          test: (code) => /#\s*include\s*<iostream>/.test(code),
+          label: "3 plus 4 prints 7",
+          stdin: "3 4\n",
+          expectedStdout: "7",
         },
         {
-          label: "Defines an int function with two parameters",
-          test: (code) =>
-            /\bint\s+(?!main\b)\w+\s*\(\s*\w+\s+\w+\s*,\s*\w+\s+\w+\s*\)/.test(
-              code,
-            ),
-        },
-        {
-          label: "Returns the sum of the two parameters",
-          test: (code) => /return\s+[\w.]+\s*\+\s*[\w.]+/.test(code),
-        },
-        {
-          label: "Calls sum with two arguments",
-          test: (code) => /\bsum\s*\(\s*\w+\s*,\s*\w+\s*\)/.test(code),
-        },
-        {
-          label: "Prints the result with cout",
-          test: (code) => /cout\s*<</.test(code),
+          label: "10 plus 25 prints 35",
+          stdin: "10 25\n",
+          expectedStdout: "35",
         },
       ],
-      hint: "Two int parameters become two local boxes inside the function; return a + b sends their sum back to main, where cout can print it directly.",
+      hint: "Two int parameters become two local boxes inside the function; return a + b sends their sum back to main, and cin >> a >> b fills the values before the call.",
       explanation:
-        "A function turns a repeated calculation into one named step. main passes the values in, the function returns the result, and the caller decides what to do with it, here printing it.",
+        "A function turns a repeated calculation into one named step. main passes the values it read into it, the function returns the result, and the caller decides what to do with it, here printing it.",
     },
   },
   "cpp-structs": {
@@ -512,35 +479,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "cpp-structs-lab",
       title: "Model a score with a const getter",
       brief:
-        "Define a struct called Score with an int member named points. Give it a constructor that takes a starting value and initialises points through the member initializer list. Add a const member function value() that returns points. In main, create a Score, print its value with cout and endl, and include iostream.",
+        "Define a struct called Score with an int member named points. Give it a constructor that takes a starting value and initialises points through the member initializer list, a const member function value() that returns points, and a member function add(int n) that increases points. In main read two whole numbers from std::cin, a starting score and a bonus. Create a Score from the starting score, print its value with cout and endl, call add with the bonus, then print the value again. Include iostream. Your program is executed with different pairs of numbers, so both printed lines must follow the input.",
       file: "structs.cpp",
       starter:
-        "#include <iostream>\nusing namespace std;\n\n// TODO: define a Score type with an int points member, a constructor that\n// initialises it, and a const member function that returns it.\n\nint main() {\n    // TODO: create a Score and print its value with cout.\n    return 0;\n}",
-      checks: [
+        "#include <iostream>\nusing namespace std;\n\n// TODO: define a Score type with an int points member, a constructor that\n// initialises it, a const value() getter and an add(int) mutator.\n\nint main() {\n    int start = 0;\n    int bonus = 0;\n    cin >> start >> bonus;\n\n    // TODO: create a Score, print value(), add the bonus, print value() again.\n    return 0;\n}",
+      tests: [
         {
-          label: "Includes the iostream header",
-          test: (code) => /#\s*include\s*<iostream>/.test(code),
+          label: "Start 42 with bonus 8 prints 42 then 50",
+          stdin: "42 8\n",
+          expectedStdout: "42\n50",
         },
         {
-          label: "Defines a struct",
-          test: (code) => /\bstruct\s+\w+/.test(code),
-        },
-        {
-          label: "Uses a member initializer list in the constructor",
-          test: (code) => /\b\w+\s*\([^)]*\)\s*:\s*\w+\s*\(/.test(code),
-        },
-        {
-          label: "Marks the getter as const",
-          test: (code) => /\w+\s*\(\s*\)\s*const\b/.test(code),
-        },
-        {
-          label: "Prints a value with cout",
-          test: (code) => /cout\s*<</.test(code),
+          label: "Start 7 with bonus 3 prints 7 then 10",
+          stdin: "7 3\n",
+          expectedStdout: "7\n10",
         },
       ],
-      hint: "Put points after the colon in the constructor, and write const after the empty parameter list of value().",
+      hint: "Put points after the colon in the constructor, write const after the empty parameter list of value(), and let add do points += n.",
       explanation:
-        "The constructor builds points as soon as the object exists, so no object can start with garbage. The const on value() lets the getter be called on objects you promise not to change.",
+        "The constructor builds points as soon as the object exists, so no object can start with garbage. The const on value() lets the getter be called on objects you promise not to change, while add is deliberately not const because it mutates points, and the two printed lines show the state before and after that change.",
     },
   },
   "cpp-stl": {
@@ -581,35 +538,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "cpp-stl-lab",
       title: "Sort, count and summarise with the STL",
       brief:
-        'Put at least three numbers into a vector<int> and sort them with sort(scores.begin(), scores.end()). Count how many are 10 or more with count_if and a lambda, then store that count in a map<string, int> under the key "high". Print the map entry with a range-based loop, and include vector, map, algorithm and iostream.',
+        'Read a count n from std::cin, then n whole numbers into a vector<int>. Sort it with sort(scores.begin(), scores.end()) and print the values from smallest to largest on one line, separated by single spaces. Count how many values are 10 or more with count_if and a lambda, store that count in a map<string, int> under the key "high", and print the map entry with a range-based loop as high: followed by the count. Include iostream, vector, map, algorithm and string. Your program is executed with different workloads, so everything must be derived from the numbers it reads.',
       file: "stl.cpp",
       starter:
-        "#include <iostream>\n#include <vector>\n#include <map>\n#include <algorithm>\nusing namespace std;\n\nint main() {\n    // TODO: build a vector of scores, sort it, count how many reach 10\n    // with count_if, then store the result in a map and print it.\n    return 0;\n}",
-      checks: [
+        '#include <iostream>\n#include <vector>\n#include <map>\n#include <algorithm>\n#include <string>\nusing namespace std;\n\nint main() {\n    int n = 0;\n    cin >> n;\n    vector<int> scores(n);\n    for (int i = 0; i < n; i++) {\n        cin >> scores[i];\n    }\n\n    // TODO: sort the vector, print the sorted values on one line, count how\n    // many reach 10 with count_if, store that count in a map under "high"\n    // and print the map entry.\n    return 0;\n}',
+      tests: [
         {
-          label: "Includes the vector header",
-          test: (code) => /#\s*include\s*<vector>/.test(code),
+          label: "Five scores sort and count three high values",
+          stdin: "5\n12 5 20 8 30\n",
+          expectedStdout: "5 8 12 20 30\nhigh: 3",
         },
         {
-          label: "Includes the algorithm header",
-          test: (code) => /#\s*include\s*<algorithm>/.test(code),
-        },
-        {
-          label: "Sorts a vector from begin to end",
-          test: (code) => /\bsort\s*\(\s*\w+\s*\.\s*begin\s*\(/.test(code),
-        },
-        {
-          label: "Counts elements with count_if",
-          test: (code) => /\bcount_if\s*\(/.test(code),
-        },
-        {
-          label: "Declares a map keyed by string",
-          test: (code) => /\bmap\s*<\s*(?:std\s*::\s*)?string\s*,/.test(code),
+          label: "Four small scores sort and count none high",
+          stdin: "4\n1 2 3 4\n",
+          expectedStdout: "1 2 3 4\nhigh: 0",
         },
       ],
-      hint: "Sort first so the order is predictable, let the lambda decide what counts as high, then store the total under a string key.",
+      hint: "Sort first so the printed order is predictable, let the lambda decide what counts as high, then store the total under a string key and let the range-based loop print it.",
       explanation:
-        "sort rearranges the vector in place through its iterators, and count_if walks the same range asking a predicate about each element. The map then keeps the summary by name, which is easier to read than a second plain variable.",
+        "sort rearranges the vector in place through its iterators, and count_if walks the same range asking a predicate about each element, so the number it returns depends only on the values that were read. The map then keeps the summary by name, which is easier to read than a second plain variable.",
     },
   },
 };

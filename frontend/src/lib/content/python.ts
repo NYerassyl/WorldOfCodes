@@ -281,34 +281,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "py-basics-lab",
       title: "Print a player card",
       brief:
-        "Create basics.py with two variables: name holding text and level holding a whole number. Then print one line that uses an f-string to include both values. The checks are a structure check on your code, so spacing and quote style do not matter.",
+        "Create basics.py that reads two input lines: a player name and a level number. Store them in two variables, convert the level to a whole number with int(), then print exactly one line built with an f-string, such as Player Ada reached level 7. Your program is really executed twice with different input, and both runs must print the expected line.",
       file: "basics.py",
       starter:
-        '# TODO: store a player name and a level, then print them in one f-string.\n# Replace the placeholder values below.\nname = "Player"\nlevel = 1',
-      checks: [
+        "# TODO: convert the level to a whole number and print both values in one f-string.\nname = input()\nlevel = input()\n\nprint(name, level)",
+      tests: [
         {
-          label: "Creates a name variable holding text",
-          test: (code) => /\bname\s*=\s*["']/.test(code),
+          label: "Input Ada / 7 prints the card",
+          stdin: "Ada\n7\n",
+          expectedStdout: "Player Ada reached level 7.",
         },
         {
-          label: "Stores a whole number in a level variable",
-          test: (code) => /\blevel\s*=\s*\d+/.test(code),
-        },
-        {
-          label: "Prints a line with an f-string",
-          test: (code) => /print\s*\(\s*f["']/.test(code),
-        },
-        {
-          label: "One f-string inserts both name and level",
-          test: (code) =>
-            /f["'][^"'\n]*\{\s*name\s*\}[^"'\n]*\{\s*level\s*\}|f["'][^"'\n]*\{\s*level\s*\}[^"'\n]*\{\s*name\s*\}/.test(
-              code,
-            ),
+          label: "Input Grace / 12 prints the card",
+          stdin: "Grace\n12\n",
+          expectedStdout: "Player Grace reached level 12.",
         },
       ],
-      hint: "The f-string starts with f before the quote, and every value you want to insert goes inside its own pair of curly braces.",
+      hint: "The f-string starts with f before the quote, and every value you want to insert goes inside its own pair of curly braces. int(input()) turns the second line into a number.",
       explanation:
-        "An f-string evaluates each expression inside braces and inserts the result, so fixed text and variables can share one readable line. Naming the two values before printing keeps the statement short and makes the program easy to extend.",
+        "An f-string evaluates each expression inside braces and inserts the result, so fixed text and variables can share one readable line. input() always returns text, so the level only behaves like a number after int() converts it.",
     },
   },
   "py-control": {
@@ -350,36 +341,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "py-control-lab",
       title: "Total the even numbers",
       brief:
-        "Write control.py that loops over the numbers 1 to 10, tests each one with if and the modulo operator, and prints only the even ones. Keep a running total in a variable named total and print it with an f-string. This is a structure check on the code you write, not a recording of its output.",
+        "Write control.py that reads a limit from the input, then loops over the numbers 1 to that limit, tests each one with if and the modulo operator, and prints only the even ones on their own lines. Add every even number to a variable named total and finish with an f-string line such as Total of even numbers: 30. The program is executed with different limits and its exact output is compared.",
       file: "control.py",
       starter:
-        "# TODO: loop over 1 to 10, print the even numbers and add them to a total.\ntotal = 0",
-      checks: [
+        '# TODO: print every even number up to the limit and add it to the total.\ntotal = 0\nlimit = int(input())\n\nfor number in range(1, limit + 1):\n    total += number\n\nprint(f"Total of even numbers: {total}")',
+      tests: [
         {
-          label: "Loops over a range with for",
-          test: (code) => /for\s+[A-Za-z_]\w*\s+in\s+range\s*\(/.test(code),
+          label: "Limit 10 prints the evens and their total",
+          stdin: "10\n",
+          expectedStdout: "2\n4\n6\n8\n10\nTotal of even numbers: 30",
         },
         {
-          label: "Tests each number with an if condition",
-          test: (code) => /if\s+[^\n:]+:/.test(code),
-        },
-        {
-          label: "Tests parity with the modulo operator",
-          test: (code) => /%\s*2\s*[!=]=\s*0/.test(code),
-        },
-        {
-          label: "Adds each matching number to a running total",
-          test: (code) => /\b[A-Za-z_]\w*\s*\+=\s*[A-Za-z_]\w*/.test(code),
-        },
-        {
-          label: "Prints the total with an f-string",
-          test: (code) =>
-            /print\s*\(\s*f["'][^"'\n]*\{\s*total\s*\}/.test(code),
+          label: "Limit 7 prints the evens and their total",
+          stdin: "7\n",
+          expectedStdout: "2\n4\n6\nTotal of even numbers: 12",
         },
       ],
-      hint: "A number is even when the remainder after dividing by 2 is 0, and the accumulation belongs inside the same if block that prints.",
+      hint: "A number is even when the remainder after dividing by 2 is 0, and both the print and the accumulation belong inside the same if block.",
       explanation:
-        "The loop creates each number, the condition filters it, and the total carries state from one round to the next. Keeping the update inside the if block is what makes the total match the numbers printed.",
+        "range(1, limit + 1) produces each number up to the limit, the condition filters it, and total carries state from one round to the next. Keeping the update inside the if block is what makes the total match the numbers printed.",
     },
   },
   "py-functions": {
@@ -421,40 +401,25 @@ export const extras: Record<string, LessonExtras> = {
       id: "py-functions-lab",
       title: "Average with a guard",
       brief:
-        "Write functions.py with a function named average that takes one list of numbers and returns their mean. Return 0 when the list is empty so the division never runs on zero items, then call the function and print the result with an f-string. The checks read the structure of your code only.",
+        "Write functions.py with a function named average that takes one list of numbers and returns their mean. Return 0 when the list is empty so the division never runs on zero items. Read one line of space-separated numbers from the input, split it into a list, call your function and print the mean with an f-string rounded to two decimals, such as Average score: 8.00. The program is executed more than once and its exact output is compared.",
       file: "functions.py",
       starter:
-        "# TODO: define average(numbers) that returns the mean, then print a call to it.\ndef average(numbers):\n    return 0",
-      checks: [
+        '# TODO: define average(numbers) that returns the mean, then print it with two decimals.\ndef average(numbers):\n    return 0\n\n\nscores = [int(part) for part in input().split()]\nprint(f"Average score: {average(scores)}")',
+      tests: [
         {
-          label: "Defines a function named average with one parameter",
-          test: (code) =>
-            /def\s+average\s*\(\s*[A-Za-z_]\w*\s*\)\s*:/.test(code),
+          label: "Scores 8, 10 and 6 average 8.00",
+          stdin: "8 10 6\n",
+          expectedStdout: "Average score: 8.00",
         },
         {
-          label: "Returns a value from inside the function",
-          test: (code) => /return\s+[^\n]+/.test(code),
-        },
-        {
-          label: "Handles an empty list before dividing",
-          test: (code) =>
-            /if\s+(not\s+[A-Za-z_]\w*|len\s*\(\s*[A-Za-z_]\w*\s*\)\s*==\s*0)\s*:/.test(
-              code,
-            ),
-        },
-        {
-          label: "Divides a total by the number of items",
-          test: (code) =>
-            /sum\s*\([^)]*\)\s*\/\s*len\s*\(|\/\s*len\s*\(/.test(code),
-        },
-        {
-          label: "Calls average and prints the result",
-          test: (code) => /print\s*\([^\n]*average\s*\(/.test(code),
+          label: "An empty line averages 0.00",
+          stdin: "\n",
+          expectedStdout: "Average score: 0.00",
         },
       ],
-      hint: "Put the guard before the division, and remember that len(numbers) is the count you divide by.",
+      hint: "Put the guard before the division, divide sum(numbers) by len(numbers), and format the result with {value:.2f} inside the f-string.",
       explanation:
-        "A guard clause handles the awkward case first and lets the normal path stay a single readable expression. Returning a value instead of printing inside the function lets the caller decide how the result is shown.",
+        "A guard clause handles the awkward case first and lets the normal path stay a single readable expression. Returning a value instead of printing inside the function lets the caller decide how the result is shown, and {value:.2f} keeps the printed digits exact.",
     },
   },
   "py-collections": {
@@ -496,38 +461,27 @@ export const extras: Record<string, LessonExtras> = {
       id: "py-collections-lab",
       title: "Track prices in a dictionary",
       brief:
-        "Write collections.py that stores three fruit names and their prices in one dictionary literal. Add a fourth fruit by assigning to a new key, raise one existing price by 1, then loop over the dictionary with items() and print each fruit and price with an f-string. The checks verify the structure of the code rather than running it.",
+        "Write collections.py that starts with one dictionary literal holding apple at 2, banana at 1 and cherry at 5. Read a fruit name and a price from the first and second input lines, add that pair by assigning to a new key, raise the price of apple by 1, then loop over items() and print one line per entry in the form apple costs 3. Entries must appear in insertion order. The program is executed with different input lines and its exact output is compared.",
       file: "collections.py",
       starter:
-        "# TODO: build a price dictionary, add one fruit, raise one price, print every pair.\nprices = {}",
-      checks: [
+        '# TODO: start from the fruit dictionary, add the input fruit, raise apple by 1, print every pair.\nprices = {}\nfruit = input()\nprice = input()\nprices[fruit] = price\n\nfor fruit_name, price_value in prices.items():\n    print(f"{fruit_name} costs {price_value}")',
+      tests: [
         {
-          label: "Builds a dictionary with key-value entries",
-          test: (code) => /\w+\s*=\s*\{[^{}]*:\s*[^,{}]+[,}]/.test(code),
+          label: "Adds kiwi at 3 and raises apple to 3",
+          stdin: "kiwi\n3\n",
+          expectedStdout:
+            "apple costs 3\nbanana costs 1\ncherry costs 5\nkiwi costs 3",
         },
         {
-          label: "Adds a new entry by assigning to a quoted key",
-          test: (code) => /\[\s*["'][^"']+["']\s*\]\s*=\s*[^=\s]/.test(code),
-        },
-        {
-          label: "Raises an existing price with +=",
-          test: (code) => /\[\s*["'][^"']+["']\s*\]\s*\+=\s*[\d.]+/.test(code),
-        },
-        {
-          label: "Loops over the pairs with items()",
-          test: (code) =>
-            /for\s+[A-Za-z_]\w*\s*,\s*[A-Za-z_]\w*\s+in\s+[A-Za-z_]\w*\s*\.\s*items\s*\(\s*\)/.test(
-              code,
-            ),
-        },
-        {
-          label: "Prints each pair with an f-string",
-          test: (code) => /print\s*\(\s*f["'][^"'\n]*\{/.test(code),
+          label: "Adds pear at 4 and raises apple to 3",
+          stdin: "pear\n4\n",
+          expectedStdout:
+            "apple costs 3\nbanana costs 1\ncherry costs 5\npear costs 4",
         },
       ],
-      hint: "Subscript assignment with a new key creates the entry, and += updates an existing one; items() gives you both halves in the loop.",
+      hint: "Subscript assignment with a new key creates the entry and += updates an existing one; convert the price line with int() so it prints as a number, and items() gives you both halves in the loop.",
       explanation:
-        "A dictionary is the right tool when each value needs a name instead of a position. Updating by key works for new and existing entries alike, and items() turns the mapping into pairs you can format.",
+        "A dictionary is the right tool when each value needs a name instead of a position. Updating by key works for new and existing entries alike, items() turns the mapping into pairs you can format, and insertion order keeps the printed lines predictable.",
     },
   },
   "py-project": {
@@ -569,33 +523,24 @@ export const extras: Record<string, LessonExtras> = {
       id: "py-project-lab",
       title: "Ask again until the number is valid",
       brief:
-        "Write project.py that asks the user for a whole number and keeps asking until the text can be converted. Use input() for reading, int() inside try, and except ValueError to print a friendly message, all inside a function that returns the number. Then print the square of that number with an f-string; the checks are a structure check on your code.",
+        "Write project.py with a function that reads lines with input(), converts the text with int() inside try, and catches ValueError to print That was not a whole number. Try again. before asking once more. The function returns the first number that converts, and the program prints The square is 144 built with an f-string. Call input() without a prompt so the output holds only those lines; your program is executed with good and bad input and its exact output is compared.",
       file: "project.py",
       starter:
-        "# TODO: write a function that asks until int(text) succeeds, then print its square.\ndef ask_number():\n    pass",
-      checks: [
+        '# TODO: keep reading until int(text) succeeds, report bad text, then print the square.\ndef ask_number():\n    return int(input())\n\n\nnumber = ask_number()\nprint(f"The square is {number}")',
+      tests: [
         {
-          label: "Calls input() to read from the user",
-          test: (code) => /input\s*\(/.test(code),
+          label: "Bad text then 12 reports once and prints 144",
+          stdin: "abc\n12\n",
+          expectedStdout:
+            "That was not a whole number. Try again.\nThe square is 144",
         },
         {
-          label: "Converts text with int() inside a try block",
-          test: (code) => /try\s*:[\s\S]*?int\s*\(/.test(code),
-        },
-        {
-          label: "Catches ValueError specifically",
-          test: (code) => /except\s+ValueError\s*:/.test(code),
-        },
-        {
-          label: "Keeps asking inside a while loop",
-          test: (code) => /while\s+[^\n]*:/.test(code),
-        },
-        {
-          label: "Prints the result with an f-string",
-          test: (code) => /print\s*\(\s*f["']/.test(code),
+          label: "Valid 5 prints 25 straight away",
+          stdin: "5\n",
+          expectedStdout: "The square is 25",
         },
       ],
-      hint: "Return the converted number from inside the try block; the loop only repeats when ValueError sends control to the matching except.",
+      hint: "Return the converted number from inside the try block; the loop only repeats when ValueError sends control to the matching except, so good input prints no warning.",
       explanation:
         "Retrying inside the function keeps the validation loop in one place instead of spreading it across the program. Catching ValueError by name means only conversion failures are retried while genuine bugs still surface.",
     },

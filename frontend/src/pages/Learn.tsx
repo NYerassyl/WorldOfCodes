@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PASS_MARK,
   correctFor,
@@ -10,12 +10,13 @@ import {
   labKey,
   languages,
   lessonKey,
-  runLabChecks,
   trackProgress,
-  type LabResult,
+  type LabCheckResult,
   type Language,
   type Lesson,
 } from "../lib/curriculum";
+import { evaluateLab } from "../lib/labRunner";
+import { buildRenderDocument } from "../lib/renderCheck";
 import { useStore } from "../lib/store";
 import { Heading, Notice, Icon } from "../components/UI";
 
@@ -243,18 +244,38 @@ function LessonView({
   });
   const [selected, setSelected] = useState<number | null>(null);
   const [checked, setChecked] = useState(false);
-  const [labResults, setLabResults] = useState<LabResult[] | null>(null);
+  const [labResults, setLabResults] = useState<LabCheckResult[]>([]);
+  const [labStatus, setLabStatus] = useState<
+    "idle" | "running" | "done" | "failed" | "unavailable"
+  >("idle");
+  const [labMessage, setLabMessage] = useState("");
+  const [labAwarded, setLabAwarded] = useState(false);
+  const [labOutput, setLabOutput] = useState<{
+    stdout: string;
+    stderr: string;
+    compileError: string;
+    verdict: string;
+  } | null>(null);
+  const labAbort = useRef<AbortController | null>(null);
   const task = lesson.tasks[current];
   const taskDone = stored.includes(current);
   const showResult = checked || taskDone;
   const nextLesson = language.lessons[index + 1];
   const labKeyValue = lab ? labKey(language.id, lesson.id, lab.id) : "";
   const labDraft = lab ? (state.drafts[labKeyValue] ?? lab.starter) : "";
-  const labPassed = Boolean(labResults?.every((result) => result.pass));
+  const labChecks = lab?.tests ?? lab?.renderChecks ?? [];
+  const labIsRender = Boolean(lab?.renderChecks?.length);
+  const labPreview = useMemo(
+    () =>
+      lab && labIsRender ? buildRenderDocument(language.id, lab, labDraft) : "",
+    [lab, labIsRender, language.id, labDraft],
+  );
 
   useEffect(() => {
     if (passed && !state.completed.includes(key)) reward(key, 40, 15);
   }, [passed, key, state.completed, reward]);
+
+  useEffect(() => () => labAbort.current?.abort(), []);
 
   if (previous && !isLessonPassed(state.practice, language.id, previous)) {
     return (
@@ -283,11 +304,55 @@ function LessonView({
     if (selected === task.answer) completeTask(key, current);
   }
 
-  function checkLab() {
+  function resetLabOutput() {
+    labAbort.current?.abort();
+    setLabResults([]);
+    setLabOutput(null);
+    setLabMessage("");
+    setLabAwarded(false);
+    setLabStatus("idle");
+  }
+
+  function editLab(value: string) {
+    draft(labKeyValue, value);
+    resetLabOutput();
+  }
+
+  async function checkLab() {
     if (!lab) return;
-    const results = runLabChecks(lab, labDraft);
-    setLabResults(results);
-    if (results.every((result) => result.pass) && !labDone) {
+    labAbort.current?.abort();
+    const controller = new AbortController();
+    labAbort.current = controller;
+    setLabStatus("running");
+    setLabResults([]);
+    setLabMessage("");
+    setLabAwarded(false);
+    setLabOutput(null);
+    const evaluation = await evaluateLab(
+      language.id,
+      lab,
+      labDraft,
+      controller.signal,
+    );
+    if (controller.signal.aborted) return;
+    if (evaluation.status === "unavailable") {
+      setLabStatus("unavailable");
+      setLabMessage(evaluation.message);
+      return;
+    }
+    const accepted =
+      evaluation.results.length > 0 &&
+      evaluation.results.every((result) => result.pass);
+    setLabResults(evaluation.results);
+    setLabOutput({
+      stdout: evaluation.stdout,
+      stderr: evaluation.stderr,
+      compileError: evaluation.compileError,
+      verdict: evaluation.verdict,
+    });
+    setLabStatus(accepted ? "done" : "failed");
+    if (accepted && !labDone) {
+      setLabAwarded(true);
       completeLab(labKeyValue);
     }
   }
@@ -523,32 +588,44 @@ function LessonView({
                 <div className="lab-meta">
                   <span className="tag">{lab.file}</span>
                   <span className="tag">
-                    {lab.checks.length} structure checks
+                    {labChecks.length}{" "}
+                    {labIsRender ? "layout tests" : "automated tests"}
                   </span>
                   {labDone && <span className="tag">Lab complete ✓</span>}
                 </div>
                 <div className="lab-checks">
-                  {lab.checks.map((labCheck, checkIndex) => {
-                    const result = labResults?.[checkIndex];
+                  {labChecks.map((labCheck, checkIndex) => {
+                    const result = labResults[checkIndex];
+                    const mark =
+                      labStatus === "running"
+                        ? "…"
+                        : result
+                          ? result.pass
+                            ? "✓"
+                            : "×"
+                          : String(checkIndex + 1).padStart(2, "0");
                     return (
                       <div
                         className={`lab-check${result ? (result.pass ? " pass" : " fail") : ""}`}
                         key={labCheck.label}
                       >
-                        <span>
-                          {result
-                            ? result.pass
-                              ? "✓"
-                              : "×"
-                            : String(checkIndex + 1).padStart(2, "0")}
-                        </span>
-                        {labCheck.label}
+                        <span>{mark}</span>
+                        <div>
+                          {labCheck.label}
+                          {result?.detail && (
+                            <small className="lab-check-detail">
+                              {result.detail}
+                            </small>
+                          )}
+                        </div>
                       </div>
                     );
                   })}
                 </div>
                 <label className="lab-editor-label" htmlFor="lab-editor">
-                  Write your code
+                  {labIsRender
+                    ? "Your HTML / CSS"
+                    : `Your ${language.name} code`}
                 </label>
                 <textarea
                   id="lab-editor"
@@ -556,49 +633,115 @@ function LessonView({
                   value={labDraft}
                   spellCheck={false}
                   rows={12}
-                  onChange={(event) => {
-                    draft(labKeyValue, event.target.value);
-                    setLabResults(null);
-                  }}
+                  onChange={(event) => editLab(event.target.value)}
                 />
+                {labIsRender && (
+                  <div className="lab-preview">
+                    <span className="lab-editor-label">Live preview</span>
+                    <iframe
+                      title="Lab preview"
+                      sandbox="allow-same-origin"
+                      srcDoc={labPreview}
+                    />
+                  </div>
+                )}
                 <div className="inline-actions">
-                  <button className="btn" onClick={checkLab}>
-                    Run structure check
+                  <button
+                    className="btn"
+                    onClick={checkLab}
+                    disabled={labStatus === "running"}
+                  >
+                    {labStatus === "running"
+                      ? "Running…"
+                      : labIsRender
+                        ? "Run layout tests"
+                        : "Run & check"}
                   </button>
                   <button
                     className="btn secondary"
                     onClick={() => {
                       draft(labKeyValue, lab.starter);
-                      setLabResults(null);
+                      resetLabOutput();
                     }}
                   >
                     Reset to starter
                   </button>
                 </div>
-                {labResults ? (
-                  <div
-                    role="status"
-                    className={`lab-result${labPassed ? " pass" : " error"}`}
-                  >
-                    {labPassed
-                      ? `All ${lab.checks.length} checks passed. +10 XP and +5 coins are granted once. ${lab.explanation}`
-                      : "Some checks are still missing. Read each line below, adjust your code and run the check again."}
+                {labStatus === "unavailable" && (
+                  <div role="status" className="lab-result error">
+                    <strong>Execution is unavailable right now.</strong>{" "}
+                    {labMessage} Your code draft is saved, and no reward is
+                    granted until a real run passes.
                   </div>
-                ) : (
-                  labDone && (
-                    <div role="status" className="lab-result pass">
-                      You already completed this lab. {lab.explanation}
-                    </div>
-                  )
                 )}
+                {labStatus === "running" && (
+                  <div role="status" className="lab-result">
+                    {labIsRender
+                      ? "Measuring the rendered page…"
+                      : "Running your code in an isolated sandbox…"}
+                  </div>
+                )}
+                {labStatus === "done" && (
+                  <div role="status" className="lab-result pass">
+                    <strong>
+                      Accepted — all {labChecks.length} tests passed.
+                    </strong>{" "}
+                    {labAwarded
+                      ? "+10 XP and +5 coins are granted once."
+                      : labDone
+                        ? "This lab was already completed."
+                        : ""}{" "}
+                    {lab.explanation}
+                  </div>
+                )}
+                {labStatus === "failed" && (
+                  <div role="status" className="lab-result error">
+                    <strong>Not accepted yet.</strong> Review the failing tests
+                    and the output below, fix your code and run again.
+                  </div>
+                )}
+                {labStatus === "idle" && labDone && (
+                  <div role="status" className="lab-result pass">
+                    You already completed this lab. {lab.explanation}
+                  </div>
+                )}
+                {!labIsRender &&
+                  labOutput &&
+                  (labOutput.compileError ||
+                    labOutput.stderr ||
+                    labOutput.stdout ||
+                    labOutput.verdict) && (
+                    <div className="lab-output">
+                      <div className="lab-output-head">
+                        <span>
+                          {labStatus === "done" && labChecks.length > 1
+                            ? "Runner output · final test"
+                            : "Runner output"}
+                        </span>
+                        <span>{labOutput.verdict}</span>
+                      </div>
+                      {labOutput.compileError && (
+                        <pre className="compile">{labOutput.compileError}</pre>
+                      )}
+                      {labOutput.stderr && (
+                        <pre className="stderr">{labOutput.stderr}</pre>
+                      )}
+                      {labOutput.stdout && <pre>{labOutput.stdout}</pre>}
+                      {!labOutput.compileError &&
+                        !labOutput.stderr &&
+                        !labOutput.stdout && (
+                          <pre className="muted">No output was produced.</pre>
+                        )}
+                    </div>
+                  )}
                 <details className="lab-hint">
                   <summary>Need a hint?</summary>
                   <p>{lab.hint}</p>
                 </details>
                 <p className="muted">
-                  Structure checks look at the shape of your code in this
-                  browser. Your program is not executed and nothing is sent to a
-                  server.
+                  {labIsRender
+                    ? "Layout tests inspect a real sandboxed rendering of your page in this browser. Scripts are blocked."
+                    : "Your code and test input are sent to the public Judge0 CE sandbox at ce.judge0.com for real compilation and execution. Do not paste passwords, keys or private data."}
                 </p>
               </>
             )
@@ -640,14 +783,14 @@ function LessonView({
                 <p>
                   {labDone
                     ? "Code lab completed."
-                    : "Pass every structure check in the code lab."}
+                    : "Pass every lab test to earn it once."}
                 </p>
               </div>
             </div>
           )}
           <Notice>
-            Quiz answers and lab checks run instantly in your browser. Preview
-            progress is saved locally; account sync is coming later.
+            Quiz answers and progress are saved in this browser. Code-lab runs
+            are sent to an external sandbox; account sync is coming later.
           </Notice>
         </aside>
       </div>

@@ -4,9 +4,11 @@ export const solutions = {
 using namespace std;
 
 int main() {
-    string name = "Ada";
-    int level = 3;
-    double price = 4.5;
+    string name;
+    int level = 0;
+    double price = 0.0;
+
+    cin >> name >> level >> price;
 
     cout << name << endl;
     cout << level << endl;
@@ -18,7 +20,11 @@ int main() {
 using namespace std;
 
 int main() {
-    for (int i = 1; i <= 5; i++) {
+    int start = 0;
+    int end = 0;
+    cin >> start >> end;
+
+    for (int i = start; i <= end; i++) {
         if (i % 2 == 0) {
             cout << i << " even" << endl;
         } else {
@@ -36,8 +42,11 @@ int sum(int a, int b) {
 }
 
 int main() {
-    int total = sum(3, 4);
-    cout << total << endl;
+    int a = 0;
+    int b = 0;
+    cin >> a >> b;
+
+    cout << sum(a, b) << endl;
     return 0;
 }
 `,
@@ -48,10 +57,17 @@ struct Score {
     int points;
     Score(int start) : points(start) {}
     int value() const { return points; }
+    void add(int n) { points += n; }
 };
 
 int main() {
-    Score score(42);
+    int start = 0;
+    int bonus = 0;
+    cin >> start >> bonus;
+
+    Score score(start);
+    cout << score.value() << endl;
+    score.add(bonus);
     cout << score.value() << endl;
     return 0;
 }
@@ -60,11 +76,25 @@ int main() {
 #include <vector>
 #include <map>
 #include <algorithm>
+#include <string>
 using namespace std;
 
 int main() {
-    vector<int> scores = {12, 5, 20, 8};
+    int n = 0;
+    cin >> n;
+
+    vector<int> scores(n);
+    for (int i = 0; i < n; i++) {
+        cin >> scores[i];
+    }
+
     sort(scores.begin(), scores.end());
+
+    for (int i = 0; i < n; i++) {
+        if (i > 0) cout << " ";
+        cout << scores[i];
+    }
+    cout << endl;
 
     int high = count_if(scores.begin(), scores.end(), [](int s) {
         return s >= 10;

@@ -1,13 +1,17 @@
 export const solutions = {
-  "py-basics-lab": `name = "Ada"
-level = 7
+  "py-basics-lab": `name = input()
+level = int(input())
+
 print(f"Player {name} reached level {level}.")`,
 
-  "py-control-lab": `total = 0
-for number in range(1, 11):
+  "py-control-lab": `limit = int(input())
+total = 0
+
+for number in range(1, limit + 1):
     if number % 2 == 0:
         print(number)
         total += number
+
 print(f"Total of even numbers: {total}")`,
 
   "py-functions-lab": `def average(numbers):
@@ -16,18 +20,21 @@ print(f"Total of even numbers: {total}")`,
     return sum(numbers) / len(numbers)
 
 
-scores = [8, 10, 6]
-print(f"Average score: {average(scores)}")`,
+scores = [int(part) for part in input().split()]
+print(f"Average score: {average(scores):.2f}")`,
 
   "py-collections-lab": `prices = {"apple": 2, "banana": 1, "cherry": 5}
-prices["kiwi"] = 3
+fruit = input()
+price = int(input())
+prices[fruit] = price
 prices["apple"] += 1
-for fruit, price in prices.items():
-    print(f"{fruit} costs {price}")`,
+
+for fruit_name, price_value in prices.items():
+    print(f"{fruit_name} costs {price_value}")`,
 
   "py-project-lab": `def ask_number():
     while True:
-        text = input("Give me a whole number: ")
+        text = input()
         try:
             return int(text)
         except ValueError:

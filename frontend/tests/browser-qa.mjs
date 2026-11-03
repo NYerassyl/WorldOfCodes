@@ -137,6 +137,15 @@ async function nav(hash) {
   await ev(`location.hash=${JSON.stringify(hash)};'ok'`);
   await sleep(500);
 }
+async function waitFor(expression, timeout = 60000) {
+  const start = Date.now();
+  while (Date.now() - start < timeout) {
+    const value = await ev(expression);
+    if (value) return value;
+    await sleep(500);
+  }
+  return null;
+}
 async function reload() {
   await send("Page.reload", {});
   await sleep(1700);
@@ -480,7 +489,7 @@ check(
   true,
 );
 
-// --- Code lab: structure checking, honest labeling and rewards ---
+// --- Code lab: real execution, verdicts and rewards ---
 await nav("#learn/javascript/js-basics");
 await clickText(".tabbar button", "Code lab");
 await sleep(350);
@@ -488,44 +497,66 @@ const labStart = await ev(`(()=>({
   checks:document.querySelectorAll('.lab-check').length,
   starter:document.querySelector('.lab-editor')?.value.includes('TODO') || false,
   file:document.querySelector('.lab-meta .tag')?.textContent || null,
-  disclaimer:document.querySelector('.panel .muted')?.textContent.replace(/\\s+/g,' ').trim() || null
+  runLabel:[...document.querySelectorAll('.inline-actions button')].map(b=>b.textContent.trim()),
+  disclosure:[...document.querySelectorAll('.panel > .muted')].map(e=>e.textContent).join(' ')
 }))()`);
-check("code lab lists its structure checks", labStart.checks, 4);
+check("code lab lists its automated tests", labStart.checks, 2);
 check("code lab starts from a starter snippet", labStart.starter, true);
 check("code lab names the target file", labStart.file, "basics.js");
 check(
-  "code lab says the program is not executed",
-  /not executed/.test(labStart.disclaimer || ""),
+  "code lab offers a real run action",
+  labStart.runLabel.some((label) => /Run & check/.test(label)),
   true,
 );
-await clickText("button", "Run structure check");
-await sleep(350);
+check(
+  "code lab discloses remote execution",
+  /Judge0 CE/.test(labStart.disclosure || "") &&
+    /sent to the public/.test(labStart.disclosure || ""),
+  true,
+);
+await clickText("button", "Run & check");
+await waitFor(
+  `Boolean(document.querySelector('.lab-result.error, .lab-result.pass'))`,
+);
 const labStarterResult = await ev(`(()=>({
   failed:document.querySelectorAll('.lab-check.fail').length,
   error:Boolean(document.querySelector('.lab-result.error')),
+  output:document.querySelector('.lab-output')?.textContent.replace(/\\s+/g,' ').trim() || null,
   state:${STATE}
 }))()`);
-check("starter code fails some checks", labStarterResult.failed, (v) => v > 0);
+check("starter code fails a real test", labStarterResult.failed, (v) => v > 0);
 check("starter code shows the retry guidance", labStarterResult.error, true);
-check("failed lab check grants no XP", labStarterResult.state?.xp, 60);
+check(
+  "failed run shows runner output",
+  /Runner output/.test(labStarterResult.output || ""),
+  true,
+);
+check("failed lab run grants no XP", labStarterResult.state?.xp, 60);
 
-const labSolution = `function greet(name) {
-  return \`Hello, \${name}!\`;
+const labSolution = `const name = require("node:fs").readFileSync(0, "utf8").trim();
+function greet(person) {
+  return \`Hello, \${person}!\`;
 }
-console.log(greet("Ada"));`;
+console.log(greet(name));`;
 await setValue(".lab-editor", labSolution);
 await sleep(200);
-await clickText("button", "Run structure check");
-await sleep(500);
+await clickText("button", "Run & check");
+await waitFor(`Boolean(document.querySelector('.lab-result.pass'))`);
 const labDone = await ev(`(()=>({
   passed:document.querySelectorAll('.lab-check.pass').length,
   result:document.querySelector('.lab-result.pass')?.textContent.replace(/\\s+/g,' ').trim() || null,
+  output:document.querySelector('.lab-output')?.textContent.replace(/\\s+/g,' ').trim() || null,
   state:${STATE}
 }))()`);
-check("complete lab solution passes every check", labDone.passed, 4);
+check("complete lab solution passes every test", labDone.passed, 2);
 check(
-  "lab result reports a structure check",
-  /checks passed/.test(labDone.result || ""),
+  "lab result reports a real accepted run",
+  /Accepted — all 2 tests passed/.test(labDone.result || ""),
+  true,
+);
+check(
+  "accepted run shows program stdout",
+  /Hello, Grace!/.test(labDone.output || ""),
   true,
 );
 check("code lab grants 10 XP", labDone.state?.xp, 70);
@@ -541,8 +572,9 @@ check(
   true,
 );
 
-await clickText("button", "Run structure check");
-await sleep(400);
+await clickText("button", "Run & check");
+await sleep(1200);
+await waitFor(`Boolean(document.querySelector('.lab-result.pass'))`);
 const labRepeat = await ev(`(()=>({state:${STATE}}))()`);
 check(
   "re-running a passed lab does not award XP again",
@@ -561,6 +593,60 @@ const labPersisted = await ev(`(()=>({
 check("lab draft persists after reload", labPersisted.draft, true);
 check("lab completion persists after reload", labPersisted.complete, true);
 check("lab XP persists after reload", labPersisted.state?.xp, 70);
+
+// --- Render lab: real sandboxed preview and computed-style checks ---
+await nav("#learn/css/css-basics");
+await clickText(".tabbar button", "Code lab");
+await sleep(350);
+const renderLabStart = await ev(`(()=>({
+  preview:Boolean(document.querySelector('.lab-preview iframe')),
+  checks:document.querySelectorAll('.lab-check').length,
+  runLabel:[...document.querySelectorAll('.inline-actions button')].map(b=>b.textContent.trim())
+}))()`);
+check("css lab renders a live preview", renderLabStart.preview, true);
+check("css lab lists its layout tests", renderLabStart.checks, 5);
+check(
+  "css lab offers a layout test action",
+  renderLabStart.runLabel.some((label) => /Run layout tests/.test(label)),
+  true,
+);
+
+const cssSolution = `.card {
+  color: #173e31;
+  background-color: #f4efe5;
+  padding: 20px;
+  border-radius: 12px;
+}
+#hero {
+  color: #ffffff;
+  background-color: #173e31;
+  padding: 24px;
+}
+.card p {
+  color: #55605b;
+  line-height: 1.6;
+}`;
+await setValue(".lab-editor", cssSolution);
+await sleep(300);
+await clickText("button", "Run layout tests");
+await waitFor(`Boolean(document.querySelector('.lab-result.pass'))`, 15000);
+const renderLabDone = await ev(`(()=>({
+  passed:document.querySelectorAll('.lab-check.pass').length,
+  result:document.querySelector('.lab-result.pass')?.textContent.replace(/\\s+/g,' ').trim() || null,
+  state:${STATE}
+}))()`);
+check(
+  "css layout tests pass on the reference solution",
+  renderLabDone.passed,
+  5,
+);
+check(
+  "css lab reports a rendered result",
+  /Accepted — all 5 tests passed/.test(renderLabDone.result || ""),
+  true,
+);
+check("css lab grants 10 XP", renderLabDone.state?.xp, 80);
+check("css lab grants 5 coins", renderLabDone.state?.coins, 30);
 
 // --- Profile rename: first free, second blocked, persistence ---
 await nav("#profile");

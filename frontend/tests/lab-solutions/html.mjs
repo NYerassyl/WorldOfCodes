@@ -41,34 +41,54 @@ export const solutions = {
     </footer>
   </body>
 </html>`,
-  "html-forms-lab": `<form action="/subscribe" method="post">
-  <label for="name">Your name</label>
-  <input id="name" name="name" type="text" required>
+  "html-forms-lab": `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Join the newsletter</title>
+  </head>
+  <body>
+    <h1>Join the newsletter</h1>
+    <form action="/subscribe" method="post">
+      <label for="name">Your name</label>
+      <input id="name" name="name" type="text" required>
 
-  <label for="email">Email address</label>
-  <input id="email" name="email" type="email" required>
+      <label for="email">Email address</label>
+      <input id="email" name="email" type="email" required>
 
-  <button type="submit">Send</button>
-</form>`,
-  "html-tables-lab": `<table>
-  <caption>Player points after round three</caption>
-  <thead>
-    <tr>
-      <th scope="col">Player</th>
-      <th scope="col">Points</th>
-    </tr>
-  </thead>
-  <tbody>
-    <tr>
-      <td>Ada</td>
-      <td>18</td>
-    </tr>
-    <tr>
-      <td>Grace</td>
-      <td>21</td>
-    </tr>
-  </tbody>
-</table>`,
+      <button type="submit">Send</button>
+    </form>
+  </body>
+</html>`,
+  "html-tables-lab": `<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <title>Player points</title>
+  </head>
+  <body>
+    <h1>Player points</h1>
+    <table>
+      <caption>Player points after round three</caption>
+      <thead>
+        <tr>
+          <th scope="col">Player</th>
+          <th scope="col">Points</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td>Ada</td>
+          <td>18</td>
+        </tr>
+        <tr>
+          <td>Grace</td>
+          <td>21</td>
+        </tr>
+      </tbody>
+    </table>
+  </body>
+</html>`,
   "html-page-lab": `<!DOCTYPE html>
 <html lang="en">
   <head>

@@ -329,35 +329,59 @@ export const extras: Record<string, LessonExtras> = {
       id: "css-basics-lab",
       title: "Colour a card and its text",
       brief:
-        "Write three rules in styles.css. Give the .card class a text color and a background-color, give the #hero id its own color, and use the descendant selector .card p to colour the paragraphs inside the card. Keep each declaration inside a block with braces.",
+        "Write three rules in styles.css. Give the .card class color: #173e31 and background-color: #f4efe5, give the #hero id color: #ffffff and background-color: #173e31, and use the descendant selector .card p to set color: #55605b on the paragraphs inside the card. Keep each declaration inside a block with braces. Your stylesheet is applied to the hero and the card in a real preview, and the browser measures the computed colours of those elements.",
       file: "styles.css",
       starter:
         "/* TODO: style the .card class, the #hero id and paragraphs inside the card */\n.card {\n  padding: 16px;\n}\n",
-      checks: [
+      fixture: `<header id="hero">
+  <h1>World of Codes</h1>
+  <p>Short lessons and real practice.</p>
+</header>
+<main>
+  <article class="card">
+    <h2>CSS basics</h2>
+    <p>Selectors choose which elements a rule reaches.</p>
+    <p>Declarations live inside braces.</p>
+  </article>
+</main>`,
+      renderChecks: [
         {
-          label: "Selects the card class",
-          test: (code) => /\.card\s*\{/.test(code),
+          label: "The card text is painted in the theme green",
+          selector: ".card",
+          count: 1,
+          style: { property: "color", value: "rgb(23, 62, 49)" },
         },
         {
-          label: "Selects the hero id",
-          test: (code) => /#hero\s*\{/.test(code),
+          label: "The card sits on a warm background",
+          selector: ".card",
+          style: {
+            property: "background-color",
+            value: "rgb(244, 239, 229)",
+          },
         },
         {
-          label: "Sets a text color",
-          test: (code) => /(^|[^-\w])color\s*:\s*[^;]+/i.test(code),
+          label: "The hero text is white",
+          selector: "#hero",
+          style: { property: "color", value: "rgb(255, 255, 255)" },
         },
         {
-          label: "Sets a background color",
-          test: (code) => /background(-color)?\s*:\s*[^;]+/i.test(code),
+          label: "The hero band is dark green",
+          selector: "#hero",
+          style: {
+            property: "background-color",
+            value: "rgb(23, 62, 49)",
+          },
         },
         {
-          label: "Styles paragraphs inside the card",
-          test: (code) => /\.card\s+p\s*\{/.test(code),
+          label: "Both card paragraphs use the softer grey",
+          selector: ".card p",
+          count: 2,
+          style: { property: "color", value: "rgb(85, 96, 91)" },
         },
       ],
-      hint: "A class starts with a dot and an id with a hash, and a space between two selectors means inside.",
+      hint: "A class starts with a dot and an id with a hash, and a space between two selectors means inside. The preview shows the winning declaration, so check that the element the check names is the one your rule reaches.",
       explanation:
-        "The dot and the hash choose which elements a rule reaches, and a space narrows that choice to descendants. Colour declarations belong inside braces, which keeps each rule separate from the next. This is a structure check, so it reads your selectors and declarations as text rather than rendering the page.",
+        "The dot and the hash choose which elements a rule reaches, and a space narrows that choice to descendants. Colour declarations belong inside braces, which keeps each rule separate from the next. The preview is a real sandboxed page holding the hero and the card, and the browser reports the computed color and background-color of each element, so a rule only passes once it genuinely matches.",
     },
   },
   "css-box": {
@@ -397,35 +421,52 @@ export const extras: Record<string, LessonExtras> = {
       id: "css-box-lab",
       title: "Space a card with the box model",
       brief:
-        "Style the .card rule in styles.css so it has a width, inner padding, a visible border and outer margin. Add box-sizing: border-box so the declared width covers the padding and border instead of growing past it. Use the margin shorthand to place the card and keep it away from its neighbours.",
+        "Style the .card rule in styles.css: set box-sizing: border-box, width: 320px, padding: 24px, border: 2px solid #d8ded8 and margin: 0 auto 16px so the card is centered with 16px below it. border-box makes the declared width cover the padding and border instead of growing past it. The card is rendered in a real preview and the browser measures its computed box values.",
       file: "styles.css",
       starter:
         "/* TODO: add width, padding, border, margin and box-sizing to .card */\n.card {\n  background-color: #f4efe5;\n}\n",
-      checks: [
+      fixture: `<main>
+  <article class="card">
+    <h2>Box model</h2>
+    <p>Padding sits inside the border and margin sits outside it.</p>
+  </article>
+</main>`,
+      renderChecks: [
         {
-          label: "Sets a width",
-          test: (code) => /(^|[^-\w])width\s*:\s*[^;]+/i.test(code),
+          label: "The card includes padding in its width",
+          selector: ".card",
+          count: 1,
+          style: { property: "box-sizing", value: "border-box" },
         },
         {
-          label: "Adds padding",
-          test: (code) => /padding\s*:\s*[^;]+/i.test(code),
+          label: "The card measures 320px across",
+          selector: ".card",
+          style: { property: "width", value: "320px" },
         },
         {
-          label: "Draws a border",
-          test: (code) => /border\s*:\s*[^;]+/i.test(code),
+          label: "The inner space above the text is 24px",
+          selector: ".card",
+          style: { property: "padding-top", value: "24px" },
         },
         {
-          label: "Adds margin",
-          test: (code) => /margin\s*:\s*[^;]+/i.test(code),
+          label: "The border is 2px thick",
+          selector: ".card",
+          style: { property: "border-top-width", value: "2px" },
         },
         {
-          label: "Includes padding in the declared width",
-          test: (code) => /box-sizing\s*:\s*border-box/i.test(code),
+          label: "The border is drawn as a solid line",
+          selector: ".card",
+          style: { property: "border-top-style", value: "solid" },
+        },
+        {
+          label: "The card keeps 16px below it",
+          selector: ".card",
+          style: { property: "margin-bottom", value: "16px" },
         },
       ],
-      hint: "The border shorthand needs a width, a style and a colour, and box-sizing belongs on the same element whose width you set.",
+      hint: "The border shorthand needs a width, a style and a colour, and box-sizing belongs on the same element whose width you set. Measure the result in the preview: the outer width should stay at the value you declared.",
       explanation:
-        "Padding sits inside the border and margin sits outside it, so all three affect the space a card claims. border-box makes the declared width the final outer width, which keeps a row of cards predictable. The structure check reads the declarations as text, so spell every property name exactly.",
+        "Padding sits inside the border and margin sits outside it, so all three affect the space a card claims. border-box makes the declared width the final outer width, which keeps a row of cards predictable. The preview renders the real card and the browser reports its computed box-sizing, width, padding, border and margin, so the numbers you see are the ones the layout uses.",
     },
   },
   "css-flex": {
@@ -465,35 +506,54 @@ export const extras: Record<string, LessonExtras> = {
       id: "css-flex-lab",
       title: "Center a row with flexbox",
       brief:
-        "Make .toolbar a flex container with flex-direction: row. Center its children on both axes with justify-content and align-items, and add a gap so the buttons do not touch. Keep the existing background rule so the row remains visible.",
+        "Make .toolbar a flex container with display: flex and flex-direction: row. Center its children on both axes with justify-content: center and align-items: center, and add gap: 12px so the buttons do not touch. Keep the existing background rule so the row remains visible. The toolbar is rendered in a real preview and the browser measures the computed display and alignment values of the container.",
       file: "styles.css",
       starter:
         "/* TODO: make .toolbar a centered flex row with a gap between the buttons */\n.toolbar {\n  background-color: #173e31;\n}\n",
-      checks: [
+      fixture: `<nav class="toolbar" aria-label="Editor tools">
+  <button type="button">Preview</button>
+  <button type="button">Save</button>
+  <button type="button">Share</button>
+</nav>`,
+      renderChecks: [
         {
-          label: "Creates a flex container",
-          test: (code) => /display\s*:\s*flex\b/i.test(code),
+          label: "The toolbar becomes a flex container",
+          selector: ".toolbar",
+          count: 1,
+          style: { property: "display", value: "flex" },
         },
         {
-          label: "Keeps items in a row",
-          test: (code) => /flex-direction\s*:\s*row\b/i.test(code),
+          label: "The buttons stay on one row",
+          selector: ".toolbar",
+          style: { property: "flex-direction", value: "row" },
         },
         {
-          label: "Centers items along the main axis",
-          test: (code) => /justify-content\s*:\s*center\b/i.test(code),
+          label: "Items are centered along the main axis",
+          selector: ".toolbar",
+          style: { property: "justify-content", value: "center" },
         },
         {
-          label: "Centers items across the cross axis",
-          test: (code) => /align-items\s*:\s*center\b/i.test(code),
+          label: "Items are centered across the cross axis",
+          selector: ".toolbar",
+          style: { property: "align-items", value: "center" },
         },
         {
-          label: "Adds space between items",
-          test: (code) => /(^|[^-\w])gap\s*:\s*[^;]+/i.test(code),
+          label: "The buttons are 12px apart",
+          selector: ".toolbar",
+          style: { property: "gap", value: "12px" },
+        },
+        {
+          label: "The toolbar keeps its dark background",
+          selector: ".toolbar",
+          style: {
+            property: "background-color",
+            value: "rgb(23, 62, 49)",
+          },
         },
       ],
-      hint: "The two centering properties belong to the container, not to each button, and gap replaces per-button margins.",
+      hint: "The two centering properties belong to the container, not to each button, and gap replaces per-button margins. The preview only changes once the container itself becomes a flex context.",
       explanation:
-        "display: flex makes the children flex items, and justify-content and align-items center them along the main and cross axes. gap keeps the spacing between items even without touching their margins. This structure check compares your text with the expected properties and does not draw the row.",
+        "display: flex makes the children flex items, and justify-content and align-items center them along the main and cross axes. gap keeps the spacing between items even without touching their margins. The preview renders the real toolbar, so the browser reports the computed display, flex-direction, justify-content, align-items and gap that the buttons are actually laid out with.",
     },
   },
   "css-grid": {
@@ -534,35 +594,73 @@ export const extras: Record<string, LessonExtras> = {
       id: "css-grid-lab",
       title: "Build a two-column gallery",
       brief:
-        "Turn .gallery into a grid with two columns using grid-template-columns and repeat, and add a gap between the tracks. Then make the .feature item span both columns with grid-column. Keep the existing background rule on the container.",
+        "Turn .gallery into a grid with two equal columns using grid-template-columns: repeat(2, 1fr), and add gap: 16px between the tracks. Then make the .feature item span both columns with grid-column: span 2. Keep the existing background rule on the container. The gallery is rendered in a real preview at a desktop width, so the browser reports the computed tracks, gaps and placement.",
       file: "styles.css",
       starter:
         "/* TODO: make .gallery a two-column grid and let .feature span both columns */\n.gallery {\n  background-color: #f4efe5;\n}\n",
-      checks: [
+      fixture: `<section class="gallery" aria-label="Latest lessons">
+  <article class="card feature">
+    <h2>Build a gallery</h2>
+    <p>Grid lines content up in rows and columns at the same time.</p>
+  </article>
+  <article class="card">
+    <h2>Tracks</h2>
+    <p>Every column and row is a track.</p>
+  </article>
+  <article class="card">
+    <h2>Gaps</h2>
+    <p>Gap spaces the tracks without adding outer margins.</p>
+  </article>
+</section>`,
+      renderChecks: [
         {
-          label: "Creates a grid container",
-          test: (code) => /display\s*:\s*grid\b/i.test(code),
+          label: "The gallery becomes a grid container",
+          selector: ".gallery",
+          count: 1,
+          viewport: 1200,
+          style: { property: "display", value: "grid" },
         },
         {
-          label: "Declares column tracks",
-          test: (code) => /grid-template-columns\s*:\s*[^;]+/i.test(code),
+          label: "The gallery has two equal columns",
+          selector: ".gallery",
+          viewport: 1200,
+          style: {
+            property: "grid-template-columns",
+            value: "584px 584px",
+          },
         },
         {
-          label: "Repeats the track list",
-          test: (code) => /repeat\s*\(/i.test(code),
+          label: "The columns are 16px apart",
+          selector: ".gallery",
+          viewport: 1200,
+          style: { property: "column-gap", value: "16px" },
         },
         {
-          label: "Adds space between tracks",
-          test: (code) => /(^|[^-\w])gap\s*:\s*[^;]+/i.test(code),
+          label: "The rows are 16px apart too",
+          selector: ".gallery",
+          viewport: 1200,
+          style: { property: "row-gap", value: "16px" },
         },
         {
-          label: "Spans the feature across both columns",
-          test: (code) => /grid-column\s*:\s*span\s*2\b/i.test(code),
+          label: "The feature crosses both columns",
+          selector: ".gallery .feature",
+          count: 1,
+          viewport: 1200,
+          style: { property: "grid-column-start", value: "span 2" },
+        },
+        {
+          label: "The gallery keeps its warm background",
+          selector: ".gallery",
+          viewport: 1200,
+          style: {
+            property: "background-color",
+            value: "rgb(244, 239, 229)",
+          },
         },
       ],
-      hint: "Columns are declared on the container, while the span belongs on the item that should be wider.",
+      hint: "Columns are declared on the container, while the span belongs on the item that should be wider. The preview updates as you type, so you can see the second card drop beside the first before you run the checks.",
       explanation:
-        "grid-template-columns with repeat describes the tracks, and gap spaces them without outer margins. grid-column: span 2 lets one item cross the line between the two columns so it reads as a feature. This is a structure check on the stylesheet text, so each track and span must be written out explicitly.",
+        "grid-template-columns with repeat describes the tracks, and gap spaces them without outer margins. grid-column: span 2 lets one item cross the line between the two columns so it reads as a feature. The preview renders the real gallery at a desktop width and the browser reports the used track sizes, the column and row gaps, and the placement of the feature, so the checks describe the layout rather than the spelling of your CSS.",
     },
   },
   "css-responsive": {
@@ -601,32 +699,70 @@ export const extras: Record<string, LessonExtras> = {
       id: "css-responsive-lab",
       title: "Make a page fluid",
       brief:
-        "Give img a fluid rule with max-width: 100% and height: auto. Size the h1 with clamp so it scales between a minimum and a maximum, and add a min-width media query that switches .cards to a two-column grid. Declare the narrow layout first so the query only adds to it.",
+        "Give img a fluid rule with max-width: 100% and height: auto. Size the h1 with font-size: clamp(1.5rem, 4vw, 2.5rem) so it scales between a minimum and a maximum. Give .cards a base rule with display: grid and gap: 24px, then add a min-width: 720px media query that adds grid-template-columns: repeat(2, 1fr) to it. Declare the narrow layout first so the query only adds to it, and keep the existing body rule. The page is rendered twice in a real preview, once at phone width and once at desktop width, and the browser measures the computed values at each size.",
       file: "styles.css",
       starter:
         "/* TODO: make the image fluid, scale the h1 with clamp and add a min-width query */\nbody {\n  margin: 0;\n}\n",
-      checks: [
+      fixture: `<main class="page">
+  <h1>Responsive by default</h1>
+  <img src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='300'%3E%3Crect width='900' height='300' fill='%23173e31'/%3E%3C/svg%3E" alt="Banner promoting the responsive design lesson">
+  <section class="cards">
+    <article class="card">
+      <h2>Units</h2>
+      <p>rem follows the root font size, while vw follows the viewport.</p>
+    </article>
+    <article class="card">
+      <h2>Breakpoints</h2>
+      <p>A min-width query adds layout once there is room for it.</p>
+    </article>
+  </section>
+</main>`,
+      renderChecks: [
         {
-          label: "Adds a min-width media query",
-          test: (code) =>
-            /@media[^{]*min-width\s*:\s*\d+\s*(px|em|rem)/i.test(code),
+          label: "At phone width the heading stops at its minimum size",
+          selector: "h1",
+          count: 1,
+          viewport: 390,
+          style: { property: "font-size", value: "24px" },
         },
         {
-          label: "Caps images at the container width",
-          test: (code) => /max-width\s*:\s*100%/i.test(code),
+          label: "At phone width the image never exceeds its column",
+          selector: "img",
+          viewport: 390,
+          style: { property: "max-width", value: "100%" },
         },
         {
-          label: "Keeps image height automatic",
-          test: (code) => /height\s*:\s*auto/i.test(code),
+          label: "At phone width the image keeps its proportions",
+          selector: "img",
+          viewport: 390,
+          style: { property: "height", value: "130px" },
         },
         {
-          label: "Sizes the heading with clamp",
-          test: (code) => /font-size\s*:\s*clamp\s*\([^)]*\)/i.test(code),
+          label: "At desktop width the heading stops at its maximum size",
+          selector: "h1",
+          viewport: 1200,
+          style: { property: "font-size", value: "40px" },
+        },
+        {
+          label: "The cards become a grid",
+          selector: ".cards",
+          count: 1,
+          viewport: 1200,
+          style: { property: "display", value: "grid" },
+        },
+        {
+          label: "Desktop width gives the cards two equal columns",
+          selector: ".cards",
+          viewport: 1200,
+          style: {
+            property: "grid-template-columns",
+            value: "588px 588px",
+          },
         },
       ],
-      hint: "The media query wraps other rules, so its opening brace comes after the condition and its closing brace comes last.",
+      hint: "The media query wraps other rules, so its opening brace comes after the condition and its closing brace comes last. Anything written outside the query is the narrow layout, and the query only adds the wide one on top of it.",
       explanation:
-        "A fluid image shrinks to its column, and clamp lets the heading scale without a separate breakpoint. The min-width query then upgrades the card row only once there is room for two columns. The structure check reads your stylesheet as text, so keep the media query, function names and units exact.",
+        "A fluid image shrinks to its column, and clamp lets the heading scale without a separate breakpoint. The min-width query then upgrades the card row only once there is room for two columns. The same page is rendered at a phone width and a desktop width, and the browser reports the computed font-size, image size and grid tracks it used at each width, so the checks follow what a visitor would actually see.",
     },
   },
 };
