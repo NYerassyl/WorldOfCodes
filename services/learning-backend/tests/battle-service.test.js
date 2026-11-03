@@ -115,7 +115,11 @@ test('friendly invite cannot be joined by its creator or after expiry', async ()
     $transaction: callback => callback({
       friendBattle: { findUnique: async () => invite },
       matchPlayer: { create: async () => assert.fail('must not add player') },
-      match: { updateMany: async () => assert.fail('must not activate') }
+      match: { updateMany: async args => {
+        assert.equal(args.where.status, 'PENDING');
+        assert.equal(args.data.status, 'EXPIRED');
+        return { count: 1 };
+      } }
     })
   });
 
