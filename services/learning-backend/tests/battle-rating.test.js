@@ -26,3 +26,12 @@ test('rejects non-finite ratings and invalid K factors', () => {
   assert.throws(() => calculateElo(1000, 1000, 1, 0), TypeError);
   assert.throws(() => calculateElo(1000, Infinity, 1), TypeError);
 });
+
+test('every Elo outcome is zero-sum after rounding', () => {
+  for (const [ratingA, ratingB] of [[1000, 1000], [1000, 1011], [2200, 1400], [800, 1600]]) {
+    for (const score of [0, 0.5, 1]) {
+      const result = calculateElo(ratingA, ratingB, score);
+      assert.equal(result.deltaA + result.deltaB, 0);
+    }
+  }
+});
