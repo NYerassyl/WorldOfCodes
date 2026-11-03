@@ -18,7 +18,8 @@ export async function attachBattleSocket(server, prisma, {
   queue = new MatchmakingQueue(prisma),
   cors = {},
   ServerClass,
-  submissionCooldownMs = 1500
+  submissionCooldownMs = 1500,
+  judge
 } = {}) {
   const SocketServer = ServerClass || (await import('socket.io')).Server;
   const io = new SocketServer(server, {
@@ -111,7 +112,8 @@ export async function attachBattleSocket(server, prisma, {
         const result = await submitBattleSolution(prisma, {
           matchId,
           userId,
-          sourceCode: code
+          sourceCode: code,
+          judge
         });
         safeAck(ack, { ok: true, result });
         io.to(MATCH_ROOM(matchId)).emit('match:updated', {
