@@ -16,6 +16,7 @@ export type State = {
   coins: number;
   completed: string[];
   practice: Record<string, number[]>;
+  labs: string[];
   activity: Record<string, number>;
   drafts: Record<string, string>;
 };
@@ -30,6 +31,7 @@ const initial: State = {
   coins: 0,
   completed: [],
   practice: {},
+  labs: [],
   activity: {},
   drafts: {},
 };
@@ -58,6 +60,9 @@ function load(): State {
                 ]),
             ) as Record<string, number[]>)
           : {},
+      labs: Array.isArray(raw.labs)
+        ? raw.labs.filter((x: unknown) => typeof x === "string")
+        : [],
       activity:
         raw.activity && typeof raw.activity === "object" ? raw.activity : {},
       drafts: raw.drafts && typeof raw.drafts === "object" ? raw.drafts : {},
@@ -72,6 +77,7 @@ type Store = {
   update: (patch: Partial<State>) => void;
   reward: (id: string, xp?: number, coins?: number) => void;
   completeTask: (key: string, index: number) => void;
+  completeLab: (key: string) => void;
   draft: (id: string, code: string) => void;
   storageError: boolean;
 };
@@ -103,6 +109,12 @@ export function Provider({ children }: { children: ReactNode }) {
               practice: { ...s.practice, [key]: [...current, index] },
             };
           }),
+        completeLab: (key) =>
+          setState((s) =>
+            s.labs.includes(key)
+              ? s
+              : { ...award(s, key, 10, 5), labs: [...s.labs, key] },
+          ),
         draft: (id, code) =>
           setState((s) => ({ ...s, drafts: { ...s.drafts, [id]: code } })),
       }}

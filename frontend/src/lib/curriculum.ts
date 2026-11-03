@@ -1,4 +1,5 @@
 import { lessonPassed, uniqueCorrect } from "./progress.mjs";
+import { extraLessons, lessonExtras } from "./lessonExtras";
 
 export const PASS_MARK = 5;
 
@@ -16,13 +17,42 @@ export type Task = {
   explanation: string;
 };
 
+export type Term = {
+  term: string;
+  meaning: string;
+};
+
+export type LabCheck = {
+  label: string;
+  test: (code: string) => boolean;
+};
+
+export type Lab = {
+  id: string;
+  title: string;
+  brief: string;
+  file: string;
+  starter: string;
+  checks: LabCheck[];
+  hint: string;
+  explanation: string;
+};
+
+export type LessonExtras = {
+  objectives: string[];
+  terms: Term[];
+  deepDive: TheoryBlock;
+  pitfall: string;
+  lab: Lab;
+};
+
 export type Lesson = {
   id: string;
   title: string;
   summary: string;
   theory: TheoryBlock[];
   tasks: Task[];
-};
+} & Partial<Omit<LessonExtras, "lab">> & { lab?: Lab };
 
 export type Language = {
   id: string;
@@ -1990,6 +2020,20 @@ export const languages: Language[] = [
   },
 ];
 
+for (const language of languages) {
+  language.lessons.push(...(extraLessons[language.id] ?? []));
+  for (const lesson of language.lessons) {
+    const extra = lessonExtras[lessonKey(language.id, lesson.id)];
+    if (!extra) continue;
+    lesson.objectives = extra.objectives;
+    lesson.terms = extra.terms;
+    lesson.deepDive = extra.deepDive;
+    lesson.pitfall = extra.pitfall;
+    lesson.lab = extra.lab;
+    lesson.theory = [...lesson.theory, extra.deepDive];
+  }
+}
+
 export function getLanguage(id?: string): Language | undefined {
   return languages.find((language) => language.id === id);
 }
@@ -2000,6 +2044,22 @@ export function getLesson(language: Language, id?: string): Lesson | undefined {
 
 export function lessonKey(languageId: string, lessonId: string) {
   return `${languageId}:${lessonId}`;
+}
+
+export function labKey(languageId: string, lessonId: string, labId: string) {
+  return `${languageId}:${lessonId}:${labId}`;
+}
+
+export type LabResult = { label: string; pass: boolean };
+
+export function runLabChecks(lab: Lab, code: string): LabResult[] {
+  return lab.checks.map((check) => {
+    try {
+      return { label: check.label, pass: check.test(code) };
+    } catch {
+      return { label: check.label, pass: false };
+    }
+  });
 }
 
 export function correctFor(

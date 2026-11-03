@@ -190,7 +190,7 @@ const jsTrack = await ev(`(()=>{
     firstAction:rows[0]?.querySelector('.lesson-status,.btn')?.textContent.trim()
   };
 })()`);
-check("JavaScript track lists three lessons", jsTrack.count, 3);
+check("JavaScript track lists five lessons", jsTrack.count, 5);
 check("first JS lesson is unlocked", jsTrack.locked[0], false);
 check("second JS lesson starts locked", jsTrack.locked[1], true);
 check("first JS lesson shows a Start action", jsTrack.firstAction, (v) =>
@@ -205,11 +205,11 @@ const pythonTrack = await ev(`(()=>{
     locked:rows.map(r=>r.classList.contains('locked'))
   };
 })()`);
-check("Python track lists three lessons", pythonTrack.count, 3);
+check("Python track lists five lessons", pythonTrack.count, 5);
 check("Python first lesson is unlocked", pythonTrack.locked[0], false);
 check("Python second lesson starts locked", pythonTrack.locked[1], true);
 
-// --- Theory and practice checking ---
+// --- Theory and quiz checking ---
 await nav("#learn/javascript/js-basics");
 check(
   "lesson page opens",
@@ -218,18 +218,33 @@ check(
 );
 const theory = await ev(`(()=>({
   blocks:document.querySelectorAll('.theory-block').length,
-  code:document.querySelectorAll('.theory-block .code').length
+  code:document.querySelectorAll('.theory-block .code').length,
+  objectives:document.querySelectorAll('.lesson-objectives li').length,
+  terms:document.querySelectorAll('.term-list dt').length,
+  pitfall:Boolean(document.querySelector('.pitfall')),
+  tabs:[...document.querySelectorAll('.tabbar button')].map(b=>b.textContent.trim())
 }))()`);
-check("lesson shows theory blocks", theory.blocks, 3);
+check("lesson shows expanded theory blocks", theory.blocks, 4);
 check("theory includes code examples", theory.code, (v) => v >= 2);
-await clickText("button", "Start practice");
+check("lesson lists objectives", theory.objectives, 3);
+check("lesson defines key terms", theory.terms, 4);
+check("lesson warns about a common mistake", theory.pitfall, true);
+check(
+  "lesson exposes theory, quiz and lab tabs",
+  theory.tabs.length === 3 &&
+    /Theory/.test(theory.tabs[0]) &&
+    /Quiz/.test(theory.tabs[1]) &&
+    /Code lab/.test(theory.tabs[2]),
+  true,
+);
+await clickText("button", "Start quiz");
 await sleep(350);
 const taskOne = await ev(`(()=>({
   head:document.querySelector('.task-head .eyebrow')?.textContent.replace(/\\s+/g,' ').trim(),
   level:document.querySelector('.task-level')?.textContent,
   choices:document.querySelectorAll('.choices input').length
 }))()`);
-check("practice starts at task one", taskOne.head, "TASK 01 / 10");
+check("quiz starts at task one", taskOne.head, "TASK 01 / 10");
 check("first task is a warm-up", taskOne.level, "Warm-up");
 check("each task has four options", taskOne.choices, 4);
 
@@ -343,7 +358,7 @@ check(
 check("unlock state persists after reload", persisted.locked[1], false);
 
 await nav("#learn/javascript/js-basics");
-await clickText(".tabbar button", "Practice");
+await clickText(".tabbar button", "Quiz");
 await sleep(350);
 const resumed = await ev(`(()=>({
   head:document.querySelector('.task-head .eyebrow')?.textContent.replace(/\\s+/g,' ').trim(),
@@ -379,7 +394,7 @@ const progressCard = await ev(`(()=>{
 })()`);
 check(
   "language picker shows track progress",
-  /1 of 3 lessons passed/.test(progressCard || ""),
+  /1 of 5 lessons passed/.test(progressCard || ""),
   true,
 );
 
@@ -464,6 +479,88 @@ check(
   typingDone.state?.completed?.includes("copy:hello"),
   true,
 );
+
+// --- Code lab: structure checking, honest labeling and rewards ---
+await nav("#learn/javascript/js-basics");
+await clickText(".tabbar button", "Code lab");
+await sleep(350);
+const labStart = await ev(`(()=>({
+  checks:document.querySelectorAll('.lab-check').length,
+  starter:document.querySelector('.lab-editor')?.value.includes('TODO') || false,
+  file:document.querySelector('.lab-meta .tag')?.textContent || null,
+  disclaimer:document.querySelector('.panel .muted')?.textContent.replace(/\\s+/g,' ').trim() || null
+}))()`);
+check("code lab lists its structure checks", labStart.checks, 4);
+check("code lab starts from a starter snippet", labStart.starter, true);
+check("code lab names the target file", labStart.file, "basics.js");
+check(
+  "code lab says the program is not executed",
+  /not executed/.test(labStart.disclaimer || ""),
+  true,
+);
+await clickText("button", "Run structure check");
+await sleep(350);
+const labStarterResult = await ev(`(()=>({
+  failed:document.querySelectorAll('.lab-check.fail').length,
+  error:Boolean(document.querySelector('.lab-result.error')),
+  state:${STATE}
+}))()`);
+check("starter code fails some checks", labStarterResult.failed, (v) => v > 0);
+check("starter code shows the retry guidance", labStarterResult.error, true);
+check("failed lab check grants no XP", labStarterResult.state?.xp, 60);
+
+const labSolution = `function greet(name) {
+  return \`Hello, \${name}!\`;
+}
+console.log(greet("Ada"));`;
+await setValue(".lab-editor", labSolution);
+await sleep(200);
+await clickText("button", "Run structure check");
+await sleep(500);
+const labDone = await ev(`(()=>({
+  passed:document.querySelectorAll('.lab-check.pass').length,
+  result:document.querySelector('.lab-result.pass')?.textContent.replace(/\\s+/g,' ').trim() || null,
+  state:${STATE}
+}))()`);
+check("complete lab solution passes every check", labDone.passed, 4);
+check(
+  "lab result reports a structure check",
+  /checks passed/.test(labDone.result || ""),
+  true,
+);
+check("code lab grants 10 XP", labDone.state?.xp, 70);
+check("code lab grants 5 coins", labDone.state?.coins, 25);
+check(
+  "code lab is recorded separately",
+  labDone.state?.labs?.includes("javascript:js-basics:js-basics-lab"),
+  true,
+);
+check(
+  "code lab counts as a completed exercise",
+  labDone.state?.completed?.includes("javascript:js-basics:js-basics-lab"),
+  true,
+);
+
+await clickText("button", "Run structure check");
+await sleep(400);
+const labRepeat = await ev(`(()=>({state:${STATE}}))()`);
+check(
+  "re-running a passed lab does not award XP again",
+  labRepeat.state?.xp,
+  70,
+);
+
+await reload();
+await clickText(".tabbar button", "Code lab");
+await sleep(350);
+const labPersisted = await ev(`(()=>({
+  draft:document.querySelector('.lab-editor')?.value.includes('Hello') || false,
+  complete:document.querySelector('.lab-meta')?.textContent.includes('Lab complete') || false,
+  state:${STATE}
+}))()`);
+check("lab draft persists after reload", labPersisted.draft, true);
+check("lab completion persists after reload", labPersisted.complete, true);
+check("lab XP persists after reload", labPersisted.state?.xp, 70);
 
 // --- Profile rename: first free, second blocked, persistence ---
 await nav("#profile");
@@ -631,7 +728,7 @@ const mobileTrack = await ev(`(()=>({
   rows:document.querySelectorAll('.lesson-row').length,
   overflow:document.documentElement.scrollWidth <= document.documentElement.clientWidth
 }))()`);
-check("mobile track lists the three lessons", mobileTrack.rows, 3);
+check("mobile track lists the five lessons", mobileTrack.rows, 5);
 check(
   "mobile lesson list stays within the viewport",
   mobileTrack.overflow,
@@ -639,10 +736,24 @@ check(
 );
 
 await nav("#learn/javascript/js-basics");
-await clickText(".tabbar button", "Practice");
+await clickText(".tabbar button", "Quiz");
 await sleep(350);
 check(
   "mobile practice stays within the viewport",
+  await ev(
+    `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+  ),
+  true,
+);
+await clickText(".tabbar button", "Code lab");
+await sleep(350);
+check(
+  "mobile code lab shows the editor",
+  await ev(`document.querySelectorAll('.lab-editor').length`),
+  1,
+);
+check(
+  "mobile code lab stays within the viewport",
   await ev(
     `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
   ),
