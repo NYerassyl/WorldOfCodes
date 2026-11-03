@@ -16,6 +16,7 @@ test('ranked queue blocks a player from rejoining while a pair is being created'
   const problemGate = new Promise(resolve => { releaseProblem = resolve; });
   const prisma = {
     problem: {
+      findMany: async () => [{ id: 'problem-1' }],
       findFirst: async () => {
         await problemGate;
         return { id: 'problem-1', language: 'python', functionName: 'solve',
