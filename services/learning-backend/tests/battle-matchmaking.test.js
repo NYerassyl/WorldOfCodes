@@ -1,0 +1,43 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { MatchmakingQueue } from '../src/battle/matchmaking.js';
+
+test('ranked queue rejects duplicate tickets and supports leaving', async () => {
+  const queue = new MatchmakingQueue({});
+  const queued = await queue.join('player-1');
+  assert.equal(queued.status, 'QUEUED');
+  await assert.rejects(queue.join('player-1'), error => error.code === 'ALREADY_QUEUED');
+  assert.deepEqual(queue.leave('player-1'), { status: 'LEFT_QUEUE' });
+  assert.equal(queue.waiting.size, 0);
+});
+
+test('ranked queue blocks a player from rejoining while a pair is being created', async () => {
+  let releaseProblem;
+  const problemGate = new Promise(resolve => { releaseProblem = resolve; });
+  const prisma = {
+    problem: {
+      findFirst: async () => {
+        await problemGate;
+        return { id: 'problem-1', language: 'python', functionName: 'solve',
+          testCases: [{ argsJson: '[]', expectedJson: '0' }] };
+      }
+    },
+    $transaction: async callback => callback({
+      rating: { upsert: async ({ where }) => ({ userId: where.userId, points: 1000 }) },
+      match: { create: async ({ data }) => ({ id: 'ranked-1', ...data }) }
+    })
+  };
+  const queue = new MatchmakingQueue(prisma);
+  await queue.join('player-1');
+  const pairing = queue.join('player-2');
+  await new Promise(resolve => setImmediate(resolve));
+
+  await assert.rejects(queue.join('player-2'), error => error.code === 'MATCHMAKING_IN_PROGRESS');
+  assert.throws(() => queue.leave('player-2'), error => error.code === 'MATCHMAKING_IN_PROGRESS');
+
+  releaseProblem();
+  const result = await pairing;
+  assert.equal(result.status, 'MATCHED');
+  assert.equal(result.match.status, 'ACTIVE');
+  assert.equal(queue.pairingUsers.size, 0);
+});
