@@ -1852,7 +1852,7 @@ label select {
   color: #5f7b4b;
 }
 .lesson-locked-note {
-  display: inline-block;
+  display: block;
   font-size: 10px;
   color: #a29a8f;
   margin-top: 7px;
@@ -1964,6 +1964,283 @@ label select {
   font-size: 11px;
   color: #96909b;
   margin: 4px 0 0;
+}
+.lesson-summary {
+  font: 11px var(--mono);
+  color: #8f8069;
+  background: #f4efe4;
+  border: 1px solid #e7dfd0;
+  border-radius: 8px;
+  padding: 9px 12px;
+  white-space: nowrap;
+}
+.language-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 24px;
+}
+.language-card {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 22px;
+  color: inherit;
+  transition:
+    border-color 0.2s,
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.language-card:hover {
+  border-color: #d5cec3;
+  transform: translateY(-2px);
+  box-shadow: 0 12px 26px #24252a0a;
+}
+.language-card-top {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+.language-badge {
+  width: 46px;
+  height: 46px;
+  border-radius: 12px;
+  display: grid;
+  place-items: center;
+  font: 600 17px var(--mono);
+  background: #f2ede3;
+  color: #8a6d3b;
+}
+.language-card h2 {
+  font-size: 19px;
+  margin: 0;
+  letter-spacing: -0.4px;
+}
+.language-card p {
+  font-size: 12px;
+  line-height: 1.6;
+  color: #8f8a92;
+  margin: 0;
+  min-height: 38px;
+}
+.language-progress {
+  margin-top: auto;
+}
+.language-progress .progress {
+  height: 5px;
+  margin-bottom: 8px;
+}
+.language-progress small {
+  font-size: 10px;
+  color: #9a948d;
+}
+.language-card-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border-top: 1px solid #f0ece5;
+  padding-top: 13px;
+  font-size: 11px;
+  color: #7e776f;
+}
+.language-card-foot > span:first-child {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.language-card[data-lang="python"] .language-badge,
+.language-icon[data-lang="python"] {
+  background: #e7eef7;
+  color: #466788;
+}
+.language-card[data-lang="javascript"] .language-badge,
+.language-icon[data-lang="javascript"] {
+  background: #f6edcd;
+  color: #86681f;
+}
+.language-card[data-lang="html"] .language-badge,
+.language-icon[data-lang="html"] {
+  background: #f8e8dd;
+  color: #a25d35;
+}
+.language-card[data-lang="css"] .language-badge,
+.language-icon[data-lang="css"] {
+  background: #e4eef4;
+  color: #3d6d86;
+}
+.language-card[data-lang="java"] .language-badge,
+.language-icon[data-lang="java"] {
+  background: #f5e5df;
+  color: #9b5744;
+}
+.language-card[data-lang="cpp"] .language-badge,
+.language-icon[data-lang="cpp"] {
+  background: #eae8f3;
+  color: #5d567f;
+}
+.lesson-task-count {
+  display: inline-block;
+  margin-top: 7px;
+  font: 10px var(--mono);
+  color: #9a8d7c;
+}
+.lesson-progress-strip {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  background: #f4f0e7;
+  border: 1px solid #e7e0d3;
+  border-radius: 10px;
+  padding: 13px 18px;
+  margin: 20px 0 24px;
+  font-size: 11px;
+  color: #7f7466;
+}
+.lesson-progress-strip .progress {
+  flex: 1;
+  height: 6px;
+}
+.lesson-progress-strip small {
+  font: 10px var(--mono);
+  color: #9a8d7c;
+  white-space: nowrap;
+}
+.theory-blocks {
+  display: grid;
+  gap: 8px;
+  margin: 8px 0 24px;
+}
+.theory-block {
+  border-top: 1px solid #f0ece5;
+  padding-top: 16px;
+  margin-top: 10px;
+}
+.theory-block h3 {
+  font-size: 14px;
+  margin: 0 0 7px;
+}
+.theory-block p {
+  font-size: 13px;
+  line-height: 1.8;
+  color: #746f78;
+  margin: 0;
+}
+.theory-block .code {
+  margin: 13px 0 4px;
+}
+.task-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.task-level {
+  font: 9px var(--mono);
+  letter-spacing: 1.2px;
+  text-transform: uppercase;
+  color: #9c7550;
+  background: #f8efe6;
+  border: 1px solid #efdfd0;
+  border-radius: 20px;
+  padding: 5px 9px;
+}
+.task-question {
+  font-size: 18px;
+  line-height: 1.55;
+  margin: 0 0 16px;
+}
+.task-code {
+  margin-top: 0;
+}
+.choice.correct {
+  border-color: #b9cba8;
+  background: #f1f6ec;
+  color: #557044;
+}
+.choice.incorrect {
+  border-color: #e4bcae;
+  background: #fcf0eb;
+  color: #a15b42;
+}
+.choice:has(input:disabled) {
+  cursor: default;
+}
+.task-dots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 22px;
+  padding-top: 18px;
+  border-top: 1px solid #f0ece5;
+}
+.task-dot {
+  width: 30px;
+  height: 30px;
+  border: 1px solid #e6e1d9;
+  border-radius: 7px;
+  background: #fff;
+  color: #9b948c;
+  font: 11px var(--mono);
+  display: grid;
+  place-items: center;
+  transition:
+    background 0.15s,
+    border-color 0.15s;
+}
+.task-dot:hover {
+  border-color: #cfbca6;
+}
+.task-dot.correct {
+  background: #eef3e8;
+  border-color: #d7e2ca;
+  color: #5f7b4b;
+}
+.task-dot.current {
+  outline: 2px solid #d8b08f;
+  outline-offset: 1px;
+}
+.lesson-pass {
+  margin-top: 20px;
+  border: 1px solid #dce5d4;
+  background: #f4f8ef;
+  border-radius: 10px;
+  padding: 16px;
+}
+.lesson-pass p {
+  font-size: 12px;
+  line-height: 1.7;
+  color: #66765a;
+  margin: 9px 0 13px;
+}
+.practice-target {
+  background: #f8f5ef;
+  border: 1px solid #ece6db;
+  border-radius: 10px;
+  padding: 18px;
+  margin: 4px 0 20px;
+}
+.practice-target strong {
+  font: 600 26px var(--display);
+  color: #45533b;
+}
+.practice-target p {
+  font-size: 11px;
+  color: #938b7e;
+  margin: 2px 0 12px;
+}
+.practice-target .progress {
+  height: 6px;
+  margin-bottom: 8px;
+}
+.practice-target small {
+  font-size: 10px;
+  color: #8f8677;
 }
 .target-card {
   max-width: 310px;
@@ -3696,6 +3973,51 @@ main > *,
   }
   .profile-layout {
     margin-top: 20px;
+  }
+}
+
+@media (max-width: 1190px) {
+  .language-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .language-grid {
+    grid-template-columns: 1fr;
+    gap: 13px;
+    margin-top: 18px;
+  }
+  .language-card {
+    padding: 18px;
+  }
+  .language-card p {
+    min-height: 0;
+  }
+  .lesson-summary {
+    display: none;
+  }
+  .lesson-progress-strip {
+    flex-wrap: wrap;
+    gap: 8px;
+    padding: 12px 14px;
+  }
+  .lesson-progress-strip .progress {
+    flex-basis: 100%;
+    order: 2;
+  }
+  .lesson-progress-strip small {
+    order: 3;
+  }
+  .task-question {
+    font-size: 16px;
+  }
+  .task-dot {
+    width: 28px;
+    height: 28px;
+  }
+  .panel {
+    padding: 22px;
   }
 }
 

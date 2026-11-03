@@ -117,8 +117,8 @@ export default function Copy() {
             ))}
           </pre>
           <Notice>
-            Build muscle memory here. Explore the Learning Path and Challenges
-            to develop your problem-solving skills.
+            Build muscle memory here. Explore Lessons and Challenges to develop
+            your problem-solving skills.
           </Notice>
         </section>
         <section>

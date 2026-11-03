@@ -10,7 +10,7 @@ import Profile from "./pages/Profile";
 import Arena from "./pages/Arena";
 const routes = [
   { id: "home", name: "Overview", icon: "home" },
-  { id: "learn", name: "Learning Path", icon: "learn" },
+  { id: "learn", name: "Lessons", icon: "learn" },
   { id: "algorithms", name: "Challenges", icon: "code" },
   { id: "copy", name: "Typing Lab", icon: "copy" },
   { id: "duel", name: "Duel Arena", icon: "duel" },
@@ -40,7 +40,7 @@ function Shell() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [menuOpen]);
-  const [page, id] = route.split("/");
+  const [page, id, sub] = route.split("/");
   const current = routes.find((r) => r.id === page);
   useEffect(() => {
     document.title = `${current?.name || "Page not found"} · WorldOfCodes`;
@@ -184,7 +184,7 @@ function Shell() {
           {page === "home" ? (
             <Home />
           ) : page === "learn" ? (
-            <Learn key={route} id={id} />
+            <Learn key={route} languageId={id} lessonId={sub} />
           ) : page === "algorithms" ? (
             <Algorithms key={route} id={id} />
           ) : page === "copy" ? (

@@ -1,6 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { award, typingStats, levelFor } from "../src/lib/progress.mjs";
+import {
+  award,
+  typingStats,
+  levelFor,
+  uniqueCorrect,
+  lessonPassed,
+} from "../src/lib/progress.mjs";
 const initial = { xp: 0, coins: 0, completed: [], activity: {} };
 test("lesson retry cannot award a second reward", () => {
   const once = award(initial, "variables", 40, 15, "2026-11-03");
@@ -26,4 +32,15 @@ test("levels advance exactly at the XP threshold", () => {
   assert.equal(levelFor(0), 1);
   assert.equal(levelFor(199), 1);
   assert.equal(levelFor(200), 2);
+});
+test("task progress counts unique answers inside the task range", () => {
+  assert.equal(uniqueCorrect([0, 0, 2, 9], 10), 3);
+  assert.equal(uniqueCorrect([10, -1, 1.5], 10), 0);
+  assert.equal(uniqueCorrect(undefined, 10), 0);
+});
+test("a lesson passes at five correct tasks", () => {
+  assert.equal(lessonPassed(4), false);
+  assert.equal(lessonPassed(5), true);
+  assert.equal(lessonPassed(7), true);
+  assert.equal(lessonPassed(NaN), false);
 });

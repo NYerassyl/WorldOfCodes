@@ -1,13 +1,25 @@
 import { useStore } from "../lib/store";
-import { lessons } from "../lib/data";
+import { languages, firstUnfinished, trackProgress } from "../lib/curriculum";
 import { levelFor } from "../lib/progress.mjs";
 import { Icon } from "../components/UI";
 import WorldArt from "../components/WorldArt";
 export default function Home() {
   const { state } = useStore();
-  const finished = lessons.filter((l) => state.completed.includes(l.id)).length;
-  const next =
-    lessons.find((l) => !state.completed.includes(l.id)) || lessons[0];
+  const finished = languages.reduce(
+    (sum, language) => sum + trackProgress(state.practice, language),
+    0,
+  );
+  const totalLessons = languages.reduce(
+    (sum, language) => sum + language.lessons.length,
+    0,
+  );
+  const javascript = languages.find(
+    (language) => language.id === "javascript",
+  )!;
+  const css = languages.find((language) => language.id === "css")!;
+  const jsFinished = trackProgress(state.practice, javascript);
+  const jsNext = firstUnfinished(state.practice, javascript);
+  const cssFinished = trackProgress(state.practice, css);
   return (
     <>
       <div className="home-welcome">
@@ -45,7 +57,7 @@ export default function Home() {
             next level.
           </p>
           <div className="hero-actions">
-            <a className="btn" href={`#learn/${next.id}`}>
+            <a className="btn" href="#learn">
               {finished ? "Continue learning" : "Start your journey"}
               <Icon name="arrow" />
             </a>
@@ -86,7 +98,7 @@ export default function Home() {
             <small>Lessons completed</small>
             <strong>
               {String(finished).padStart(2, "0")}
-              <span>/ {String(lessons.length).padStart(2, "0")}</span>
+              <span>/ {String(totalLessons).padStart(2, "0")}</span>
             </strong>
           </div>
           <span className="stat-detail">Keep the momentum</span>
@@ -123,13 +135,13 @@ export default function Home() {
           <div className="section-head">
             <div>
               <span className="eyebrow">ONE STEP AT A TIME</span>
-              <h2>Your learning path</h2>
+              <h2>Your lessons</h2>
             </div>
             <a className="text-link" href="#learn">
-              View curriculum <Icon name="arrow-up" />
+              View all lessons <Icon name="arrow-up" />
             </a>
           </div>
-          <a className="track-card js-track" href={`#learn/${next.id}`}>
+          <a className="track-card js-track" href="#learn/javascript">
             <div className="track-art">
               <span className="js-tile">JS</span>
               <span className="track-orbit orbit-one" />
@@ -139,21 +151,29 @@ export default function Home() {
             <div className="track-body">
               <div className="track-top">
                 <span className="tag">FOUNDATIONS</span>
-                <span className="track-duration">{lessons.length} lessons</span>
+                <span className="track-duration">
+                  {javascript.lessons.length} lessons
+                </span>
               </div>
               <h3>Speak JavaScript.</h3>
               <p>From your first variable to thinking in functions.</p>
               <div className="track-progress-row">
                 <div className="progress">
-                  <span style={{ width: `${(finished / 6) * 100}%` }} />
+                  <span
+                    style={{
+                      width: `${(jsFinished / javascript.lessons.length) * 100}%`,
+                    }}
+                  />
                 </div>
-                <span>{Math.round((finished / 6) * 100)}%</span>
+                <span>
+                  {Math.round((jsFinished / javascript.lessons.length) * 100)}%
+                </span>
               </div>
               <div className="track-bottom">
                 <span>
-                  {finished === 6
+                  {jsFinished === javascript.lessons.length
                     ? "Completed · ready to review"
-                    : `Up next: ${next.title}`}
+                    : `Up next: ${jsNext.title}`}
                 </span>
                 <span className="round-arrow">
                   <Icon name="arrow" />
@@ -161,7 +181,7 @@ export default function Home() {
               </div>
             </div>
           </a>
-          <a className="track-card css-track" href="#learn/html">
+          <a className="track-card css-track" href="#learn/css">
             <div className="track-art">
               <div className="mini-layout">
                 <span />
@@ -173,14 +193,17 @@ export default function Home() {
             </div>
             <div className="track-body">
               <div className="track-top">
-                <span className="tag">CREATIVE STUDIO</span>
-                <span className="track-duration">Hands-on lab</span>
+                <span className="tag">VISUAL LANGUAGE</span>
+                <span className="track-duration">
+                  {css.lessons.length} lessons
+                </span>
               </div>
-              <h3>Make the web your canvas.</h3>
-              <p>Recreate a design with HTML & CSS. See it come to life.</p>
+              <h3>Style with CSS.</h3>
+              <p>From selectors to flexible, responsive layouts.</p>
               <div className="track-bottom">
                 <span>
-                  <Icon name="code" /> Open the studio
+                  <Icon name="code" /> {cssFinished} of {css.lessons.length}{" "}
+                  lessons passed
                 </span>
                 <span className="round-arrow">
                   <Icon name="arrow" />

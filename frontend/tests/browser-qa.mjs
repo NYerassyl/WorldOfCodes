@@ -150,117 +150,238 @@ await reload();
 const fresh = await ev(STATE);
 check("fresh demo state starts at 0 XP", fresh?.xp, 0);
 check("fresh demo state has no completions", fresh?.completed?.length, 0);
+check(
+  "fresh demo state has no task answers",
+  Object.keys(fresh?.practice || {}).length,
+  0,
+);
 
-// --- Learning path: lock state ---
+// --- Lessons: language picker and tracks ---
 await nav("#learn");
-const list = await ev(`(()=>{
+const picker = await ev(`(()=>({
+  cards:[...document.querySelectorAll('.language-card')].map(c=>c.dataset.lang),
+  heading:document.querySelector('h1')?.textContent
+}))()`);
+check("language picker shows six languages", picker.cards.length, 6);
+check("picker includes Python", picker.cards.includes("python"), true);
+check("picker includes JavaScript", picker.cards.includes("javascript"), true);
+check(
+  "picker includes HTML and CSS",
+  picker.cards.includes("html") && picker.cards.includes("css"),
+  true,
+);
+check(
+  "picker includes Java and C++",
+  picker.cards.includes("java") && picker.cards.includes("cpp"),
+  true,
+);
+check(
+  "picker heading invites a choice",
+  picker.heading,
+  "Choose your language.",
+);
+
+await nav("#learn/javascript");
+const jsTrack = await ev(`(()=>{
   const rows=[...document.querySelectorAll('.lesson-row')];
   return {
     count:rows.length,
     locked:rows.map(r=>r.classList.contains('locked')),
-    done:rows.map(r=>r.classList.contains('done')),
     firstAction:rows[0]?.querySelector('.lesson-status,.btn')?.textContent.trim()
   };
 })()`);
-check("learning path lists six lessons", list.count, 6);
-check("first lesson is unlocked", list.locked[0], false);
-check("second lesson starts locked", list.locked[1], true);
-check("first lesson shows a Start action", list.firstAction, (v) =>
+check("JavaScript track lists three lessons", jsTrack.count, 3);
+check("first JS lesson is unlocked", jsTrack.locked[0], false);
+check("second JS lesson starts locked", jsTrack.locked[1], true);
+check("first JS lesson shows a Start action", jsTrack.firstAction, (v) =>
   /Start/.test(v || ""),
 );
 
-// --- Lesson completion, retry and idempotent reward ---
-await nav("#learn/variables");
+await nav("#learn/python");
+const pythonTrack = await ev(`(()=>{
+  const rows=[...document.querySelectorAll('.lesson-row')];
+  return {
+    count:rows.length,
+    locked:rows.map(r=>r.classList.contains('locked'))
+  };
+})()`);
+check("Python track lists three lessons", pythonTrack.count, 3);
+check("Python first lesson is unlocked", pythonTrack.locked[0], false);
+check("Python second lesson starts locked", pythonTrack.locked[1], true);
+
+// --- Theory and practice checking ---
+await nav("#learn/javascript/js-basics");
 check(
-  "variables lesson page opens",
+  "lesson page opens",
   await ev(`document.querySelector('h1')?.textContent`),
-  "Variables & types",
+  "Values & variables",
 );
-await clickText(".tabbar button", "Practice");
-await sleep(300);
-const choices = await ev(
-  `[...document.querySelectorAll('.choices span')].map(s=>s.textContent)`,
+const theory = await ev(`(()=>({
+  blocks:document.querySelectorAll('.theory-block').length,
+  code:document.querySelectorAll('.theory-block .code').length
+}))()`);
+check("lesson shows theory blocks", theory.blocks, 3);
+check("theory includes code examples", theory.code, (v) => v >= 2);
+await clickText("button", "Start practice");
+await sleep(350);
+const taskOne = await ev(`(()=>({
+  head:document.querySelector('.task-head .eyebrow')?.textContent.replace(/\\s+/g,' ').trim(),
+  level:document.querySelector('.task-level')?.textContent,
+  choices:document.querySelectorAll('.choices input').length
+}))()`);
+check("practice starts at task one", taskOne.head, "TASK 01 / 10");
+check("first task is a warm-up", taskOne.level, "Warm-up");
+check("each task has four options", taskOne.choices, 4);
+
+await ev(`document.querySelectorAll('.choices input')[2].click();'ok'`);
+await sleep(200);
+await clickText("button", "Check answer");
+await sleep(350);
+const wrongAttempt = await ev(`(()=>({
+  text:document.querySelector('.panel .result')?.textContent || null,
+  state:${STATE}
+}))()`);
+check(
+  "wrong answer is marked incorrect",
+  /Not quite/.test(wrongAttempt.text || ""),
+  true,
 );
-check("practice choices render", choices.length, 4);
-await ev(`document.querySelectorAll('.choices input')[1].click();'ok'`);
+check(
+  "wrong answer is not counted",
+  wrongAttempt.state?.practice?.["javascript:js-basics"]?.length ?? 0,
+  0,
+);
+
+await ev(`document.querySelectorAll('.choices input')[0].click();'ok'`);
 await sleep(200);
 await clickText("button", "Check answer");
 await sleep(400);
-const afterLesson = await ev(`(()=>({
-  result:document.querySelector('.panel .result')?.textContent || null,
-  tag:[...document.querySelectorAll('.tag')].map(t=>t.textContent).find(t=>t.includes('Lesson complete')) || null,
-  reward:document.querySelector('.lesson-reward p')?.textContent || null,
+const firstCorrect = await ev(`(()=>({
+  text:document.querySelector('.panel .result')?.textContent || null,
   state:${STATE}
 }))()`);
 check(
   "correct answer is accepted",
-  /Exactly right/.test(afterLesson.result || ""),
+  /Correct\./.test(firstCorrect.text || ""),
   true,
 );
 check(
-  "lesson complete tag appears",
-  /Lesson complete/.test(afterLesson.tag || ""),
+  "correct answer is stored",
+  firstCorrect.state?.practice?.["javascript:js-basics"]?.length,
+  1,
+);
+check(
+  "one correct task does not complete the lesson",
+  firstCorrect.state?.completed?.includes("javascript:js-basics"),
+  false,
+);
+
+const nextAnswers = [1, 1, 1, 2];
+for (const answer of nextAnswers) {
+  await clickText("button", "Next task");
+  await sleep(250);
+  await ev(
+    `document.querySelectorAll('.choices input')[${answer}].click();'ok'`,
+  );
+  await sleep(150);
+  await clickText("button", "Check answer");
+  await sleep(350);
+}
+const passedLesson = await ev(`(()=>({
+  tag:[...document.querySelectorAll('.tag')].map(t=>t.textContent).find(t=>t.includes('Lesson passed')) || null,
+  pass:document.querySelector('.lesson-pass')?.textContent.replace(/\\s+/g,' ').trim() || null,
+  state:${STATE}
+}))()`);
+check(
+  "five correct tasks pass the lesson",
+  passedLesson.tag,
+  "Lesson passed ✓",
+);
+check(
+  "pass banner says the next lesson is unlocked",
+  /next lesson is now unlocked/.test(passedLesson.pass || ""),
   true,
 );
-check("lesson grants 40 XP", afterLesson.state?.xp, 40);
-check("lesson grants 15 coins", afterLesson.state?.coins, 15);
+check("lesson grants 40 XP", passedLesson.state?.xp, 40);
+check("lesson grants 15 coins", passedLesson.state?.coins, 15);
 check(
   "lesson is recorded as completed",
-  afterLesson.state?.completed?.includes("variables"),
+  passedLesson.state?.completed?.includes("javascript:js-basics"),
   true,
 );
 check(
-  "reward copy switches to earned",
-  /earned this lesson reward/.test(afterLesson.reward || ""),
-  true,
+  "five task answers are stored",
+  passedLesson.state?.practice?.["javascript:js-basics"]?.length,
+  5,
 );
 
-await clickText("button", "Check answer");
-await sleep(350);
-const repeated = await ev(STATE);
-check("re-checking does not award XP twice", repeated?.xp, 40);
-check("re-checking does not award coins twice", repeated?.coins, 15);
-
-await nav("#learn");
+await nav("#learn/javascript");
 const unlocked = await ev(`(()=>{
   const rows=[...document.querySelectorAll('.lesson-row')];
   return {locked:rows.map(r=>r.classList.contains('locked')), done:rows.map(r=>r.classList.contains('done'))};
 })()`);
-check("second lesson unlocks after the first", unlocked.locked[1], false);
-check("completed lesson is marked done", unlocked.done[0], true);
+check(
+  "second lesson unlocks after five correct tasks",
+  unlocked.locked[1],
+  false,
+);
+check("passed lesson is marked done", unlocked.done[0], true);
 
 await reload();
 const persisted = await ev(`(()=>({
   hash:location.hash,
   state:${STATE},
-  locked:[...document.querySelectorAll('.lesson-row')].map(r=>r.classList.contains('locked')),
-  row1:[...document.querySelectorAll('.lesson-row')][1]?.querySelector('.lesson-copy h3')?.textContent
+  locked:[...document.querySelectorAll('.lesson-row')].map(r=>r.classList.contains('locked'))
 }))()`);
-check("hash survives reload", persisted.hash, "#learn");
+check("track hash survives reload", persisted.hash, "#learn/javascript");
 check("XP persists after reload", persisted.state?.xp, 40);
 check(
   "completed lesson persists after reload",
-  persisted.state?.completed?.includes("variables"),
+  persisted.state?.completed?.includes("javascript:js-basics"),
   true,
 );
 check("unlock state persists after reload", persisted.locked[1], false);
 
-// --- Wrong answer then retry ---
-await nav("#learn/variables");
+await nav("#learn/javascript/js-basics");
 await clickText(".tabbar button", "Practice");
-await sleep(300);
+await sleep(350);
+const resumed = await ev(`(()=>({
+  head:document.querySelector('.task-head .eyebrow')?.textContent.replace(/\\s+/g,' ').trim(),
+  state:${STATE}
+}))()`);
+check(
+  "practice resumes at the next unanswered task",
+  resumed.head,
+  "TASK 06 / 10",
+);
+check(
+  "task progress persists after reload",
+  resumed.state?.practice?.["javascript:js-basics"]?.length,
+  5,
+);
+
 await ev(`document.querySelectorAll('.choices input')[0].click();'ok'`);
 await sleep(200);
 await clickText("button", "Check answer");
-await sleep(350);
-const wrong = await ev(`document.querySelector('.panel .result')?.textContent`);
-check("wrong answer shows retry guidance", /Not quite/.test(wrong || ""), true);
-await ev(`document.querySelectorAll('.choices input')[1].click();'ok'`);
-await sleep(200);
-await clickText("button", "Check answer");
-await sleep(350);
-const retryState = await ev(STATE);
-check("retry after completion keeps XP at 40", retryState?.xp, 40);
+await sleep(400);
+const extra = await ev(`(()=>({state:${STATE}}))()`);
+check("extra correct task does not award XP twice", extra.state?.xp, 40);
+check(
+  "extra correct task is stored",
+  extra.state?.practice?.["javascript:js-basics"]?.length,
+  6,
+);
+
+await nav("#learn");
+const progressCard = await ev(`(()=>{
+  const card=document.querySelector('.language-card[data-lang="javascript"]');
+  return card?.textContent.replace(/\\s+/g,' ').trim() || null;
+})()`);
+check(
+  "language picker shows track progress",
+  /1 of 3 lessons passed/.test(progressCard || ""),
+  true,
+);
 
 // --- Challenge filtering ---
 await nav("#algorithms");
@@ -496,9 +617,37 @@ const menuNav = await ev(`(()=>({
   heading:document.querySelector('h1')?.textContent || null,
   overflow:document.documentElement.scrollWidth <= document.documentElement.clientWidth
 }))()`);
-check("mobile navigation reaches Learning Path", menuNav.hash, "#learn");
+check("mobile navigation reaches Lessons", menuNav.hash, "#learn");
+check(
+  "mobile lessons page shows the picker",
+  menuNav.heading,
+  "Choose your language.",
+);
 check("mobile menu closes after navigation", menuNav.open, false);
 check("mobile page stays within the viewport", menuNav.overflow, true);
+
+await nav("#learn/javascript");
+const mobileTrack = await ev(`(()=>({
+  rows:document.querySelectorAll('.lesson-row').length,
+  overflow:document.documentElement.scrollWidth <= document.documentElement.clientWidth
+}))()`);
+check("mobile track lists the three lessons", mobileTrack.rows, 3);
+check(
+  "mobile lesson list stays within the viewport",
+  mobileTrack.overflow,
+  true,
+);
+
+await nav("#learn/javascript/js-basics");
+await clickText(".tabbar button", "Practice");
+await sleep(350);
+check(
+  "mobile practice stays within the viewport",
+  await ev(
+    `document.documentElement.scrollWidth <= document.documentElement.clientWidth`,
+  ),
+  true,
+);
 
 const failed = results.filter((r) => !r.pass);
 console.log(

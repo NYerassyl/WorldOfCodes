@@ -27,3 +27,12 @@ export function typingStats(expected, actual) {
 export function levelFor(xp) {
   return Math.floor(xp / 200) + 1;
 }
+export function uniqueCorrect(indices, total) {
+  if (!Array.isArray(indices)) return 0;
+  return new Set(
+    indices.filter((i) => Number.isInteger(i) && i >= 0 && i < total),
+  ).size;
+}
+export function lessonPassed(correctCount, threshold = 5) {
+  return Number.isFinite(correctCount) && correctCount >= threshold;
+}

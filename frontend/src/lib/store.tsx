@@ -15,6 +15,7 @@ export type State = {
   xp: number;
   coins: number;
   completed: string[];
+  practice: Record<string, number[]>;
   activity: Record<string, number>;
   drafts: Record<string, string>;
 };
@@ -28,6 +29,7 @@ const initial: State = {
   xp: 0,
   coins: 0,
   completed: [],
+  practice: {},
   activity: {},
   drafts: {},
 };
@@ -45,6 +47,17 @@ function load(): State {
       completed: Array.isArray(raw.completed)
         ? raw.completed.filter((x: unknown) => typeof x === "string")
         : [],
+      practice:
+        raw.practice && typeof raw.practice === "object"
+          ? (Object.fromEntries(
+              Object.entries(raw.practice)
+                .filter(([, value]) => Array.isArray(value))
+                .map(([key, value]) => [
+                  key,
+                  (value as unknown[]).filter((n) => Number.isInteger(n)),
+                ]),
+            ) as Record<string, number[]>)
+          : {},
       activity:
         raw.activity && typeof raw.activity === "object" ? raw.activity : {},
       drafts: raw.drafts && typeof raw.drafts === "object" ? raw.drafts : {},
@@ -58,6 +71,7 @@ type Store = {
   state: State;
   update: (patch: Partial<State>) => void;
   reward: (id: string, xp?: number, coins?: number) => void;
+  completeTask: (key: string, index: number) => void;
   draft: (id: string, code: string) => void;
   storageError: boolean;
 };
@@ -80,6 +94,15 @@ export function Provider({ children }: { children: ReactNode }) {
         update: (patch) => setState((s) => ({ ...s, ...patch })),
         reward: (id, xp = 40, coins = 15) =>
           setState((s) => award(s, id, xp, coins)),
+        completeTask: (key, index) =>
+          setState((s) => {
+            const current = s.practice[key] ?? [];
+            if (current.includes(index)) return s;
+            return {
+              ...s,
+              practice: { ...s.practice, [key]: [...current, index] },
+            };
+          }),
         draft: (id, code) =>
           setState((s) => ({ ...s, drafts: { ...s.drafts, [id]: code } })),
       }}
