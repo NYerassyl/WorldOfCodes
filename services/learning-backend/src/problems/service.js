@@ -3,7 +3,7 @@ import { judgePython } from './dockerJudge.js';
 
 export const publicProblemSelect = {
   id:true, lessonId:true, title:true, statement:true, language:true, topicSlug:true, difficulty:true,
-  functionName:true, rewardXp:true, rewardCoins:true,
+  functionName:true, starterCode:true, rewardXp:true, rewardCoins:true,
   testCases:{where:{isSample:true},orderBy:{position:'asc'},select:{argsJson:true,expectedJson:true}}
 };
 export async function getPublicProblemBank(prisma,{topic,difficulty}={}) {

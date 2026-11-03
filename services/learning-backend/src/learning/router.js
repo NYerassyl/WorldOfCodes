@@ -11,7 +11,7 @@ export function createLearningRouter(prisma,requireAuth){
   router.get('/learning/lessons/:id',asyncRoute(async(req,res)=>{
     const lesson=await prisma.lesson.findUnique({where:{id:req.params.id},select:{id:true,title:true,position:true,theoryMd:true,
       topic:{select:{id:true,title:true,course:{select:{language:true,isPublished:true}}}},
-      problems:{where:{isPublished:true},select:{id:true,title:true,difficulty:true,rewardXp:true,rewardCoins:true}}}});
+      problems:{where:{isPublished:true},select:{id:true,title:true,difficulty:true,functionName:true,starterCode:true,rewardXp:true,rewardCoins:true}}}});
     if(!lesson||!lesson.topic.course.isPublished)throw notFound();
     res.json({lesson});
   }));

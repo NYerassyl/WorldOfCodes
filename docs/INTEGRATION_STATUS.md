@@ -24,9 +24,9 @@ const verdict = await judgePython({
 Never send hidden cases to frontend or Socket.IO. Duel must settle its own ratings and never call the learning XP-awarding submission route. Judge infra errors throw 503.
 
 ## Remaining review and deployment blockers
-1. GPT 1: approve Express route base, central error middleware, auth/DB integration and root dependencies; review limits and deployment.
+1. GPT 1 approved Express `/api`, Bearer tokens and PostgreSQL; GPT 1 owns connection wiring, frontend API integration, central error middleware, CORS, auth/submission rate limits, body limits and end-to-end tests. These tasks still require implementation/verification.
 2. GPT 3 approved function-style Judge, Battle enums, classic Elo K=32, lifecycle and idempotent settlement requirements; GPT 3 still owns Battle service implementation, FK deletion policy and problem-snapshot review.
-3. Shared database: **PostgreSQL vs SQLite contract conflict** — GPT 1 must decide provider; do not execute initial or additive migrations against an existing shared DB without approval.
+3. Shared database: GPT 1 confirmed **PostgreSQL + Prisma**, superseding the older SQLite draft. Do not execute initial or additive migrations against an existing shared DB without schema review and an isolated test run.
 4. Production: real PostgreSQL transactional/concurrency testing and Docker sandbox/worker/isolation verification not performed here.
 5. API rate limiting, abuse prevention and a persistent judge queue require integration work.
 6. PR stays a draft; merge only after approvals and CI.
@@ -51,3 +51,9 @@ Added four GPT 3-specified models (`Match`, `MatchPlayer`, `Rating`, `FriendBatt
 
 ## GPT 3 confirmation received
 Ranked starts ACTIVE; Friendly invitation starts PENDING, becomes ACTIVE on second join, then COMPLETED after settlement. Initial rating 1000, classic Elo K=32, no beginner protection. Friendly never updates ratings. Invite expiry is 30 minutes, matches contain two participants, only participants submit, spectators remain read-only, and a conditional status update + rating settlement share one transaction. GPT 3 requested a Match `[status,type]` index; delivered in a separate follow-up migration without rewriting the original or Battle-init migrations.
+
+## Python editor starter templates / GPT 1 frontend handoff
+
+The `Problem` model now includes `starterCode String @default("") @db.Text` (migration `20261103230000_problem_starter_code`). `GET /api/problems`, `GET /api/problems/:id`, and the exercises within `GET /api/learning/lessons/:id` expose `starterCode` and `functionName` without hidden tests.
+
+All **16** seeded Python coding problems have explicit, valid `def name(argumentNames):\n    pass\n` templates. Example: `py-area` → `def rectangle_area(width, height):\n    pass\n`; `algo-two-sum` → `def two_sum(nums, target):\n    pass\n`. GPT 1 connects the editor to these signatures; stdout-style labs and non-Python practice cannot grant server XP or rating. Rerun the seed after migrations to fill `starterCode` on existing problems.

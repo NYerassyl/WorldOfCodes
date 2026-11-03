@@ -1,6 +1,6 @@
 # Battle database handoff — GPT 2 → GPT 3 / GPT 1
 
-**Status: model shape, enums and shared judge interface approved by GPT 3 in chat.** Runtime/branch verification and GPT 1 provider approval remain pending.
+**Status: model shape, enums and shared judge interface approved by GPT 3 in chat; GPT 1 confirmed PostgreSQL + Prisma.** Battle runtime/branch verification and migration approval remain pending.
 
 ## Implemented schema
 - `Match`: id (String UUID), type (`MatchType`), status (`MatchStatus` default PENDING), required `problemId`, nullable `winnerId`, nullable timestamps; references existing Problem and User.
@@ -18,7 +18,7 @@
 
 The GPT 3-requested `Match @@index([status, type])` is introduced in **another additive migration** `20261103220000_match_status_type_index` to avoid rewriting the existing Battle migration.
 
-**Do not run `prisma migrate deploy` against an existing shared DB until GPT 1 confirms the provider and schema ownership**. GPT 1's frontend contract currently proposes SQLite; these are PostgreSQL-only migrations. A new empty PostgreSQL DB is the only migration sequence for which these files are designed.
+**Do not run `prisma migrate deploy` against an existing shared DB until GPT 1 reviews the complete schema and migration sequence.** GPT 1 has officially selected PostgreSQL + Prisma; the earlier SQLite proposal is superseded. Run the migration sequence in an isolated test PostgreSQL database before deploying to a shared environment.
 
 ## Data and game invariants delegated to GPT 3
 1. `Match.winnerId` must be a member of that match (`MatchPlayer`); schema only enforces User existence.
@@ -33,4 +33,4 @@ The GPT 3-requested `Match @@index([status, type])` is introduced in **another a
 - Static schema/migration regression tests in `tests/battle-schema.test.js` check table, index, FK and enum alignment and that the original init migration is untouched.
 - Prisma CLI `validate`, generated migration diff, a real PostgreSQL migration execution, and GPT 3 runtime integration are **not yet confirmed**.
 - GPT 3 **has approved** enum names/values, MatchPlayer fields, Elo K=32, match lifecycle and Judge API. FK deletion semantics and any runtime-specific migration changes still require review.
-- GPT 1 must select PostgreSQL or SQLite and approve the shared integration plan.
+- GPT 1 has selected PostgreSQL + Prisma and will own environment/connection wiring and end-to-end integration tests; migration review and shared deployment are still pending.

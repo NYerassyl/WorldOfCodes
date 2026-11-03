@@ -2,7 +2,7 @@
 
 **Scope:** auth/profile; 6-topic Python course; 16 coding problems (12 lessons + 4 algorithm exercises); 3 exact-copy exercises; first-completion XP and coins. Duel, ranked/friendly matches, ratings and Socket.IO belong to GPT 3. Frontend, root package.json and shared server entrypoint belong to GPT 1.
 
-**Status:** code, seed, initial migration and mock tests are committed to `feat/learning-backend`. Review `docs/contracts.md` before integrating. Real PostgreSQL + Docker end-to-end validation and signoff from GPT 1/3 are pending.
+**Status:** code, seed, migrations and mock tests are committed to `feat/learning-backend`. GPT 1 confirmed PostgreSQL + Prisma, Express `/api`, Bearer auth, Python-first grading and the level formula. Real PostgreSQL + Docker end-to-end integration tests, schema migration approvals and Battle runtime verification are still pending.
 
 ## Local setup (Node >=20, PostgreSQL, Docker)
 
@@ -21,7 +21,7 @@ npm start
 
 **GPT 3 confirmation:** Battle enums accepted; Ranked starts ACTIVE, friendly invite PENDING then ACTIVE on second join, settled state COMPLETED. Rating starts at 1000 with classic Elo K=32, no beginner protection; friendly is unranked. Invite expiry 30 minutes; only participants submit; spectators are read-only. Match `[status, type]` index is included in a new follow-up migration `20261103220000_match_status_type_index` (both previous migrations unchanged). Judge outages never produce a winner. GPT 3 owns match lifecycle, transactional conditional status updates and Elo settlement.
 
-**Migration safety:** The original `prisma/migrations/20261103000000_init/migration.sql` is unchanged. GPT 3's four proposed battle models were added in a **separate** migration `prisma/migrations/20261103170000_add_battle_models/migration.sql`. Both migrations target PostgreSQL; GPT 1's frontend contract instead proposes SQLite. Resolve the provider conflict and approve the proposed enum names / FKs before applying migrations to a shared database.
+**Migration safety:** The original `prisma/migrations/20261103000000_init/migration.sql` is unchanged. GPT 3's four proposed battle models were added in a **separate** migration `prisma/migrations/20261103170000_add_battle_models/migration.sql`. These migrations target PostgreSQL, which GPT 1 explicitly confirmed (superseding the frontend's earlier SQLite draft). A fourth additive migration `20261103230000_problem_starter_code` adds `starterCode`; existing migrations remain untouched. Review the complete shared schema and run migrations against an isolated test database before any shared environment.
 
 Docker is required for grading: no Docker/image → HTTP 503 `JUDGE_UNAVAILABLE`, no fictitious Accepted verdict or rewards. The Docker daemon must not be exposed to users. Production code execution needs a dedicated isolated worker, concurrency limits and ops review.
 
@@ -66,3 +66,13 @@ The judge accepts **Python functions with JSON-serializable arguments and return
 `npm test` runs mock-based tests for password hashing, sessions, private profile data, nickname payment gate, seed structure, false/duplicate submissions, account isolation and exact copy. Previous independent prototype passed 20/20 local tests; do **not** treat that result as CI validation of this GitHub commit. PostgreSQL migrations/seed and Docker-based judging have **not** been verified end-to-end in this environment. Concurrent reward locking and runtime isolation require staging tests and review.
 
 See `../../docs/contracts.md` (proposed integration contract), `../../docs/INTEGRATION_STATUS.md` and `../../AGENTS.md`.
+
+## GPT 1 Python editor contract
+
+`GET /api/problems/:id` returns `{problem:{id,title,statement,language,topicSlug,difficulty,functionName,starterCode,examples,...}}`. The problem list uses `{problems:[...]}` and lesson detail includes `problems` with `functionName` and `starterCode`. Each seeded Python problem has an explicit function signature and named parameters, for example:
+
+```json
+{"problem":{"id":"py-area","functionName":"rectangle_area","starterCode":"def rectangle_area(width, height):\n    pass\n"}}
+```
+
+The editor should submit the **complete Python function source** via `POST /api/problems/:id/submit` with `{"code":"def rectangle_area(width, height):\n    return width * height"}`, not stdin/stdout. The judge calls the function with server-side hidden tests. Other frontend languages must not grant server-verified XP, coins or rating. Apply the reviewed `20261103230000_problem_starter_code` migration and run `npm run db:seed` to backfill seeded problem templates.

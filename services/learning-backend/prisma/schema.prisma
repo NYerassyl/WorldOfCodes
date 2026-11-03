@@ -114,6 +114,7 @@ model Problem {
   topicSlug    String
   difficulty   Difficulty
   functionName String
+  starterCode  String              @default("") @db.Text
   rewardXp     Int                 @default(20)
   rewardCoins  Int                 @default(5)
   isPublished  Boolean             @default(true)

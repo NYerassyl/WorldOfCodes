@@ -29,7 +29,8 @@ export const syllabus = [
             ],
             0
           ]
-        ]
+        ],
+        "starterCode": "def double(n):\n    pass\n"
       },
       {
         "id": "py-area",
@@ -59,7 +60,8 @@ export const syllabus = [
             ],
             99
           ]
-        ]
+        ],
+        "starterCode": "def rectangle_area(width, height):\n    pass\n"
       }
     ]
   },
@@ -93,7 +95,8 @@ export const syllabus = [
             ],
             true
           ]
-        ]
+        ],
+        "starterCode": "def is_even(n):\n    pass\n"
       },
       {
         "id": "py-grade",
@@ -126,7 +129,8 @@ export const syllabus = [
             ],
             "D"
           ]
-        ]
+        ],
+        "starterCode": "def grade(score):\n    pass\n"
       }
     ]
   },
@@ -160,7 +164,8 @@ export const syllabus = [
             ],
             55
           ]
-        ]
+        ],
+        "starterCode": "def sum_to_n(n):\n    pass\n"
       },
       {
         "id": "py-multiples",
@@ -190,7 +195,8 @@ export const syllabus = [
             ],
             0
           ]
-        ]
+        ],
+        "starterCode": "def count_multiples(n, k):\n    pass\n"
       }
     ]
   },
@@ -224,7 +230,8 @@ export const syllabus = [
             ],
             "Hello, !"
           ]
-        ]
+        ],
+        "starterCode": "def greet(name):\n    pass\n"
       },
       {
         "id": "py-max3",
@@ -257,7 +264,8 @@ export const syllabus = [
             ],
             7
           ]
-        ]
+        ],
+        "starterCode": "def max_of_three(a, b, c):\n    pass\n"
       }
     ]
   },
@@ -309,7 +317,8 @@ export const syllabus = [
               -1
             ]
           ]
-        ]
+        ],
+        "starterCode": "def first_and_last(nums):\n    pass\n"
       },
       {
         "id": "py-unique",
@@ -351,7 +360,8 @@ export const syllabus = [
               4
             ]
           ]
-        ]
+        ],
+        "starterCode": "def unique_in_order(nums):\n    pass\n"
       }
     ]
   },
@@ -385,7 +395,8 @@ export const syllabus = [
             ],
             ""
           ]
-        ]
+        ],
+        "starterCode": "def upper_name(name):\n    pass\n"
       },
       {
         "id": "py-lengths",
@@ -426,7 +437,8 @@ export const syllabus = [
               3
             ]
           ]
-        ]
+        ],
+        "starterCode": "def word_lengths(words):\n    pass\n"
       }
     ]
   }
@@ -482,7 +494,8 @@ export const algorithms = [
           1
         ]
       ]
-    ]
+    ],
+    "starterCode": "def two_sum(nums, target):\n    pass\n"
   },
   {
     "id": "algo-binary-search",
@@ -525,7 +538,8 @@ export const algorithms = [
         ],
         0
       ]
-    ]
+    ],
+    "starterCode": "def binary_search(nums, target):\n    pass\n"
   },
   {
     "id": "algo-sort",
@@ -569,7 +583,8 @@ export const algorithms = [
           0
         ]
       ]
-    ]
+    ],
+    "starterCode": "def sort_numbers(nums):\n    pass\n"
   },
   {
     "id": "algo-brackets",
@@ -603,7 +618,8 @@ export const algorithms = [
         ],
         true
       ]
-    ]
+    ],
+    "starterCode": "def valid_parentheses(text):\n    pass\n"
   }
 ];
 export const copyExercises = [

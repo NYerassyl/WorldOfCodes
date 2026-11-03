@@ -29,3 +29,15 @@ test('three exact-code-copy exercises contain real templates',()=>{
   assert.equal(new Set(copyExercises.map(e=>e.id)).size,3);
   for(const e of copyExercises) assert.ok(e.templateCode.endsWith('\n'));
 });
+
+test('every seeded Python problem exposes an explicit editor starter with argument names',()=>{
+  const all=[...syllabus.flatMap(s=>s.problems),...algorithms];
+  assert.equal(all.length,16);
+  for(const p of all) {
+    assert.equal(typeof p.starterCode,'string');
+    assert.match(p.starterCode,new RegExp('^def '+p.functionName+'\\([a-z, ]*\\):\\n    pass\\n$'));
+    assert.ok(p.starterCode.length<200);
+  }
+  assert.equal(all.find(p=>p.id==='py-area').starterCode,'def rectangle_area(width, height):\\n    pass\\n'.replaceAll('\\n','\n'));
+  assert.equal(all.find(p=>p.id==='algo-two-sum').starterCode,'def two_sum(nums, target):\\n    pass\\n'.replaceAll('\\n','\n'));
+});

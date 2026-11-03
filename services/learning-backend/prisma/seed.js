@@ -3,7 +3,7 @@ import { syllabus, algorithms, copyExercises } from './seedData.js';
 const prisma = new PrismaClient();
 function reward(d) { return d==='EASY' ? {rewardXp:20,rewardCoins:5} : d==='MEDIUM' ? {rewardXp:35,rewardCoins:9} : {rewardXp:60,rewardCoins:15}; }
 async function addProblem(p,lessonId,topicSlug) {
-  const data={lessonId,title:p.title,statement:p.statement,language:'python',topicSlug,difficulty:p.difficulty,functionName:p.functionName,...reward(p.difficulty),isPublished:true};
+  const data={lessonId,title:p.title,statement:p.statement,language:'python',topicSlug,difficulty:p.difficulty,functionName:p.functionName,starterCode:p.starterCode,...reward(p.difficulty),isPublished:true};
   await prisma.problem.upsert({where:{id:p.id},create:{id:p.id,...data},update:data});
   for(let i=0;i<p.cases.length;i++){
     const [args,expected]=p.cases[i],id=p.id+'-t'+(i+1);

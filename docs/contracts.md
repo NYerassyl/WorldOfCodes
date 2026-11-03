@@ -1,11 +1,11 @@
 # WorldOfCodes — Week 1 integration contract DRAFT
 
-**Status: proposed for GPT 1 and GPT 3 review; not yet accepted by both agents.** Concrete interfaces below match the learning-backend implementation in this branch. Changes to external contracts require coordinated review.
+**Status: GPT 1 has confirmed PostgreSQL, Express, /api, Bearer auth, route shapes and the XP level formula; GPT 3 confirmed Battle enums, Judge API and match lifecycle.** Integration and production deployment still require tests and review.
 
 ## Shared stack boundary
 - Learning module: Node.js >=20, Express 4, Prisma 6/PostgreSQL, Python function judge via Docker.
-- Root `package.json`, lockfile, shared server entrypoint are owned by GPT 1. The working dependency manifest is `services/learning-backend/package.json`; it is not an agreed root manifest.
-- Learning Prisma schema: `services/learning-backend/prisma/schema.prisma`. GPT 3 provided the four battle model shapes; GPT 2 has prepared their relationships and a separate additive PostgreSQL migration. GPT 3 has approved the enum values and Judge interface; the shared DB provider still requires GPT 1 approval.
+- Root `package.json`, lockfile and shared server entrypoint are owned by GPT 1, who confirmed Node.js + Express, REST prefix `/api` mounted once, PostgreSQL + Prisma, CORS allowlist, auth/submission rate limits, body limits and central error handler. The service-local manifest is `services/learning-backend/package.json`. Production DB credentials remain server-side.
+- Learning Prisma schema: `services/learning-backend/prisma/schema.prisma`. GPT 3 provided the four battle model shapes; GPT 2 has prepared their relationships and a separate additive PostgreSQL migration. GPT 3 approved enum values and Judge interface; GPT 1 confirmed PostgreSQL as the shared DB provider. GPT 1 will own connection wiring, CORS, limits, server mounting and integration testing.
 
 ## Authentication and account interface (GPT 2 → GPT 1 / GPT 3)
 - Middleware factory: `makeRequireAuth(prisma)` from `services/learning-backend/src/index.js`; on success writes `req.auth = { userId, sessionId, user }`.
@@ -18,7 +18,7 @@
   - `GET /users/me`, `PATCH /users/me` {nickname?,avatarUrl?} (auth)
   - `GET /users/:nickname` (public; never returns email/password/session/coins).
 - First distinct normalized nickname change free; later changes blocked with `402 NICKNAME_CHANGE_PAYMENT_REQUIRED`. No payment integration.
-- XP/coins belong to learning only; do not treat `User.xp` as duel rating. Proposed level formula `floor(xp / 100) + 1` requires product signoff.
+- XP/coins belong to learning only; do not treat `User.xp` as duel rating. GPT 1 approved `level = floor(xp / 100) + 1` for Week 1; frontend displays the server-provided level.
 
 ## Problems Bank (GPT 2 → GPT 3)
 ```js
@@ -26,9 +26,9 @@ import { getPublicProblemBank, getJudgableProblem } from './services/learning-ba
 const publicList = await getPublicProblemBank(prisma, { topic: 'sorting', difficulty: 'MEDIUM' });
 const problem = await getJudgableProblem(prisma, problemId); // server only!
 ```
-- `getPublicProblemBank(prisma, {topic?, difficulty?})` returns published problems with public **sample** cases only, sorted by difficulty and id. DB difficulty: `EASY | MEDIUM | HARD`.
+- `getPublicProblemBank(prisma, {topic?, difficulty?})` returns published problems with public **sample** cases only, sorted by difficulty and id. DB difficulty: `EASY | MEDIUM | HARD`. Public problem objects now contain `starterCode` (complete Python `def functionName(argumentNames):\n    pass\n` template).
 - `getJudgableProblem(prisma, problemId)` returns `{ id, language, topicSlug, difficulty, functionName, testCases }`; every test case has `argsJson` and `expectedJson` strings, including **hidden** tests. This object is strictly server-only, NEVER emit to frontend/Socket.IO.
-- Public API: `GET /api/problems?topic=sorting&difficulty=MEDIUM`, `GET /api/problems/:id`. Submission: `POST /api/problems/:id/submit` {code}. **Duel must not use submission endpoint**, because it changes learning XP.
+- Public API: `GET /api/problems?topic=sorting&difficulty=MEDIUM` → `{problems:[...]}`, `GET /api/problems/:id` → `{problem:{...}}`. Both return `starterCode` and `functionName`. `GET /api/learning/lessons/:id` also supplies those two fields for each exercise. Submission: `POST /api/problems/:id/submit` `{code}` → `{submissionId,status,passedCases,totalCases,rewarded,earnedXp,earnedCoins}`. **Duel must not use the learning submission endpoint**, because it changes learning XP.
 - Stable problem IDs may be persisted in match records. GPT 3 should decide whether to snapshot problem/test version at match start; discuss before introducing mutable content.
 
 ## Judge interface (GPT 2 → GPT 3)
@@ -91,4 +91,15 @@ Model design from GPT 3's supplied request, implemented in `services/learning-ba
 - **Indexes:** preserve `[type, status]`; add `[status, type]` for the requested match queries, and retain existing `[userId]` on MatchPlayer, `[expiresAt]` on FriendBattle, plus the specified unique constraints.
 - **New migration policy:** initial `20261103000000_init` and existing `20261103170000_add_battle_models` remain unchanged. A follow-up migration adds the extra index.
 
-**Stack conflict:** `feat/frontend/docs/contracts.md` proposes **Prisma + SQLite** while `feat/learning-backend` uses **Prisma + PostgreSQL**. These migration files are PostgreSQL-only. GPT 1 must choose the shared provider and approve a unified migration before applying it. GPT 3 confirmed the proposed enum values and declared interface compatibility in chat; an actual Battle branch/runtime comparison is still pending.
+**Database provider resolved:** GPT 1 explicitly confirmed **PostgreSQL + Prisma**, superseding the older SQLite proposal on the frontend branch. The migrations remain PostgreSQL-only; applying them to an existing database still requires schema review and isolated integration testing. GPT 3 confirmed the enum values and Judge interfaces; actual Battle runtime code integration is still pending.
+
+## GPT 1 confirmed integration contract (2026-11-03)
+
+- **Provider:** PostgreSQL + Prisma; the earlier SQLite proposal on the frontend branch is **superseded** by GPT 1's explicit confirmation. GPT 2 owns shared Prisma models and migrations; GPT 1 owns DB wiring, environment, root configuration and review of migrations before applying.
+- **Server:** Node.js + Express; mount all routers exactly once under `/api`. GPT 1 owns CORS origin allowlist, authentication/submission rate limits, request-body limits, central error middleware and production configuration. Existing development proxy to port 4001 is acceptable.
+- **Authentication:** Bearer opaque session token; `/api/auth/register`, `/api/auth/login`, `/api/auth/logout`, `/api/users/me` and `/api/users/:nickname` shapes remain unchanged. Logout revokes server-side session. GPT 3 must validate Socket.IO auth against the same session state.
+- **Learning:** Python is the **only Week-1 server-graded language**. Other frontend language labs are for practice and must not earn authoritative server XP, coins or duel rating. Our judge is function-return based, not stdin/stdout.
+- **Editor:** the previously missing `starterCode` is now stored on `Problem` and exposed through problem-list/detail and lesson-detail reads; each of the 16 seeded problems contains an explicit Python signature and named arguments. For example `def rectangle_area(width, height):\n    pass\n`.
+- **Rewards and progress:** server-authoritative, never import unverified local preview state; no XP for opening theory. GPT 1 approved `Math.floor(xp / 100) + 1` for frontend display.
+- **Verification/ownership:** GPT 1 will run full integration tests against real PostgreSQL and Docker judge, including register/login/logout/session restore, authorization, learning progress, duplicated/concurrent submissions, and judge failures. The server database must never be reset as a shortcut. GPT 2 can validate schema and unit tests; these do **not** substitute for end-to-end checks.
+- **Additive migration:** `20261103230000_problem_starter_code` adds the new `Problem.starterCode` field, defaulting to empty for pre-existing problems. Rerun `npm run db:seed` after approved migrations to populate all 16 published seeded problem templates. The original migrations remain unchanged.

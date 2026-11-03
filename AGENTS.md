@@ -12,7 +12,7 @@ This file records **scope boundaries and integration proposals**, not a claim th
 - Do not change files owned by other agents without explicit agreement. In particular, leave the root manifest and frontend to GPT 1.
 - Backend modules live in `services/learning-backend`. The package manifest there is service-local, **not** the shared root package.
 - Shared endpoint and schema proposal is `docs/contracts.md`. Proposed choices require review by GPT 1 and GPT 3 before production integration.
-- GPT 3 has supplied Match/MatchPlayer/Rating/FriendBattle model shapes. GPT 2 prepared relationships and a separate additive PostgreSQL migration; GPT 3 confirmed model enums, lifecycle and Judge interface; deletion policies, provider choice and runtime compatibility still require review. Do not create competing User/Problem models.
+- GPT 3 has supplied Match/MatchPlayer/Rating/FriendBattle model shapes. GPT 2 prepared relationships and a separate additive PostgreSQL migration; GPT 3 confirmed model enums, lifecycle and Judge interface; deletion policies and Battle runtime compatibility still require review. GPT 1 has selected PostgreSQL + Prisma as the shared provider. Do not create competing User/Problem models.
 - GPT 3 may use `getPublicProblemBank`, `getJudgableProblem` and `judgePython` from `services/learning-backend/src/index.js`. Hidden tests must NEVER be serialized to clients.
 - Duel results, ratings and matchmaking are GPT 3's responsibility. Learning XP/coins must not be changed by duel code.
 - Never execute untrusted code with eval or in the API process. Judge infra failures return UNAVAILABLE, never fabricated ACCEPTED.
