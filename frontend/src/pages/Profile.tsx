@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useStore } from "../lib/store";
 import { levelFor } from "../lib/progress.mjs";
 import { Heading, Notice, Icon } from "../components/UI";
+import AccountPanel from "../components/AccountPanel";
 export default function Profile() {
   const { state, update } = useStore();
   const [name, setName] = useState(state.name);
@@ -78,6 +79,7 @@ export default function Profile() {
           </div>
         </div>
       </section>
+      <AccountPanel />
       <div className="profile-layout">
         <section className="panel">
           <div className="section-head">

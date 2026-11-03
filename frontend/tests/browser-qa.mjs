@@ -1,8 +1,11 @@
 // Browser QA for the demo frontend. Start the dev server first:
 //   npm run dev -- --port 5180
 //   node tests/browser-qa.mjs
+// The account checks use a local stub on port 4001 through the Vite proxy.
+// Stop any real learning backend on that port before running this script.
 // Override CHROME_PATH, BASE_URL, CDP_PORT or CHROME_PROFILE when needed.
 import { spawn } from "node:child_process";
+import http from "node:http";
 import { setTimeout as sleep } from "node:timers/promises";
 
 const CHROME =
@@ -10,6 +13,138 @@ const CHROME =
   "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome";
 const PORT = Number(process.env.CDP_PORT || 9335);
 const BASE = process.env.BASE_URL || "http://localhost:5180";
+const STUB_PORT = 4001;
+
+let stubUser = {
+  id: "stub-user",
+  email: "ada@example.com",
+  nickname: "Aruzhan",
+  avatarUrl: null,
+  xp: 120,
+  coins: 30,
+  level: 2,
+  nicknameChanges: 0,
+  nextNicknameChange: "FREE",
+};
+const stubTokens = new Set();
+
+function stubJson(res, status, payload) {
+  res.writeHead(status, { "content-type": "application/json" });
+  res.end(JSON.stringify(payload));
+}
+
+function stubPrivateUser() {
+  return {
+    ...stubUser,
+    nextNicknameChange:
+      stubUser.nicknameChanges === 0 ? "FREE" : "PAYMENT_REQUIRED",
+  };
+}
+
+const stub = http.createServer((req, res) => {
+  let body = "";
+  req.on("data", (chunk) => {
+    body += chunk;
+  });
+  req.on("end", () => {
+    const input = body ? JSON.parse(body) : {};
+    const token = (req.headers.authorization || "").replace(/^Bearer /, "");
+    const authed = stubTokens.has(token);
+    if (req.method === "POST" && req.url === "/api/auth/register") {
+      const nickname = String(input.nickname || "").trim();
+      if (!/^[A-Za-z0-9_]{3,24}$/.test(nickname)) {
+        return stubJson(res, 400, {
+          error: {
+            code: "BAD_REQUEST",
+            message:
+              "Nickname must be 3-24 Latin letters, digits, or underscores",
+          },
+        });
+      }
+      stubUser = {
+        ...stubUser,
+        email: String(input.email || "").toLowerCase(),
+        nickname,
+        nicknameChanges: 0,
+      };
+      const issued = "stub-token-register";
+      stubTokens.add(issued);
+      return stubJson(res, 201, { token: issued, user: stubPrivateUser() });
+    }
+    if (req.method === "POST" && req.url === "/api/auth/login") {
+      if (
+        String(input.email || "").toLowerCase() !== stubUser.email ||
+        input.password !== "password123"
+      ) {
+        return stubJson(res, 401, {
+          error: {
+            code: "INVALID_CREDENTIALS",
+            message: "Invalid email or password",
+          },
+        });
+      }
+      const issued = `stub-token-login-${stubTokens.size}`;
+      stubTokens.add(issued);
+      return stubJson(res, 200, { token: issued, user: stubPrivateUser() });
+    }
+    if (!authed) {
+      return stubJson(res, 401, {
+        error: { code: "UNAUTHORIZED", message: "Bearer token required" },
+      });
+    }
+    if (req.method === "POST" && req.url === "/api/auth/logout") {
+      stubTokens.delete(token);
+      res.writeHead(204);
+      return res.end();
+    }
+    if (req.method === "GET" && req.url === "/api/users/me") {
+      return stubJson(res, 200, { ...stubPrivateUser(), completedLessons: 4 });
+    }
+    if (req.method === "PATCH" && req.url === "/api/users/me") {
+      const nickname = String(input.nickname ?? stubUser.nickname).trim();
+      if (!/^[A-Za-z0-9_]{3,24}$/.test(nickname)) {
+        return stubJson(res, 400, {
+          error: { code: "BAD_REQUEST", message: "Invalid nickname" },
+        });
+      }
+      if (
+        nickname.toLowerCase() !== stubUser.nickname.toLowerCase() &&
+        stubUser.nicknameChanges > 0
+      ) {
+        return stubJson(res, 402, {
+          error: {
+            code: "NICKNAME_CHANGE_PAYMENT_REQUIRED",
+            message:
+              "Additional nickname changes require payment; payment is not available this week",
+          },
+        });
+      }
+      if (nickname.toLowerCase() !== stubUser.nickname.toLowerCase()) {
+        stubUser = {
+          ...stubUser,
+          nickname,
+          nicknameChanges: stubUser.nicknameChanges + 1,
+        };
+      }
+      return stubJson(res, 200, stubPrivateUser());
+    }
+    stubJson(res, 404, {
+      error: { code: "NOT_FOUND", message: "Not found" },
+    });
+  });
+});
+
+try {
+  await new Promise((resolve, reject) => {
+    stub.once("error", reject);
+    stub.listen(STUB_PORT, "127.0.0.1", resolve);
+  });
+} catch {
+  console.error(
+    `Browser QA needs port ${STUB_PORT} free for its account stub. Stop the learning backend first.`,
+  );
+  process.exit(1);
+}
 
 const chrome = spawn(
   CHROME,
@@ -701,6 +836,146 @@ check(
   true,
 );
 
+// --- Account: server session through the /api proxy ---
+await nav("#profile");
+const accountAnon = await ev(`(()=>({
+  tabs:[...document.querySelectorAll('.account-tab')].map(b=>b.textContent.trim()),
+  fields:document.querySelectorAll('.account-form input').length,
+  note:document.querySelector('.account-note')?.textContent || ''
+}))()`);
+check(
+  "account panel offers sign in",
+  accountAnon.tabs.includes("Sign in"),
+  true,
+);
+check(
+  "account panel offers registration",
+  accountAnon.tabs.includes("Create account"),
+  true,
+);
+check("signed-out account asks for credentials", accountAnon.fields, 2);
+check(
+  "account panel explains local progress",
+  /on this device/.test(accountAnon.note),
+  true,
+);
+
+await clickText(".account-tab", "Create account");
+await sleep(250);
+await setValue('.account-form input[type="email"]', "ada@example.com");
+await setValue('.account-form input[type="password"]', "password123");
+await setValue('.account-form input[autocomplete="username"]', "Aruzhan");
+await ev(
+  `document.querySelector('.account-form button[type=submit]').click();'ok'`,
+);
+await waitFor(`!!document.querySelector('.account-identity')`);
+await waitFor(`document.querySelectorAll('.account-facts dd').length === 4`);
+await waitFor(
+  `document.querySelector('.sidebar .account')?.textContent.includes('Aruzhan')`,
+);
+const signedIn = await ev(`(()=>({
+  identity:document.querySelector('.account-identity strong')?.textContent,
+  email:document.querySelector('.account-identity div span')?.textContent,
+  tag:document.querySelector('.account-panel .tag')?.textContent,
+  facts:[...document.querySelectorAll('.account-facts dd')].map(d=>d.textContent),
+  sidebar:document.querySelector('.sidebar .account')?.textContent || '',
+  hero:document.querySelector('.profile-identity h2')?.textContent,
+  localXp:document.querySelector('.profile-numbers strong')?.textContent,
+  token:localStorage.getItem('worldofcodes-session-v1')
+}))()`);
+check("registration opens a server session", signedIn.identity, "Aruzhan");
+check("account shows the server email", signedIn.email, "ada@example.com");
+check("account panel marks the server session", signedIn.tag, "SERVER SESSION");
+check(
+  "account shows server level, XP, coins and lessons",
+  signedIn.facts.join(","),
+  "2,120,30,4",
+);
+check(
+  "server nickname reaches the sidebar",
+  /Aruzhan/.test(signedIn.sidebar),
+  true,
+);
+check("server nickname reaches the profile hero", signedIn.hero, "Aruzhan");
+check("server XP stays separate from local XP", signedIn.localXp, "80");
+check(
+  "registration stores a session token",
+  typeof signedIn.token === "string" && signedIn.token.length > 0,
+  true,
+);
+
+await setValue(".account-form input[pattern]", "Aruzhan_One");
+await ev(
+  `document.querySelector('.account-form button[type=submit]').click();'ok'`,
+);
+await waitFor(
+  `document.querySelector('.account-identity strong')?.textContent === 'Aruzhan_One'`,
+);
+const renamedAccount = await ev(`(()=>({
+  identity:document.querySelector('.account-identity strong')?.textContent,
+  hint:document.querySelector('.account-form small')?.textContent || '',
+  notice:document.querySelector('.account-form .result')?.textContent || ''
+}))()`);
+check(
+  "server nickname update is reflected",
+  renamedAccount.identity,
+  "Aruzhan_One",
+);
+check(
+  "server profile save confirms",
+  /server profile has been updated/.test(renamedAccount.notice),
+  true,
+);
+check(
+  "nickname hint reports the used free change",
+  /free nickname change has been used/.test(renamedAccount.hint),
+  true,
+);
+
+await reload();
+const restoredAccount = await waitFor(
+  `(()=>{const el=document.querySelector('.account-identity strong');return el?el.textContent:null})()`,
+);
+check("server session survives reload", restoredAccount, "Aruzhan_One");
+
+await clickText(".account-panel button", "Sign out");
+await waitFor(`!!document.querySelector('.account-tabs')`);
+const signedOut = await ev(`(()=>({
+  form:!!document.querySelector('.account-tabs'),
+  token:localStorage.getItem('worldofcodes-session-v1')
+}))()`);
+check("sign out returns to the account form", signedOut.form, true);
+check("sign out removes the session token", signedOut.token, null);
+
+await setValue('.account-form input[type="email"]', "ada@example.com");
+await setValue('.account-form input[type="password"]', "not-the-password");
+await ev(
+  `document.querySelector('.account-form button[type=submit]').click();'ok'`,
+);
+const signInError = await waitFor(
+  `document.querySelector('.account-form .result.error')?.textContent || null`,
+);
+check(
+  "bad credentials show the api error",
+  /Invalid email or password/.test(signInError || ""),
+  true,
+);
+
+await setValue('.account-form input[type="password"]', "password123");
+await ev(
+  `document.querySelector('.account-form button[type=submit]').click();'ok'`,
+);
+await waitFor(
+  `document.querySelector('.account-identity strong')?.textContent === 'Aruzhan_One'`,
+);
+check(
+  "sign in restores the server profile",
+  await ev(`document.querySelector('.account-identity strong')?.textContent`),
+  "Aruzhan_One",
+);
+await clickText(".account-panel button", "Sign out");
+await waitFor(`!!document.querySelector('.account-tabs')`);
+
 // --- Arena rehearsal: start, timeout, finish ---
 await nav("#duel");
 await ev(
@@ -863,4 +1138,6 @@ console.log(
 );
 ws.close();
 chrome.kill();
+stub.closeAllConnections();
+stub.close();
 process.exit(failed.length ? 1 : 0);

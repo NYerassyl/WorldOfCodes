@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Provider, useStore } from "./lib/store";
+import { Provider as AuthProvider, useAuth } from "./lib/auth";
 import { Icon, Heading } from "./components/UI";
 import { levelFor } from "./lib/progress.mjs";
 import Home from "./pages/Home";
@@ -18,8 +19,16 @@ const routes = [
   { id: "profile", name: "My Profile", icon: "profile" },
 ];
 function Shell() {
-  const { state, storageError } = useStore();
+  const { state, storageError, update } = useStore();
+  const { status: authStatus, user } = useAuth();
   const [route, setRoute] = useState(() => location.hash.slice(1) || "home");
+  useEffect(() => {
+    if (authStatus !== "authenticated" || !user) return;
+    const avatar = user.nickname.slice(0, 1).toUpperCase();
+    if (user.nickname !== state.name || avatar !== state.avatar) {
+      update({ name: user.nickname, avatar });
+    }
+  }, [authStatus, user, state.name, state.avatar, update]);
   const [menuOpen, setMenuOpen] = useState(false);
   const mainRef = useRef<HTMLElement>(null);
   useEffect(() => {
@@ -218,8 +227,10 @@ function Shell() {
 }
 export default function App() {
   return (
-    <Provider>
-      <Shell />
-    </Provider>
+    <AuthProvider>
+      <Provider>
+        <Shell />
+      </Provider>
+    </AuthProvider>
   );
 }

@@ -4,8 +4,9 @@
 
 Frontend branch: feat/frontend. React + TypeScript application in frontend/.
 The six week-one areas are implemented as client-side UI. Lessons cover six language
-tracks with 30 lessons (300 checked quiz tasks) plus 30 hands-on code labs. Backend
-integration is pending.
+tracks with 30 lessons (300 checked quiz tasks) plus 30 hands-on code labs. Account
+registration, sign-in, sign-out and profile editing now use GPT 2's auth API; learning
+progress is still device-local because no progress endpoints exist yet.
 
 ## Ownership
 
@@ -26,6 +27,42 @@ Root contracts.md is still a draft. This file specifies UI needs, not finalized 
 - #friends: private room creation/join UI (offline rehearsal currently)
 - #copy: typing practice
 - #profile: local profile editing
+
+## Account and session integration
+
+Implemented against the auth section of GPT 2's contract on
+`origin/feat/learning-backend`:
+
+- `frontend/src/lib/api.ts` is the typed client. The opaque Bearer token is stored under
+  `worldofcodes-session-v1`, requests time out after 20 seconds, `{error:{code,message}}`
+  becomes `ApiError`, 204 is supported, and a 401 on a non-auth route clears the token.
+  `configureApi` exists for tests.
+- `frontend/src/lib/auth.tsx` restores the session with `GET /users/me` when a token
+  exists and exposes `loading | anonymous | authenticated | unavailable` with a retry.
+  Login and registration store the token before loading the private profile. Logout
+  clears the local token even when the server cannot be reached.
+- The Profile page has an Account panel for register, sign-in, sign-out, nickname and
+  avatar URL updates. Server level, XP, coins and completedLessons appear only in this
+  panel. Preview XP/coins stay device-local and are never uploaded.
+- When a server session is active, its nickname is adopted by the sidebar and profile
+  hero so the displayed identity matches the authenticated account.
+- `frontend/vite.config.ts` proxies `/api` to `http://127.0.0.1:4001` in development.
+  The standalone backend sends no CORS headers, so production must serve the SPA and
+  API from one origin or add a reviewed CORS policy.
+
+Requested error handling is visible in the UI: a 402
+`NICKNAME_CHANGE_PAYMENT_REQUIRED` explains that paid nickname changes are unavailable,
+invalid credentials show the server message, and an unreachable server offers retry.
+
+Not implemented, because the backend has no matching models or routes:
+
+- Quiz task attempts and lab runs are not sent to the server.
+- The Prisma schema has no quiz-task model; `LessonProgress` is only completed through
+  problem submissions, and this curriculum's labs are not published `Problem` rows.
+- `GET /users/me` exposes `completedLessons` as a count without per-lesson detail.
+- No seed script or seed data exists for courses, lessons or tasks. No PostgreSQL or
+  Docker is available in this agent's environment, so only contract-level and stub-backed
+  browser verification was possible here.
 
 ## GPT 2 integration requirements
 
@@ -85,11 +122,37 @@ submits all 40 run-lab solution tests to Judge0 CE and requires exact stdout mat
 loads the real render-check module in headless Chrome and verifies every render check on
 the ten HTML/CSS reference solutions while confirming each starter fails at least one.
 npm run build performs strict TypeScript checking and the production bundle build.
+`node tests/api.test.mjs` (included in npm test) runs the API client against a
+`node:http` stub and covers registration, Bearer headers, 204 responses, 401 token
+clearing, non-auth 401 handling, profile PATCH, encoded public profiles, non-JSON errors,
+network failure and token round-trips in a non-browser environment.
 Browser QA is automated in tests/browser-qa.mjs. With the dev server running on port 5180
 (`npm run dev -- --port 5180`), run `node tests/browser-qa.mjs`. It drives headless Chrome
 over CDP against a cleared demo localStorage and checks language switching, lesson
 unlock at five correct quiz answers, retry behavior, reload persistence, a real JavaScript
 lab run (starter failure, accepted verdict, one-time reward), a real CSS render lab with
-the sandboxed preview and computed-style checks, profile rename, algorithm filtering,
-typing completion, demo arena cancel/timeout, friendly room-code validation and
-390px/1440px layouts. Browser QA needs network access to Judge0 CE.
+the sandboxed preview and computed-style checks, profile rename, account registration and
+nickname update through the `/api` proxy, session restore after reload, sign-out, rejected
+credentials, algorithm filtering, typing completion, demo arena cancel/timeout, friendly
+room-code validation and 390px/1440px layouts. Browser QA starts its own auth stub on port
+4001, so stop a real learning backend on that port first, and it needs network access to
+Judge0 CE.
+
+## Proposal to the integrator
+
+These shared changes are proposals only; this branch does not modify the root manifest,
+lockfile or server entrypoint.
+
+1. Serve one production origin. Either mount the built SPA and `/api` behind one host or
+   put both behind a reverse proxy. The standalone learning backend currently sends no CORS
+   headers, and the frontend calls same-origin `/api`.
+2. Add agreed root scripts for running the frontend and backend together, or document the
+   two-terminal flow (`npm run dev` in frontend/, `node src/standalone.js` in
+   services/learning-backend/). Root script changes need integrator review.
+3. Provide PostgreSQL provisioning plus a seed command for courses, lessons and tasks.
+   Without seed data the Lessons UI cannot switch from bundled content to server content.
+4. Define progress endpoints and models for quiz attempts and lab runs, with idempotent,
+   transactional rewards and server-side verification. Client answer indices must not be
+   trusted and should not ship for production-graded content.
+5. Decide session authentication for Socket.IO with GPT 3. That belongs to the duel
+   service and is outside this slice.
