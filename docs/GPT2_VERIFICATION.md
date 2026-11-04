@@ -31,7 +31,7 @@ Migration validation is designed for an **isolated** PostgreSQL database. Shared
 
 ## Verified CI results — 2026-11-04
 
-**Latest code commit:** `f822d21a65446266429d372f160f2a8d28d77f8f`. GitHub Actions: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780374274
+**Latest code commit:** `50a809c41b0c59ad81f78f4fa5a1edbb87d975ab`. GitHub Actions: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780676514
 
 | Check | Observed result |
 | --- | --- |
@@ -39,7 +39,7 @@ Migration validation is designed for an **isolated** PostgreSQL database. Shared
 | ESM dynamic import of `socket.io` | PASS; `Server` and `Socket` exports verified |
 | Prisma validate | PASS on PostgreSQL schema |
 | Prisma generate | PASS, Prisma Client **v6.19.3**; all required Battle model delegates present |
-| Backend tests | **38 passed / 0 failed** |
+| Backend tests | **39 passed / 0 failed** |
 | Isolated PostgreSQL 16 + real Docker Judge tests | **12 passed / 0 failed** (11 subtests + parent) |
 | Migration deploy #1 | All four migrations applied in declared order |
 | Migration deploy #2 | **No pending migrations to apply** |
@@ -55,3 +55,7 @@ Migration validation is designed for an **isolated** PostgreSQL database. Shared
 The **Socket.IO event-time revalidation** remains a GPT 3 action. This report verifies the shared lookup and session revocation against PostgreSQL, **not** live websocket submission/settlement in the combined Battle app. GPT 1 must regenerate the authoritative **root workspace `package-lock.json`**, connect REST and Socket.IO with one `MatchmakingQueue`, and run combined Battle end-to-end tests.
 
 **Security/deployment limitations:** Docker resource flags and cleanup were checked, but full hostile-code sandbox penetration testing, distributed judge workers, distributed matchmaking, production rate-limits, TLS/hosting and production secret provisioning remain outside this verification. No shared or production database was migrated or reset.
+
+## Final CI confirmation for the same 2026-11-04 code
+
+GitHub Actions run `41780676514` completed **successfully** on `50a809c41b0c59ad81f78f4fa5a1edbb87d975ab`: 39/39 backend unit/contract tests and 12/12 real isolated PostgreSQL/Docker test results passed. The additional unit case verified that argument counts in **all 16** `starterCode` function signatures match every sample and hidden `cases` input. No shared/prod DB mutation or root lockfile edit was performed.

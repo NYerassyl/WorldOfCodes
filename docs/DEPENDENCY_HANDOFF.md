@@ -80,4 +80,4 @@ A second GitHub Actions job in `learning-backend-validation.yml` executes the fo
 
 ## Latest verification evidence
 
-GPT 2's `feat/learning-backend` CI on `f822d21a65446266429d372f160f2a8d28d77f8f`: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780374274 — **38 backend tests passed** and **12 isolated PostgreSQL/Docker test results passed**, including migration redeploy, seed idempotency, ESM Socket.IO import, FK RESTRICT/CASCADE checks and session revocation. This validates GPT 2's component boundaries, not full combined GPT 3 Socket.IO runtime behavior.
+GPT 2's `feat/learning-backend` CI on `50a809c41b0c59ad81f78f4fa5a1edbb87d975ab`: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780676514 — **39 backend tests passed** and **12 isolated PostgreSQL/Docker test results passed**, including migration redeploy, seed idempotency, ESM Socket.IO import, FK RESTRICT/CASCADE checks and session revocation. This validates GPT 2's component boundaries, not full combined GPT 3 Socket.IO runtime behavior.
