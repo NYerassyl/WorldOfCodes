@@ -1,0 +1,205 @@
+name: Learning backend validation
+
+on:
+  push:
+    branches:
+      - feat/learning-backend
+  pull_request:
+    paths:
+      - 'services/learning-backend/**'
+      - '.github/workflows/learning-backend-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/learning-backend
+    env:
+      DATABASE_URL: postgresql://worldofcodes:test@localhost:5432/worldofcodes?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install service dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema prisma/schema.prisma
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema prisma/schema.prisma
+      - name: Verify generated Battle model delegates
+        run: |
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { PrismaClient } from "@prisma/client";
+            const prisma = new PrismaClient();
+            for (const name of ["match", "matchPlayer", "rating", "friendBattle", "user", "problem"]) {
+              assert.ok(prisma[name], "Missing generated Prisma delegate " + name);
+              assert.equal(typeof prisma[name].findMany, "function");
+            }
+            await prisma.$disconnect();
+          '
+      - name: Run Learning backend regression tests
+        run: npm test
+
+  postgresql-docker-integration:
+    name: Isolated PostgreSQL migrations, seed and Docker judge
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: services/learning-backend
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: woc_ci
+          POSTGRES_PASSWORD: woc_ci_only
+          POSTGRES_DB: worldofcodes_integration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U woc_ci -d worldofcodes_integration_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://woc_ci:woc_ci_only@127.0.0.1:5432/worldofcodes_integration_test?schema=public
+      JUDGE_IMAGE: python:3.12-alpine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install service dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Prisma schema validation and client generation
+        run: |
+          npx prisma validate --schema prisma/schema.prisma
+          npx prisma generate --schema prisma/schema.prisma
+      - name: Deploy migration history to isolated test DB
+        run: npx prisma migrate deploy --schema prisma/schema.prisma
+      - name: Re-deploy migrations (must be no-op)
+        run: npx prisma migrate deploy --schema prisma/schema.prisma
+      - name: Seed course, problems, tests and copy exercises
+        run: node prisma/seed.js
+      - name: Reseed (must not create duplicates)
+        run: node prisma/seed.js
+      - name: Pull trusted Python Docker image for isolated judge
+        run: docker pull python:3.12-alpine
+      - name: Run real PostgreSQL + Docker Judge integration tests
+        run: npm run test:integration
+
+  integrated-root-lock-verification:
+    name: Root workspace npm ci, Prisma/Socket.IO imports and npm audit
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: integration-check
+    env:
+      DATABASE_URL: postgresql://woc_ci:woc_ci_only@127.0.0.1:5432/worldofcodes_integration_test?schema=public
+    steps:
+      - name: Check out GPT 1 integration snapshot (no branch modifications)
+        uses: actions/checkout@v4
+        with:
+          ref: c907eab63713f45415e9bd556082932c9f285c1c
+          path: integration-check
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Confirm tested integration commit and manifests
+        run: |
+          git rev-parse HEAD
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import {readFileSync} from "node:fs";
+            const root=JSON.parse(readFileSync("package.json","utf8"));
+            const service=JSON.parse(readFileSync("services/learning-backend/package.json","utf8"));
+            const lock=JSON.parse(readFileSync("package-lock.json","utf8"));
+            assert.ok(root.workspaces.includes("services/learning-backend"));
+            assert.equal(root.dependencies["socket.io"], "^4.8.4");
+            assert.equal(service.dependencies["socket.io"], "^4.8.4");
+            assert.equal(lock.packages[""].dependencies["socket.io"], "^4.8.4");
+            assert.equal(lock.packages["services/learning-backend"].dependencies["socket.io"], "^4.8.4");
+            console.log("Root workspace manifests and lock metadata agree");
+          '
+      - name: Install reproducibly with authoritative root lockfile
+        run: npm ci --no-audit --no-fund
+      - name: Verify installed Prisma 6, Socket.IO ESM and Battle delegates
+        run: |
+          npm ls prisma @prisma/client socket.io
+          npm run db:validate
+          npm run db:generate
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import {Server,Socket} from "socket.io";
+            import {PrismaClient} from "@prisma/client";
+            assert.equal(typeof Server,"function");
+            assert.equal(typeof Socket,"function");
+            const prisma=new PrismaClient();
+            for(const key of ["user","authSession","course","topic","lesson","problem","testCase",
+              "submission","problemCompletion","lessonProgress","copyExercise","copyAttempt",
+              "copyCompletion","rewardLedger","match","matchPlayer","rating","friendBattle"]){
+              assert.equal(typeof prisma[key]?.findMany,"function",key);
+            }
+            await prisma.$disconnect();
+            console.log("Socket.IO ESM imports and 18 Learning/Battle Prisma delegates passed");
+          '
+      - name: npm audit of entire locked tree (report, no silent suppression)
+        shell: bash
+        run: |
+          set +e
+          npm audit --json > "$RUNNER_TEMP/woc-audit-all.json"
+          audit_status=$?
+          set -e
+          node --input-type=module <<'NODE'
+          import {readFileSync} from "node:fs";
+          const raw=readFileSync(process.env.RUNNER_TEMP+"/woc-audit-all.json","utf8");
+          const obj=JSON.parse(raw);
+          if(obj.error||!obj.metadata?.vulnerabilities){
+            console.error("npm audit could not produce vulnerability metadata",obj.error||obj);
+            process.exitCode=2;
+          }else{
+            console.log("Full lockfile vulnerability counts:",JSON.stringify(obj.metadata.vulnerabilities));
+            const issues=Object.entries(obj.vulnerabilities||{});
+            for(const [name,entry] of issues){
+              console.log(JSON.stringify({name,severity:entry.severity,range:entry.range,
+                isDirect:entry.isDirect,fixAvailable:entry.fixAvailable,
+                via:(entry.via||[]).map(v=>typeof v==="string"?v:{name:v.name,title:v.title,url:v.url,range:v.range})}));
+            }
+            const summary=issues.map(([n,e])=>"- "+n+": "+e.severity+"; fix="+JSON.stringify(e.fixAvailable)).join("\n");
+            const fs=await import("node:fs");
+            fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              "### Root-lock npm audit (full tree)\n\nCommit: `c907eab63713f45415e9bd556082932c9f285c1c`\n\n"
+              +"```json\n"+JSON.stringify(obj.metadata.vulnerabilities,null,2)+"\n```\n\n"+summary+"\n");
+          }
+          NODE
+          echo "npm audit exit code (1 means advisories): $audit_status"
+      - name: npm audit for production dependencies only
+        shell: bash
+        run: |
+          set +e
+          npm audit --omit=dev --json > "$RUNNER_TEMP/woc-audit-prod.json"
+          audit_status=$?
+          set -e
+          node --input-type=module <<'NODE'
+          import {readFileSync,appendFileSync} from "node:fs";
+          const obj=JSON.parse(readFileSync(process.env.RUNNER_TEMP+"/woc-audit-prod.json","utf8"));
+          if(obj.error||!obj.metadata?.vulnerabilities){
+            console.error("Production audit did not return metadata",obj.error||obj);
+            process.exitCode=2;
+          }else{
+            console.log("Runtime vulnerability counts:",JSON.stringify(obj.metadata.vulnerabilities));
+            for(const [name,entry] of Object.entries(obj.vulnerabilities||{}))
+              console.log(JSON.stringify({name,severity:entry.severity,via:entry.via,fixAvailable:entry.fixAvailable}));
+            appendFileSync(process.env.GITHUB_STEP_SUMMARY,
+              "\n### Production-only audit\n\n```json\n"+JSON.stringify(obj.metadata.vulnerabilities,null,2)+"\n```\n");
+          }
+          NODE
+          echo "npm audit --omit=dev exit code: $audit_status"
