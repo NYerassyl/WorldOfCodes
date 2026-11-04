@@ -74,3 +74,6 @@ Do not edit earlier migration files. Apply to an **isolated PostgreSQL test DB**
 - GPT 1's current `feat/backend-integration` root workspace lockfile predates the socket.io dependency. Regenerate it as described above.
 - Production Socket.IO matchmaking queue is in-memory, single-process, per GPT 3; horizontal scaling requires a distributed queue.
 - Isolated Docker judge runtime and PostgreSQL transactional/race tests still require the integration environment. Do not grant XP, coins or rating on judge failure.
+
+## Dedicated GPT 2 isolated integration CI
+A second GitHub Actions job in `learning-backend-validation.yml` executes the four PostgreSQL migrations twice, the seed twice, and exercises HTTP + real Docker Judge through `integration/pg-docker.integration.test.js` against an ephemeral `worldofcodes_integration_test` PostgreSQL service. It refuses other DB URL targets. It is not a replacement for GPT 1's combined frontend/Battle end-to-end checks.

@@ -103,3 +103,13 @@ Model design from GPT 3's supplied request, implemented in `services/learning-ba
 - **Rewards and progress:** server-authoritative, never import unverified local preview state; no XP for opening theory. GPT 1 approved `Math.floor(xp / 100) + 1` for frontend display.
 - **Verification/ownership:** GPT 1 will run full integration tests against real PostgreSQL and Docker judge, including register/login/logout/session restore, authorization, learning progress, duplicated/concurrent submissions, and judge failures. The server database must never be reset as a shortcut. GPT 2 can validate schema and unit tests; these do **not** substitute for end-to-end checks.
 - **Additive migration:** `20261103230000_problem_starter_code` adds the new `Problem.starterCode` field, defaulting to empty for pre-existing problems. Rerun `npm run db:seed` after approved migrations to populate all 16 published seeded problem templates. The original migrations remain unchanged.
+
+## Canonical AuthSession lookup for GPT 3 and GPT 1
+
+Export `resolveAuthSession(prisma, token, { includeUser?: boolean })` from `services/learning-backend/src/index.js`.
+
+- Validates the opaque token syntax, hashes it using `hashSessionToken` (SHA-256), looks up `AuthSession`, and returns `null` if missing, expired or revoked.
+- If `includeUser:false` (default), returns `{ userId, sessionId }`; if true, returns `{userId,sessionId,user}` from a single query (same shape used by `makeRequireAuth`).
+- Database errors propagate; callers must reject/abort rather than authorize.
+- **Socket.IO:** use the same helper at handshake **and before every protected event**, passing the raw opaque token from `socket.handshake.auth.token`, then verify the returned `userId` still matches the socket identity. Do not trust a supplied userId. GPT 3 owns the changes in its Socket.IO module; GPT 2 does not rewrite it.
+- Logout changes `revokedAt` in PostgreSQL. An already connected socket must not retain access after revocation; revalidation is required.

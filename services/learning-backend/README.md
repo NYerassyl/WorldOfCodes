@@ -79,3 +79,22 @@ The editor should submit the **complete Python function source** via `POST /api/
 
 ## Socket.IO and npm workspaces
 Battle hardening uses the Socket.IO 4 runtime dependency now declared in this service manifest. GPT 1's shared server/HTTP wiring and shared `MatchmakingQueue` are described in `docs/DEPENDENCY_HANDOFF.md`. GPT 1's root npm workspace manages its own authoritative root `package-lock.json`. Do not create a second service lockfile; GPT 1 must regenerate the root workspace lock after incorporating this manifest change.
+
+## Real integration verification workflow
+The `.github/workflows/learning-backend-validation.yml` job `postgresql-docker-integration` runs a separate **ephemeral PostgreSQL 16 service** with database `worldofcodes_integration_test`, validates/generates Prisma Client, executes all four migrations **twice** (second run must be a no-op), seeds **twice** (unique counts checked), and pulls `python:3.12-alpine` to run real function-style Docker judge tests. The integration test refuses to connect unless the DB URL points to local `worldofcodes_integration_test`. It checks token auth/revocation/expiry, HTTP privacy, real hidden tests, concurrent reward idempotency, copy, snapshot-independent rating/XP separation and Docker timeout/unavailable handling. It does not mutate shared or production databases, and is separate from the `npm test` mock suite.
+
+Local opt-in command (only after you have provisioned a disposable PostgreSQL database and Docker image):
+
+```sh
+# Working directory: services/learning-backend
+# DATABASE_URL must target localhost/worldofcodes_integration_test (never production)
+npm run db:generate
+npm run db:migrate
+npm run db:migrate
+npm run db:seed
+npm run db:seed
+docker pull python:3.12-alpine
+npm run test:integration
+```
+
+This workflow verifies learning/account and schema boundaries, **not a deployed combined GPT 3 Battle socket**. GPT 3 owns its actual battle event and rating settlement tests. Production readiness still requires GPT 1's shared app, real worker isolation and review.

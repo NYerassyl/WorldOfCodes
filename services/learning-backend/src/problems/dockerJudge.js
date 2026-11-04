@@ -1,4 +1,5 @@
 import { execFile } from 'node:child_process';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, writeFile, chmod, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -21,8 +22,9 @@ except BaseException:
 
 function runDockerOnce(directory, image, functionName, args, timeoutMs) {
   return new Promise((resolve, reject) => {
+    const containerName = `woc-judge-${randomUUID()}`;
     const dockerArgs = [
-      'run', '--rm', '--pull=never', '--network=none', '--read-only',
+      'run', '--name', containerName, '--rm', '--pull=never', '--network=none', '--read-only',
       '--cap-drop=ALL', '--security-opt=no-new-privileges',
       '--pids-limit=32', '--memory=128m', '--cpus=0.5',
       '--user=65534:65534', '--ulimit=nofile=64:64',
@@ -30,7 +32,10 @@ function runDockerOnce(directory, image, functionName, args, timeoutMs) {
       '--mount', `type=bind,src=${directory},dst=/workspace,readonly`,
       '-i', image, 'python', '-I', '-B', '-c', PYTHON_RUNNER
     ];
-    const child = execFile('docker', dockerArgs, { timeout: timeoutMs, maxBuffer: 65_536, windowsHide: true }, (err, stdout) => {
+    const child = execFile('docker', dockerArgs, { timeout: timeoutMs, killSignal: 'SIGKILL', maxBuffer: 65_536, windowsHide: true }, async (err, stdout) => {
+      // Killing the Docker CLI does not stop its container. Always reap our own
+      // named container before releasing the queue slot or deleting its files.
+      await new Promise(done => execFile('docker', ['rm', '-f', containerName], {timeout: 5000, killSignal: 'SIGKILL'}, () => done()));
       if (err) {
         if (err.killed || err.signal === 'SIGTERM') return resolve({ status: 'TIME_LIMIT' });
         return reject(new AppError(503, 'JUDGE_UNAVAILABLE', 'Isolated Docker judge is not available; no verdict was stored'));
