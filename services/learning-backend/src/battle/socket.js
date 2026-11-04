@@ -53,7 +53,7 @@ export async function attachBattleSocket(server, prisma, {
   };
   const readSession = async token => {
     const session = await resolveAuthSession(prisma, token);
-    return session ? { ...session, expiresAt: true } : null;
+    return session;
   };
 
   io.use(async (socket, next) => {
