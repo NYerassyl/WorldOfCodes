@@ -125,3 +125,26 @@ test('Socket.IO watches only participant matches and broadcasts friendly complet
   assert.ok(io.emitted.some(item => item.event === 'match:updated'));
   assert.ok(io.emitted.some(item => item.event === 'battle:completed'));
 });
+
+
+test('protected socket events revalidate revoked sessions and remove the last tab from queue', async () => {
+  const mutableSession = { ...session, revokedAt: null };
+  let leaveCalls = 0;
+  const queue = {
+    join: async () => ({ status: 'QUEUED', ticketId: 'ticket-1' }),
+    leave: () => { leaveCalls += 1; return { status: 'LEFT_QUEUE' }; }
+  };
+  const prisma = { authSession: { findUnique: async () => mutableSession } };
+  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer, queue });
+  const socket = await FakeSocketServer.instance.connect(validToken);
+  socket.disconnected = false;
+  socket.disconnect = () => { socket.disconnected = true; };
+  mutableSession.revokedAt = new Date();
+
+  let ack;
+  await socket.trigger('ranked:join', {}, result => { ack = result; });
+  assert.equal(ack.ok, false);
+  assert.equal(ack.code, 'SESSION_INVALID');
+  assert.equal(socket.disconnected, true);
+  assert.equal(leaveCalls, 1);
+});
