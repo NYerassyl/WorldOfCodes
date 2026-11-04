@@ -174,6 +174,32 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal(ratingAfter.points,1000);
       assert.equal(battle.status,'PENDING');
     });
+    await t.test('real PostgreSQL FK delete policies preserve references and cascade children',async()=>{
+      const tmp=await prisma.user.create({data:{
+        email:'fk-'+suffix+'@example.test',nickname:'fk_'+suffix,
+        normalizedNickname:'fk_'+suffix,passwordHash:'not-a-real-password-hash'
+      }});
+      await prisma.rating.create({data:{userId:tmp.id}});
+      const match=await prisma.match.create({data:{
+        type:'FRIENDLY',status:'PENDING',problemId:'algo-sort',
+        players:{create:[{userId:tmp.id,seat:0}]}
+      }});
+      await prisma.friendBattle.create({data:{
+        matchId:match.id,inviteCode:'FK'+suffix.toUpperCase(),createdById:tmp.id,
+        expiresAt:new Date(Date.now()+30*60_000)
+      }});
+      // MatchPlayer.userId and FriendBattle.createdById are RESTRICT.
+      await assert.rejects(prisma.user.delete({where:{id:tmp.id}}),e=>e.code==='P2003');
+      // Match.problemId is RESTRICT even though problem test cases can cascade.
+      await assert.rejects(prisma.problem.delete({where:{id:'algo-sort'}}),e=>e.code==='P2003');
+      // Removing a match cascades MatchPlayer and FriendBattle.
+      await prisma.match.delete({where:{id:match.id}});
+      assert.equal(await prisma.matchPlayer.count({where:{matchId:match.id}}),0);
+      assert.equal(await prisma.friendBattle.count({where:{matchId:match.id}}),0);
+      // Rating belongs to User and cascades when User is deleted.
+      await prisma.user.delete({where:{id:tmp.id}});
+      assert.equal(await prisma.rating.count({where:{userId:tmp.id}}),0);
+    });
     await t.test('real Docker sandbox returns Accepted, Wrong Answer, Runtime Error and timeout',async()=>{
       const cases=[{argsJson:'[3]',expectedJson:'6'}];
       const run=sourceCode=>judgePython({sourceCode,functionName:'double',cases});
