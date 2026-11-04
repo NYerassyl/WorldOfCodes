@@ -104,8 +104,11 @@ export function Provider({ children }: { children: ReactNode }) {
   const logout = useCallback(async () => {
     try {
       if (getToken()) await api.logout();
-    } catch {
-      // Signing out locally must succeed even when the server is unreachable.
+    } catch (caught) {
+      if (!(caught instanceof ApiError && caught.status === 401)) {
+        setError(authErrorMessage(caught));
+        throw caught;
+      }
     }
     setToken(null);
     setUser(null);

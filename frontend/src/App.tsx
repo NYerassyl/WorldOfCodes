@@ -4,10 +4,15 @@ import { Provider as AuthProvider, useAuth } from "./lib/auth";
 import AvatarFace from "./components/Avatar";
 import { Icon, Heading } from "./components/UI";
 import { levelFor } from "./lib/progress.mjs";
+
 import Home from "./pages/Home";
 import Learn from "./pages/Learn";
-import Algorithms from "./pages/Algorithms";
-import Copy from "./pages/Copy";
+import {
+  ServerLearning,
+  ServerProblems,
+  ServerCopy,
+} from "./pages/ServerPractice";
+
 import Profile from "./pages/Profile";
 import Arena from "./pages/Arena";
 const routes = [
@@ -172,7 +177,7 @@ function Shell() {
           </div>
           <div className="header-right">
             <span className="demo">
-              <i /> Preview workspace
+              <i /> {user ? "Account connected" : "Sign in to save progress"}
             </span>
             <span className="balance">
               <Icon name="coin" />
@@ -198,11 +203,15 @@ function Shell() {
           {page === "home" ? (
             <Home />
           ) : page === "learn" ? (
-            <Learn key={route} languageId={id} lessonId={sub} />
+            id === "python" ? (
+              <ServerLearning key={route} lessonId={sub} />
+            ) : (
+              <Learn key={route} languageId={id} lessonId={sub} />
+            )
           ) : page === "algorithms" ? (
-            <Algorithms key={route} id={id} />
+            <ServerProblems key={route} id={id} />
           ) : page === "copy" ? (
-            <Copy />
+            <ServerCopy />
           ) : page === "profile" ? (
             <Profile />
           ) : page === "duel" || page === "friends" ? (

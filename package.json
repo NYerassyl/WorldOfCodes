@@ -4,17 +4,33 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22.12"
   },
+  "workspaces": [
+    "frontend",
+    "services/learning-backend"
+  ],
   "scripts": {
-    "start": "node server/main.js",
-    "test": "node --test server/*.test.js",
-    "db:generate": "npm --prefix services/learning-backend run db:generate",
-    "db:migrate": "npm --prefix services/learning-backend run db:migrate",
-    "db:seed": "npm --prefix services/learning-backend run db:seed"
+    "dev:api": "node --env-file-if-exists=.env server/index.js",
+    "dev:web": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "start": "node --env-file-if-exists=.env server/index.js",
+    "postinstall": "prisma generate --schema services/learning-backend/prisma/schema.prisma",
+    "db:generate": "prisma generate --schema services/learning-backend/prisma/schema.prisma",
+    "db:validate": "prisma validate --schema services/learning-backend/prisma/schema.prisma",
+    "db:migrate": "prisma migrate deploy --schema services/learning-backend/prisma/schema.prisma",
+    "db:seed": "node --env-file-if-exists=.env services/learning-backend/prisma/seed.js",
+    "test": "npm test --workspace=frontend && npm test --workspace=services/learning-backend && node --test server/*.test.js tests/server.test.mjs",
+    "test:integration": "node --env-file-if-exists=.env.test --test --test-concurrency=1 tests/integration.test.mjs"
   },
   "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "cors": "^2.8.5",
     "express": "^4.21.2",
-    "socket.io": "^4.8.1"
+    "express-rate-limit": "^8.0.0",
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0"
   }
 }

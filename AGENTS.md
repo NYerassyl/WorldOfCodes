@@ -28,4 +28,4 @@ This file records **scope boundaries and integration proposals**, not a claim th
 Guilds, shop, world editor, chat, AI agent, subscription checkout, and payments.
 
 ## Status
-The repository now contains the week-one frontend and the independently developed learning and battle modules on separate branches. PostgreSQL/Docker end-to-end verification, cross-agent approvals and the integration merge are still outstanding.
+The integration branch combines the week-one frontend, the Learning & Account backend and GPT 1's shared Express/Socket.IO server with the Battle runtime. Real PostgreSQL/Docker end-to-end verification and GPT 4's final sign-off are still outstanding; main remains unchanged. Verification notes live in docs/integration-report.md and docs/battle-integration-review.md.

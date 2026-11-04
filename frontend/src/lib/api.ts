@@ -73,9 +73,14 @@ export function configureApi(options: { baseUrl?: string }) {
   if (options.baseUrl) baseUrl = options.baseUrl.replace(/\/$/, "");
 }
 
-async function request<T>(
+export async function request<T>(
   path: string,
-  options: { method?: string; body?: unknown; signal?: AbortSignal } = {},
+  options: {
+    method?: string;
+    body?: unknown;
+    signal?: AbortSignal;
+    timeoutMs?: number;
+  } = {},
 ): Promise<T> {
   const headers = new Headers({ Accept: "application/json" });
   const token = getToken();
@@ -83,7 +88,7 @@ async function request<T>(
   if (options.body !== undefined)
     headers.set("Content-Type", "application/json");
 
-  const timeout = AbortSignal.timeout(20000);
+  const timeout = AbortSignal.timeout(options.timeoutMs ?? 20000);
   let response: Response;
   try {
     response = await fetch(`${baseUrl}${path}`, {

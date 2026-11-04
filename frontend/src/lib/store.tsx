@@ -44,8 +44,8 @@ function load(): State {
       ...initial,
       ...raw,
       name: typeof raw.name === "string" ? raw.name : initial.name,
-      xp: Number.isFinite(raw.xp) && raw.xp >= 0 ? raw.xp : 0,
-      coins: Number.isFinite(raw.coins) && raw.coins >= 0 ? raw.coins : 0,
+      xp: 0,
+      coins: 0,
       completed: Array.isArray(raw.completed)
         ? raw.completed.filter((x: unknown) => typeof x === "string")
         : [],
@@ -98,8 +98,7 @@ export function Provider({ children }: { children: ReactNode }) {
         state,
         storageError,
         update: (patch) => setState((s) => ({ ...s, ...patch })),
-        reward: (id, xp = 40, coins = 15) =>
-          setState((s) => award(s, id, xp, coins)),
+        reward: (id) => setState((s) => award(s, id, 0, 0)),
         completeTask: (key, index) =>
           setState((s) => {
             const current = s.practice[key] ?? [];
@@ -113,7 +112,7 @@ export function Provider({ children }: { children: ReactNode }) {
           setState((s) =>
             s.labs.includes(key)
               ? s
-              : { ...award(s, key, 10, 5), labs: [...s.labs, key] },
+              : { ...award(s, key, 0, 0), labs: [...s.labs, key] },
           ),
         draft: (id, code) =>
           setState((s) => ({ ...s, drafts: { ...s.drafts, [id]: code } })),

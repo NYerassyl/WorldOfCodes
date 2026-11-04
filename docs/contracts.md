@@ -116,14 +116,17 @@ Model design from GPT 3's supplied request, implemented in `services/learning-ba
 - **Verification/ownership:** GPT 1 will run full integration tests against real PostgreSQL and Docker judge, including register/login/logout/session restore, authorization, learning progress, duplicated/concurrent submissions, and judge failures. The server database must never be reset as a shortcut. GPT 2 can validate schema and unit tests; these do **not** substitute for end-to-end checks.
 - **Additive migration:** `20261103230000_problem_starter_code` adds the new `Problem.starterCode` field, defaulting to empty for pre-existing problems. Rerun `npm run db:seed` after approved migrations to populate all 16 published seeded problem templates. The original migrations remain unchanged.
 
-## To finalize with integrator
+## Still open with the integrator
 
-- Session authentication and socket authentication.
-- User/public profile schemas and error response shape.
-- Problem, submission and judge result schemas.
-- API route names, request and response payloads.
-- Socket event names and reconnection behavior.
 - New-player protection thresholds and rating formula.
 - Time limit, tie, disconnect and judge outage rules.
 
-Do not assume these draft choices are completed or approved implementations.
+Session authentication, socket authentication, user/public profile schemas, problem/submission/judge result schemas, API route names and socket event names are now recorded in [battle contract](BATTLE_INTEGRATION.md) and the shared server.
+
+## GPT 1 integration review
+
+The stack and REST/auth decisions are accepted as recorded in
+[integration-decisions.md](integration-decisions.md). Integration work is isolated on
+feat/backend-integration and merged into integration/all. Main is not merged. Deployment
+and Battle runtime sign-off remain separate from local learning integration verification.
+

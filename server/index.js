@@ -1,22 +1,27 @@
 import { PrismaClient } from "./prisma.js";
-import { parseOrigins, startServer } from "./app.js";
+import { startServer } from "./app.js";
+import { readConfig } from "./config.js";
 
+if (!process.env.DATABASE_URL)
+  throw new Error("DATABASE_URL is required. See .env.example.");
+
+const config = readConfig();
 const prisma = new PrismaClient();
-const corsOrigins = parseOrigins(process.env.CORS_ORIGINS);
-const { server, io } = await startServer({ prisma, corsOrigins });
+await prisma.$connect();
+const { server, io } = await startServer({ prisma, config });
 const { address, port } = server.address();
 
-console.log(`WorldOfCodes API listening on http://${address}:${port}`);
+console.log(`WorldOfCodes listening on http://${address}:${port}`);
 console.log(
-  corsOrigins.length
-    ? `CORS allowlist: ${corsOrigins.join(", ")}`
+  config.origins.length
+    ? `CORS allowlist: ${config.origins.join(", ")}`
     : "CORS: same-origin only (set CORS_ORIGINS to allow other origins)",
 );
 
-let closing = false;
+let stopping = false;
 async function shutdown(signal) {
-  if (closing) return;
-  closing = true;
+  if (stopping) return;
+  stopping = true;
   console.log(`${signal} received; closing server`);
   await new Promise((resolve) => io.close(resolve));
   await prisma.$disconnect();

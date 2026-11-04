@@ -3,7 +3,7 @@ import { asyncRoute, ensureKeys } from '../lib/errors.js';
 import { createFriendlyInvite, getLeaderboard, getMatchForUser, getMyRating, joinFriendlyInvite, submitBattleSolution } from './service.js';
 import { MatchmakingQueue } from './matchmaking.js';
 
-export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(prisma) } = {}) {
+export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(prisma), judge } = {}) {
   const router = Router();
   router.get('/battle/leaderboard', asyncRoute(async (req, res) => res.json({ items: await getLeaderboard(prisma, req.query.limit) })));
   router.get('/battle/rating/me', auth, asyncRoute(async (req, res) => res.json(await getMyRating(prisma, req.auth.userId))));
@@ -25,7 +25,7 @@ export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(
   }));
   router.post('/battle/matches/:matchId/submit', auth, asyncRoute(async (req, res) => {
     ensureKeys(req.body, ['code']);
-    res.json(await submitBattleSolution(prisma, { matchId: req.params.matchId, userId: req.auth.userId, sourceCode: req.body.code }));
+    res.json(await submitBattleSolution(prisma, { matchId: req.params.matchId, userId: req.auth.userId, sourceCode: req.body.code, judge }));
   }));
   return router;
 }

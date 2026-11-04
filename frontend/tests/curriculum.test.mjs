@@ -11,7 +11,7 @@ const frontendDir = fileURLToPath(new URL("..", import.meta.url));
 
 const tempDir = mkdtempSync(join(tmpdir(), "woc-curriculum-"));
 const bundlePath = join(tempDir, "curriculum.mjs");
-const esbuild = join(frontendDir, "node_modules", ".bin", "esbuild");
+const esbuild = fileURLToPath(import.meta.resolve('esbuild/bin/esbuild'));
 
 execFileSync(
   esbuild,

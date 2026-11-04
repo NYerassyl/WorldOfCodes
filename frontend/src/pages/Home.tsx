@@ -1,18 +1,14 @@
+import { useAuth } from "../lib/auth";
 import { useStore } from "../lib/store";
 import { languages, firstUnfinished, trackProgress } from "../lib/curriculum";
-import { levelFor } from "../lib/progress.mjs";
+
 import { Icon } from "../components/UI";
 import WorldArt from "../components/WorldArt";
 export default function Home() {
+  const { user } = useAuth();
   const { state } = useStore();
-  const finished = languages.reduce(
-    (sum, language) => sum + trackProgress(state.practice, language),
-    0,
-  );
-  const totalLessons = languages.reduce(
-    (sum, language) => sum + language.lessons.length,
-    0,
-  );
+  const finished = user?.completedLessons ?? 0;
+  const totalLessons = 6;
   const javascript = languages.find(
     (language) => language.id === "javascript",
   )!;
@@ -26,13 +22,13 @@ export default function Home() {
         <div>
           <span className="eyebrow">YOUR DEVELOPER JOURNEY</span>
           <h1>
-            Good to see you, <span>{state.name}.</span>
+            Good to see you, <span>{user?.nickname ?? "Explorer"}.</span>
           </h1>
         </div>
         <a href="#profile" className="welcome-level">
           <Icon name="sparkle" />
           <span>
-            Level {levelFor(state.xp)}
+            Level {user?.level ?? 1}
             <small>Just getting started</small>
           </span>
           <Icon name="arrow-up" />
@@ -57,7 +53,7 @@ export default function Home() {
             next level.
           </p>
           <div className="hero-actions">
-            <a className="btn" href="#learn">
+            <a className="btn" href="#learn/python">
               {finished ? "Continue learning" : "Start your journey"}
               <Icon name="arrow" />
             </a>
@@ -84,7 +80,7 @@ export default function Home() {
           <div>
             <small>Total experience</small>
             <strong>
-              {state.xp}
+              {user?.xp ?? 0}
               <span>XP</span>
             </strong>
           </div>
@@ -108,7 +104,7 @@ export default function Home() {
             <Icon name="flame" />
           </span>
           <div>
-            <small>Active learning days</small>
+            <small>Local practice days</small>
             <strong>
               {String(Object.keys(state.activity).length).padStart(2, "0")}
               <span>days</span>
@@ -123,7 +119,7 @@ export default function Home() {
           <div>
             <small>Coin balance</small>
             <strong>
-              {state.coins}
+              {user?.coins ?? 0}
               <span>coins</span>
             </strong>
           </div>
