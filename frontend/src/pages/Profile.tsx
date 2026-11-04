@@ -6,13 +6,16 @@ import { Heading, Notice, Icon } from "../components/UI";
 import AccountPanel from "../components/AccountPanel";
 export default function Profile() {
   const { state, update } = useStore();
-  const { status } = useAuth();
-  const signedIn = status === "authenticated";
+  const { status, user } = useAuth();
+  const account = status === "authenticated" ? user : null;
+  const signedIn = account !== null;
   const [name, setName] = useState(state.name);
   const [bio, setBio] = useState(state.bio);
   const [frame, setFrame] = useState(state.frame);
   const [message, setMessage] = useState("");
-  const level = levelFor(state.xp);
+  const level = account ? account.level : levelFor(state.xp);
+  const xpInLevel = account ? account.xp % 100 : state.xp % 200;
+  const xpSpan = account ? 100 : 200;
   useEffect(() => {
     setName(state.name);
   }, [state.name]);
@@ -82,10 +85,10 @@ export default function Profile() {
           </div>
           <div className="identity-xp">
             <span>
-              <b>{state.xp % 200}</b> / 200 XP to level {level + 1}
+              <b>{xpInLevel}</b> / {xpSpan} XP to level {level + 1}
             </span>
             <div className="progress">
-              <span style={{ width: `${(state.xp % 200) / 2}%` }} />
+              <span style={{ width: `${(xpInLevel / xpSpan) * 100}%` }} />
             </div>
           </div>
         </div>

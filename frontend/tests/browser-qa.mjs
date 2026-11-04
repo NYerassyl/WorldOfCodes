@@ -890,7 +890,13 @@ const signedIn = await ev(`(()=>({
   tag:document.querySelector('.account-panel .tag')?.textContent,
   facts:[...document.querySelectorAll('.account-facts dd')].map(d=>d.textContent),
   sidebar:document.querySelector('.sidebar .account')?.textContent || '',
+  sidebarLevel:document.querySelector('.sidebar .account small')?.textContent || '',
+  coins:document.querySelector('.balance')?.textContent.replace(/\\s+/g,' ').trim() || '',
+  nextLevel:document.querySelector('.journey-top strong')?.textContent,
+  journey:document.querySelector('.journey p')?.textContent.replace(/\\s+/g,' ').trim() || '',
   hero:document.querySelector('.profile-identity h2')?.textContent,
+  heroLevel:document.querySelector('.profile-level')?.textContent || '',
+  heroXp:document.querySelector('.identity-xp > span')?.textContent.replace(/\\s+/g,' ').trim() || '',
   localXp:document.querySelector('.profile-numbers strong')?.textContent,
   token:localStorage.getItem('worldofcodes-session-v1')
 }))()`);
@@ -908,6 +914,24 @@ check(
   true,
 );
 check("server nickname reaches the profile hero", signedIn.hero, "Aruzhan");
+check(
+  "signed-in shell shows the server level",
+  /Level 2/.test(signedIn.sidebarLevel),
+  true,
+);
+check("signed-in shell shows server coins", /30/.test(signedIn.coins), true);
+check("next level follows the server formula", signedIn.nextLevel, "03");
+check("journey follows server xp", /20 \/ 100 XP/.test(signedIn.journey), true);
+check(
+  "profile hero shows the server level",
+  /LVL 2/.test(signedIn.heroLevel),
+  true,
+);
+check(
+  "profile hero shows server xp",
+  /20 \/ 100 XP/.test(signedIn.heroXp),
+  true,
+);
 check("server XP stays separate from local XP", signedIn.localXp, "80");
 check(
   "registration stores a session token",

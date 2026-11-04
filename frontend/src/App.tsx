@@ -22,8 +22,12 @@ const routes = [
 function Shell() {
   const { state, storageError, update } = useStore();
   const { status: authStatus, user } = useAuth();
-  const serverAvatar =
-    authStatus === "authenticated" ? (user?.avatarUrl ?? null) : null;
+  const account = authStatus === "authenticated" ? user : null;
+  const serverAvatar = account?.avatarUrl ?? null;
+  const identityLevel = account ? account.level : levelFor(state.xp);
+  const xpInLevel = account ? account.xp % 100 : state.xp % 200;
+  const xpSpan = account ? 100 : 200;
+  const coins = account ? account.coins : state.coins;
   const [route, setRoute] = useState(() => location.hash.slice(1) || "home");
   useEffect(() => {
     if (authStatus !== "authenticated" || !user) return;
@@ -84,7 +88,7 @@ function Shell() {
         <div className="mobile-controls">
           <span className="mobile-coins">
             <Icon name="coin" />
-            {state.coins}
+            {coins}
           </span>
           <button
             aria-label={menuOpen ? "Close navigation" : "Open navigation"}
@@ -137,15 +141,13 @@ function Shell() {
                   <Icon name="bolt" />
                 </span>
                 <span>YOUR NEXT LEVEL</span>
-                <strong>
-                  {String(levelFor(state.xp) + 1).padStart(2, "0")}
-                </strong>
+                <strong>{String(identityLevel + 1).padStart(2, "0")}</strong>
               </div>
               <div className="journey-progress">
-                <span style={{ width: `${(state.xp % 200) / 2}%` }} />
+                <span style={{ width: `${(xpInLevel / xpSpan) * 100}%` }} />
               </div>
               <p>
-                <b>{state.xp % 200}</b> / 200 XP <span>Keep building.</span>
+                <b>{xpInLevel}</b> / {xpSpan} XP <span>Keep building.</span>
               </p>
             </div>
             <a href="#profile" className="account">
@@ -154,7 +156,7 @@ function Shell() {
               </span>
               <span>
                 {state.name}
-                <small>Level {levelFor(state.xp)} · Explorer</small>
+                <small>Level {identityLevel} · Explorer</small>
               </span>
               <Icon name="settings" />
             </a>
@@ -174,7 +176,7 @@ function Shell() {
             </span>
             <span className="balance">
               <Icon name="coin" />
-              <b>{state.coins}</b>
+              <b>{coins}</b>
               <span>coins</span>
             </span>
             <a

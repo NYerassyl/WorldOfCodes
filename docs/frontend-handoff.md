@@ -51,6 +51,11 @@ Implemented against the auth section of GPT 2's contract on
 - While signed in, the local "Display name" field is replaced by a note pointing to the
   Account nickname, so a device save cannot overwrite or fight the server identity. Bio
   and avatar frame remain device-local preferences.
+- Per `docs/integration-decisions.md`, the signed-in shell and profile identity render the
+  server level `floor(xp / 100) + 1`, server XP progress and server coins. The local
+  preview cards keep the demo 200-XP data and stay labeled PREVIEW DATA.
+- Only a 401 clears the session and returns to sign-in. A 403 keeps the valid token and
+  surfaces the server's permission message.
 - `frontend/vite.config.ts` proxies `/api` to `http://127.0.0.1:4001` in development.
   The standalone backend sends no CORS headers, so production must serve the SPA and
   API from one origin or add a reviewed CORS policy.

@@ -124,6 +124,21 @@ test("an expired session clears the stored token", async () => {
   assert.equal(api.getToken(), null);
 });
 
+test("a forbidden response keeps the valid session token", async () => {
+  api.setToken("live-token");
+  handler = (_req, res) =>
+    json(res, 403, {
+      error: { code: "FORBIDDEN", message: "Not allowed" },
+    });
+  await assert.rejects(api.me(), (error) => {
+    assert.ok(error instanceof api.ApiError);
+    assert.equal(error.status, 403);
+    assert.equal(error.code, "FORBIDDEN");
+    return true;
+  });
+  assert.equal(api.getToken(), "live-token");
+});
+
 test("a rejected login keeps the previous token intact", async () => {
   api.setToken("keep-me");
   handler = (_req, res) =>

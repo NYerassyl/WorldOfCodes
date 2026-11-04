@@ -58,10 +58,7 @@ export function Provider({ children }: { children: ReactNode }) {
       setError(null);
       setStatus("authenticated");
     } catch (caught) {
-      if (
-        caught instanceof ApiError &&
-        (caught.status === 401 || caught.status === 403)
-      ) {
+      if (caught instanceof ApiError && caught.status === 401) {
         setToken(null);
         setUser(null);
         setError(null);
@@ -130,10 +127,7 @@ export function Provider({ children }: { children: ReactNode }) {
         setStatus("authenticated");
         return merged;
       } catch (caught) {
-        if (
-          caught instanceof ApiError &&
-          (caught.status === 401 || caught.status === 403)
-        ) {
+        if (caught instanceof ApiError && caught.status === 401) {
           setToken(null);
           setUser(null);
           setError(null);
