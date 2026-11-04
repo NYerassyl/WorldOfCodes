@@ -50,11 +50,22 @@ maxQueued})` and passes it to both `createProblemsRouter()` and
 therefore share `JUDGE_CONCURRENCY` slots; overflow returns `JUDGE_BUSY` (503).
 Hidden tests never leave the server.
 
+### Shared matchmaking and notifications
+
+`startServer()` creates one `MatchmakingQueue` and one `createBattleNotifier()`.
+The queue is passed to both `createBattleRouter()` and `attachBattleSocket()`;
+the notifier forwards REST match events to Socket.IO rooms, so a player queued
+over REST also receives the realtime `battle:matched` update. `buildApp()` still
+accepts an injected queue so wiring tests can assert both transports share it.
+
 ### Socket.IO authentication
 
 Socket clients send `auth: { token }` in the handshake. The adapter hashes the
 token with the same helper as HTTP sessions and rejects missing, expired or
-revoked sessions. Client-supplied user IDs are never trusted.
+revoked sessions. Protected events revalidate the session and verify the socket
+identity, so logout revokes an already-connected socket. Client-supplied user
+IDs are never trusted. Origin checks run in `allowRequest` against the same
+`CORS_ORIGINS` allowlist for polling and WebSocket upgrades.
 
 ## 2. Socket.IO dependency
 
