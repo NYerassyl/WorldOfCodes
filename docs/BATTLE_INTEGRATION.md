@@ -1,56 +1,103 @@
-# Battle backend integration notes
+# Battle backend integration contract
 
-## Runtime contract
+## Shared application wiring
 
-Battle HTTP routes and Socket.IO must share the **same** `MatchmakingQueue` instance. Creating a queue independently for REST and Socket.IO creates two unrelated in-memory queues and players will not be paired across transports.
-
-The integration API is exported from `services/learning-backend/src/battle/index.js`:
-
-- `createBattleRouter(prisma, auth, { queue })`
-- `new MatchmakingQueue(prisma)`
-- `attachBattleSocket(httpServer, prisma, { queue, cors })`
-
-Example for the shared application entrypoint (GPT 1 owns the actual shared entrypoint):
+REST and Socket.IO must use the same Prisma client, MatchmakingQueue, bounded Judge function and notifier instance. GPT 1 owns the shared server entrypoint and must inject its existing queuedJudge.
 
 ```js
+import http from 'node:http';
 import {
-  createBattleRouter,
-  MatchmakingQueue,
-  attachBattleSocket
+  createBattleRouter, MatchmakingQueue, attachBattleSocket, createBattleNotifier
 } from './services/learning-backend/src/battle/index.js';
 
 const battleQueue = new MatchmakingQueue(prisma);
-app.use('/api', createBattleRouter(prisma, requireAuth, { queue: battleQueue }));
-const io = await attachBattleSocket(httpServer, prisma, {
-  queue: battleQueue,
-  cors: { origin: allowedOrigins, credentials: true }
+const battleNotifier = createBattleNotifier();
+const server = http.createServer(app);
+
+app.use('/api', createBattleRouter(prisma, requireAuth, {
+  queue: battleQueue, judge: queuedJudge, notifier: battleNotifier
+}));
+const io = await attachBattleSocket(server, prisma, {
+  queue: battleQueue, judge: queuedJudge, notifier: battleNotifier,
+  cors: { origin: allowedOrigins, credentials: true }, allowedOrigins
 });
+server.listen(PORT);
 ```
 
-The shared HTTP server must be created with `http.createServer(app)` before Socket.IO attaches. Keep the existing central error middleware and authentication factory. Do not create a second PrismaClient for Battle.
+Do not create a second PrismaClient, queue or Judge Queue for Battle. Start the shared HTTP server after Socket.IO is attached.
 
-## Socket events
+## REST endpoints
 
-Client → server:
-- `ranked:join` — join the shared ranked queue; callback receives `QUEUED` or `MATCHED`.
-- `ranked:leave` — leave the waiting queue.
-- `match:watch` — `{ matchId }`; only a match participant can join its room.
-- `match:submit` — `{ matchId, code }`; same server-side judge and settlement path as the REST endpoint.
+All routes are mounted under /api. Except the leaderboard, routes require the existing opaque Bearer session.
 
-Server → client:
-- `battle:matched` — sent to both authenticated user rooms.
-- `match:updated` — verdict and public match-completion state; never includes source code or test cases.
-- `battle:completed` — match ID and winner ID.
+| Method | Path | Purpose |
+|---|---|---|
+| GET | /api/battle/leaderboard | Public rating leaderboard |
+| GET | /api/battle/rating/me | Current user's rating |
+| POST | /api/battle/ranked/queue | Join ranked queue |
+| DELETE | /api/battle/ranked/queue | Leave ranked queue |
+| POST | /api/battle/friendly | Create a 30-minute invite |
+| POST | /api/battle/friendly/:inviteCode/join | Join invite |
+| GET | /api/battle/matches/:matchId | Read own match |
+| POST | /api/battle/matches/:matchId/submit | Submit Python code |
 
-Authentication:
-- Handshake: `auth: { token: '<opaque session token>' }`.
-- The token is hashed with the same SHA-256 helper used by HTTP sessions. Revoked and expired sessions are rejected.
-- Do not send user IDs as trusted client identity.
+REST submit body: { "code": "..." }. Unknown body keys are rejected. Source is limited to 20,000 characters. Both transports must use the same injected Judge Queue and settlement service.
 
-## Scaling and operational constraints
+## Socket authentication and origin
 
-- `MatchmakingQueue` is an in-memory, single-process MVP. It is not safe for multiple application instances or server restarts. Use Redis or a PostgreSQL advisory-lock queue before horizontal scaling.
-- The Socket.IO module dynamically imports `socket.io`; the learning-backend package must declare a compatible runtime dependency before this adapter is deployed.
-- Socket.IO should be attached to the same HTTP server and origin policy as the API. Configure production CORS explicitly.
-- Judge execution remains synchronous in the submission request. Move it to an isolated worker/queue before production traffic.
-- Do not expose hidden test cases through REST responses or Socket.IO events.
+Connect using the existing token: io(API_ORIGIN, { auth: { token: opaqueSessionToken } }).
+
+The server hashes the opaque token with the shared SHA-256 helper and validates it at handshake and before every protected event. A revoked or expired session is rejected, disconnected and removed from queue when it is the user's last connected tab. Never trust a userId supplied by the client.
+
+WebSocket Origin is checked against an explicit allowlist. Missing and unlisted origins are rejected. Configure allowedOrigins as an array of exact origins or a trusted predicate; do not use wildcard origins with credentials.
+
+## Client to server events
+
+| Event | Payload | Acknowledgement |
+|---|---|---|
+| ranked:join | {} | { ok:true, status:"QUEUED", ticketId } or { ok:true, status:"MATCHED", match } |
+| ranked:leave | {} | { ok:true, status:"LEFT_QUEUE" } |
+| match:watch | { matchId:string } | { ok:true, match } |
+| match:submit | { matchId:string, code:string } | { ok:true, result } |
+
+Only participants can watch or submit. Payloads are validated; code is limited to 20,000 characters. Ack callbacks are guarded.
+
+## Server to client events
+
+| Event | Payload | Meaning |
+|---|---|---|
+| battle:matched | Public match snapshot | Ranked pair or friendly invite activated |
+| match:updated | { matchId, matchCompleted, winnerId, verdict } | Submission or match state changed |
+| battle:completed | { matchId, winnerId } | Settlement completed |
+
+The public match snapshot is allowlisted and excludes source code, hidden tests and judge inputs. REST-originated match changes are broadcast through the shared notifier so both transports converge.
+
+## Error codes
+
+UNAUTHORIZED: invalid handshake session.
+SESSION_INVALID: session expired or revoked after connection.
+ALREADY_QUEUED: user already has a queue ticket.
+MATCHMAKING_IN_PROGRESS: pair creation is in progress.
+OPPONENT_SESSION_INVALID: waiting player's session is no longer active.
+INVALID_MATCH_ID / INVALID_INPUT: malformed payload.
+BATTLE_NOT_FOUND: match does not belong to this user.
+ACTIVE_MATCH_NOT_FOUND: no active participant match.
+ALREADY_SOLVED: accepted submission was already recorded.
+SUBMISSION_ALREADY_PROCESSED: concurrent accepted submission was processed first.
+RATE_LIMITED: user-level socket submission cooldown.
+JUDGE_UNAVAILABLE: judge infrastructure failed; no winner is awarded.
+INTERNAL_ERROR: unexpected server failure.
+
+## Reconnect and multiple tabs
+
+Reconnect using the opaque token. Re-fetch GET /api/battle/matches/:matchId after reconnect; REST is the authoritative snapshot. Rejoin the room with match:watch for realtime updates.
+
+Multiple local tabs are tracked per authenticated user. Closing one tab does not remove another tab's queue ticket. The queue ticket is removed when the last local socket disconnects or its session is invalidated. Socket submission cooldown is keyed by userId rather than socket ID, so reconnecting or opening another tab does not reset it.
+
+## Scope and operational notes
+
+Ranked/Friendly lifecycle, Elo and conditional transactional settlement remain as implemented. Friendly matches do not change competitive rating; Learning XP/coins remain separate.
+
+Beginner protection, spectator access and algorithm-filtered matching are NOT implemented and must not be advertised. Queue and cooldown are process-local MVP mechanisms; use a shared store/lock before horizontal scaling.
+
+GPT 4 must run end-to-end checks with two real accounts, PostgreSQL, Docker Judge and Socket.IO. Unit tests alone do not prove production integration.
