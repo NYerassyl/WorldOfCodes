@@ -74,14 +74,11 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
   }
   try {
     const result = await prisma.$transaction(async tx => {
-      // Re-read invitation state inside the transaction to avoid stale preflight data.
       const invite = await tx.friendBattle.findUnique({
         where: { inviteCode: inviteCode.trim().toUpperCase() },
         include: { match: { include: { players: true } } }
       });
-      if (!invite) {
-        throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
-      }
+      if (!invite) throw new AppError(404, 'INVITE_NOT_FOUND', 'Invite is invalid or expired');
       if (invite.expiresAt <= new Date()) {
         await tx.match.updateMany({
           where: { id: invite.matchId, type: 'FRIENDLY', status: 'PENDING' },
@@ -90,26 +87,20 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
         await tx.friendBattle.delete({ where: { id: invite.id } });
         return { expired: true };
       }
-      if (invite.createdById === userId) {
-        throw new AppError(409, 'CANNOT_JOIN_OWN_INVITE', 'You cannot join your own invite');
-      }
+      if (invite.createdById === userId) throw new AppError(409, 'CANNOT_JOIN_OWN_INVITE', 'You cannot join your own invite');
       if (invite.match.type !== 'FRIENDLY' || invite.match.status !== 'PENDING') {
         throw new AppError(409, 'INVITE_ALREADY_USED', 'This invite is no longer available');
       }
       if (invite.match.players.length !== 1 ||
           invite.match.players[0].userId !== invite.createdById ||
-          invite.match.players[0].seat !== 0) {
-        throw new AppError(409, 'MATCH_FULL', 'This battle already has two players');
-      }
+          invite.match.players[0].seat !== 0) throw new AppError(409, 'MATCH_FULL', 'This battle already has two players');
 
       await tx.matchPlayer.create({ data: { matchId: invite.matchId, userId, seat: 1 } });
       const activated = await tx.match.updateMany({
         where: { id: invite.matchId, type: 'FRIENDLY', status: 'PENDING' },
         data: { status: 'ACTIVE', startedAt: new Date() }
       });
-      if (activated.count !== 1) {
-        throw new AppError(409, 'INVITE_ALREADY_USED', 'This invite is no longer available');
-      }
+      if (activated.count !== 1) throw new AppError(409, 'INVITE_ALREADY_USED', 'This invite is no longer available');
       await tx.friendBattle.delete({ where: { id: invite.id } });
       return { match: await tx.match.findUnique({ where: { id: invite.matchId }, select: publicMatchSelect }) };
     }, { isolationLevel: 'Serializable' });
@@ -128,6 +119,14 @@ export async function getMatchForUser(prisma, matchId, userId) {
   const match = await prisma.match.findFirst({ where: { id: matchId, players: { some: { userId } } }, select: publicMatchSelect });
   if (!match) throw new AppError(404, 'BATTLE_NOT_FOUND', 'Battle not found');
   return match;
+}
+
+export async function getActiveMatchForUser(prisma, userId) {
+  return prisma.match.findFirst({
+    where: { status: 'ACTIVE', players: { some: { userId } } },
+    orderBy: { startedAt: 'desc' },
+    select: publicMatchSelect
+  });
 }
 
 async function settleRankedMatch(tx, matchId, winnerId) {
@@ -157,7 +156,6 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
   if (player.submittedAt) throw new AppError(409, 'ALREADY_SOLVED', 'You have already submitted an accepted solution');
   const problem = await getJudgableProblem(prisma, match.problemId);
   if (problem.language !== 'python' || !Array.isArray(problem.testCases) || !problem.testCases.length) throw new AppError(503, 'JUDGE_UNAVAILABLE', 'No usable judge is available for this problem');
-  // Judge failures propagate. They never become a win or a stored ACCEPTED verdict.
   const verdict = await judge({ sourceCode, functionName: problem.functionName, cases: problem.testCases });
   if (!['ACCEPTED', 'WRONG_ANSWER', 'RUNTIME_ERROR', 'TIME_LIMIT'].includes(verdict?.status)) {
     throw new AppError(503, 'JUDGE_UNAVAILABLE', 'Judge returned an untrusted verdict');
@@ -167,24 +165,23 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       claimed = await prisma.$transaction(async tx => {
-    // The match may complete while the external judge is running.
-    const current = await tx.match.findUnique({ where: { id: matchId }, include: { players: true } });
-    if (!current || current.status !== 'ACTIVE' || current.type !== match.type ||
-        current.players.length !== 2 || !current.players.some(p => p.userId === userId)) return false;
-    const update = await tx.matchPlayer.updateMany({
-      where: { matchId, userId, submittedAt: null },
-      data: { submittedAt: new Date(), verdict: 'ACCEPTED' }
-    });
-    if (update.count !== 1) return false;
-    if (current.type === 'RANKED') return settleRankedMatch(tx, matchId, userId);
-    if (current.type === 'FRIENDLY') {
-      const ended = await tx.match.updateMany({
-        where: { id: matchId, type: 'FRIENDLY', status: 'ACTIVE' },
-        data: { status: 'COMPLETED', winnerId: userId, completedAt: new Date() }
-      });
-      return ended.count === 1;
-    }
-    return false;
+        const current = await tx.match.findUnique({ where: { id: matchId }, include: { players: true } });
+        if (!current || current.status !== 'ACTIVE' || current.type !== match.type ||
+            current.players.length !== 2 || !current.players.some(p => p.userId === userId)) return false;
+        const update = await tx.matchPlayer.updateMany({
+          where: { matchId, userId, submittedAt: null },
+          data: { submittedAt: new Date(), verdict: 'ACCEPTED' }
+        });
+        if (update.count !== 1) return false;
+        if (current.type === 'RANKED') return settleRankedMatch(tx, matchId, userId);
+        if (current.type === 'FRIENDLY') {
+          const ended = await tx.match.updateMany({
+            where: { id: matchId, type: 'FRIENDLY', status: 'ACTIVE' },
+            data: { status: 'COMPLETED', winnerId: userId, completedAt: new Date() }
+          });
+          return ended.count === 1;
+        }
+        return false;
       }, { isolationLevel: 'Serializable' });
       break;
     } catch (error) {
