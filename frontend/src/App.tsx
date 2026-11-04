@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Provider, useStore } from "./lib/store";
 import { Provider as AuthProvider, useAuth } from "./lib/auth";
+import AvatarFace from "./components/Avatar";
 import { Icon, Heading } from "./components/UI";
 import { levelFor } from "./lib/progress.mjs";
 import Home from "./pages/Home";
@@ -21,6 +22,8 @@ const routes = [
 function Shell() {
   const { state, storageError, update } = useStore();
   const { status: authStatus, user } = useAuth();
+  const serverAvatar =
+    authStatus === "authenticated" ? (user?.avatarUrl ?? null) : null;
   const [route, setRoute] = useState(() => location.hash.slice(1) || "home");
   useEffect(() => {
     if (authStatus !== "authenticated" || !user) return;
@@ -147,7 +150,7 @@ function Shell() {
             </div>
             <a href="#profile" className="account">
               <span className={`avatar frame-${state.frame}`}>
-                {state.avatar}
+                <AvatarFace url={serverAvatar} name={state.name} />
               </span>
               <span>
                 {state.name}
@@ -179,7 +182,7 @@ function Shell() {
               aria-label="Open profile"
               className={`avatar small frame-${state.frame}`}
             >
-              {state.avatar}
+              <AvatarFace url={serverAvatar} name={state.name} />
             </a>
           </div>
         </header>

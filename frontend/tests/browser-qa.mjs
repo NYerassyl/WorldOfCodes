@@ -19,7 +19,7 @@ let stubUser = {
   id: "stub-user",
   email: "ada@example.com",
   nickname: "Aruzhan",
-  avatarUrl: null,
+  avatarUrl: `${BASE.replace(/\/$/, "")}/api/avatar`,
   xp: 120,
   coins: 30,
   level: 2,
@@ -27,6 +27,10 @@ let stubUser = {
   nextNicknameChange: "FREE",
 };
 const stubTokens = new Set();
+const AVATAR_PNG = Buffer.from(
+  "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==",
+  "base64",
+);
 
 function stubJson(res, status, payload) {
   res.writeHead(status, { "content-type": "application/json" });
@@ -50,6 +54,13 @@ const stub = http.createServer((req, res) => {
     const input = body ? JSON.parse(body) : {};
     const token = (req.headers.authorization || "").replace(/^Bearer /, "");
     const authed = stubTokens.has(token);
+    if (req.method === "GET" && req.url === "/api/avatar") {
+      res.writeHead(200, {
+        "content-type": "image/png",
+        "cache-control": "no-store",
+      });
+      return res.end(AVATAR_PNG);
+    }
     if (req.method === "POST" && req.url === "/api/auth/register") {
       const nickname = String(input.nickname || "").trim();
       if (!/^[A-Za-z0-9_]{3,24}$/.test(nickname)) {
@@ -903,6 +914,21 @@ check(
   typeof signedIn.token === "string" && signedIn.token.length > 0,
   true,
 );
+await waitFor(
+  `['.sidebar .account .avatar img','header .avatar img','.account-avatar img'].every(s=>{const img=document.querySelector(s);return img && img.complete && img.naturalWidth>0})`,
+);
+const avatarState = await ev(`(()=>({
+  sidebar:document.querySelector('.sidebar .account .avatar img')?.naturalWidth || 0,
+  header:document.querySelector('header .avatar img')?.naturalWidth || 0,
+  account:document.querySelector('.account-avatar img')?.naturalWidth || 0
+}))()`);
+check("server avatar renders in the sidebar", avatarState.sidebar > 0, true);
+check("server avatar renders in the header", avatarState.header > 0, true);
+check(
+  "server avatar renders in the account panel",
+  avatarState.account > 0,
+  true,
+);
 
 await setValue(".account-form input[pattern]", "Aruzhan_One");
 await ev(
@@ -937,6 +963,45 @@ const restoredAccount = await waitFor(
   `(()=>{const el=document.querySelector('.account-identity strong');return el?el.textContent:null})()`,
 );
 check("server session survives reload", restoredAccount, "Aruzhan_One");
+
+const signedProfileForm = await ev(`(()=>({
+  hasNameField:[...document.querySelectorAll('.profile-form label')].some(l=>/Display name/.test(l.textContent)),
+  note:document.querySelector('.profile-form .muted')?.textContent || ''
+}))()`);
+check(
+  "signed-in profile hides the local name field",
+  signedProfileForm.hasNameField,
+  false,
+);
+check(
+  "signed-in profile points to the account nickname",
+  /account nickname/.test(signedProfileForm.note),
+  true,
+);
+await setValue('.profile-form input[maxlength="100"]', "Server-backed learner");
+await sleep(150);
+await clickText(".profile-form button", "Save changes");
+await sleep(400);
+const savedDeviceProfile = await ev(`(()=>({
+  message:document.querySelector('.profile-form .result')?.textContent || '',
+  hero:document.querySelector('.profile-identity h2')?.textContent,
+  sidebar:document.querySelector('.sidebar .account')?.textContent || ''
+}))()`);
+check(
+  "signed-in profile saves device preferences",
+  /device preferences/.test(savedDeviceProfile.message),
+  true,
+);
+check(
+  "saving device preferences keeps the account identity",
+  savedDeviceProfile.hero,
+  "Aruzhan_One",
+);
+check(
+  "saving device preferences keeps the sidebar identity",
+  /Aruzhan_One/.test(savedDeviceProfile.sidebar),
+  true,
+);
 
 await clickText(".account-panel button", "Sign out");
 await waitFor(`!!document.querySelector('.account-tabs')`);

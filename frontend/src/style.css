@@ -379,6 +379,14 @@ nav > div:first-child .navlabel {
   border-width: 2px;
   font-size: 12px;
 }
+.avatar img,
+.account-avatar img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
 .mobile-controls {
   display: none;
 }

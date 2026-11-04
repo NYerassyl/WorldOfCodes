@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { useAuth, authErrorMessage } from "../lib/auth";
 import { ApiError } from "../lib/api";
+import AvatarFace from "./Avatar";
 import { Icon } from "./UI";
 
 type Notice = { tone: "ok" | "error"; text: string };
@@ -215,19 +216,9 @@ function SignedIn() {
   return (
     <>
       <div className="account-identity">
-        {user.avatarUrl ? (
-          <img
-            className="account-avatar"
-            src={user.avatarUrl}
-            alt=""
-            loading="lazy"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <span className="account-avatar">
-            {user.nickname.slice(0, 1).toUpperCase()}
-          </span>
-        )}
+        <span className="account-avatar">
+          <AvatarFace url={user.avatarUrl} name={user.nickname} />
+        </span>
         <div>
           <strong>{user.nickname}</strong>
           <span>{user.email}</span>

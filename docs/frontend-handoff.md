@@ -45,7 +45,12 @@ Implemented against the auth section of GPT 2's contract on
   avatar URL updates. Server level, XP, coins and completedLessons appear only in this
   panel. Preview XP/coins stay device-local and are never uploaded.
 - When a server session is active, its nickname is adopted by the sidebar and profile
-  hero so the displayed identity matches the authenticated account.
+  hero so the displayed identity matches the authenticated account. `avatarUrl` renders
+  in the sidebar, header and account panel, with the nickname initial as a fallback when
+  the image is empty or fails to load.
+- While signed in, the local "Display name" field is replaced by a note pointing to the
+  Account nickname, so a device save cannot overwrite or fight the server identity. Bio
+  and avatar frame remain device-local preferences.
 - `frontend/vite.config.ts` proxies `/api` to `http://127.0.0.1:4001` in development.
   The standalone backend sends no CORS headers, so production must serve the SPA and
   API from one origin or add a reviewed CORS policy.
@@ -132,9 +137,10 @@ over CDP against a cleared demo localStorage and checks language switching, less
 unlock at five correct quiz answers, retry behavior, reload persistence, a real JavaScript
 lab run (starter failure, accepted verdict, one-time reward), a real CSS render lab with
 the sandboxed preview and computed-style checks, profile rename, account registration and
-nickname update through the `/api` proxy, session restore after reload, sign-out, rejected
-credentials, algorithm filtering, typing completion, demo arena cancel/timeout, friendly
-room-code validation and 390px/1440px layouts. Browser QA starts its own auth stub on port
+nickname update through the `/api` proxy, server avatar rendering, signed-in profile
+device preferences, session restore after reload, sign-out, rejected credentials,
+algorithm filtering, typing completion, demo arena cancel/timeout, friendly room-code
+validation and 390px/1440px layouts. Browser QA starts its own auth stub on port
 4001, so stop a real learning backend on that port first, and it needs network access to
 Judge0 CE.
 

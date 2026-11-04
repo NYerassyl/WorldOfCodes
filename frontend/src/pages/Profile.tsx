@@ -1,15 +1,21 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useStore } from "../lib/store";
+import { useAuth } from "../lib/auth";
 import { levelFor } from "../lib/progress.mjs";
 import { Heading, Notice, Icon } from "../components/UI";
 import AccountPanel from "../components/AccountPanel";
 export default function Profile() {
   const { state, update } = useStore();
+  const { status } = useAuth();
+  const signedIn = status === "authenticated";
   const [name, setName] = useState(state.name);
   const [bio, setBio] = useState(state.bio);
   const [frame, setFrame] = useState(state.frame);
   const [message, setMessage] = useState("");
   const level = levelFor(state.xp);
+  useEffect(() => {
+    setName(state.name);
+  }, [state.name]);
   const days = Array.from({ length: 56 }, (_, i) => {
     const d = new Date();
     d.setDate(d.getDate() - (55 - i));
@@ -17,6 +23,11 @@ export default function Profile() {
   });
   function save(e: React.FormEvent) {
     e.preventDefault();
+    if (signedIn) {
+      update({ bio: bio.trim(), frame });
+      setMessage("Your device preferences have been saved.");
+      return;
+    }
     const trimmed = name.trim();
     if (trimmed.length < 2 || trimmed.length > 24) {
       setMessage("Your name must be between 2 and 24 characters.");
@@ -132,21 +143,30 @@ export default function Profile() {
             <span className="tag">LOCAL PREVIEW</span>
           </div>
           <form className="profile-form" onSubmit={save}>
-            <label>
-              Display name
-              <input
-                required
-                minLength={2}
-                maxLength={24}
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-              />
-            </label>
-            <small className="muted">
-              {state.renamed
-                ? "Your free name change has been used."
-                : "Your first name change is free."}
-            </small>
+            {signedIn ? (
+              <p className="muted">
+                Your display name is your account nickname. Change it in the
+                Account panel above.
+              </p>
+            ) : (
+              <>
+                <label>
+                  Display name
+                  <input
+                    required
+                    minLength={2}
+                    maxLength={24}
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                  />
+                </label>
+                <small className="muted">
+                  {state.renamed
+                    ? "Your free name change has been used."
+                    : "Your first name change is free."}
+                </small>
+              </>
+            )}
             <label>
               About you
               <input
