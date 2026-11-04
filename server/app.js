@@ -15,6 +15,7 @@ import {
 import {
   MatchmakingQueue,
   attachBattleSocket,
+  createBattleNotifier,
   createBattleRouter,
 } from "../services/learning-backend/src/battle/index.js";
 import {
@@ -41,6 +42,7 @@ export function createApp({
   judge = judgePython,
   judgeQueue,
   battleQueue = new MatchmakingQueue(prisma),
+  battleNotifier,
   staticDirectory = resolve("frontend/dist"),
 } = {}) {
   if (!prisma) throw new Error("Prisma client is required");
@@ -109,7 +111,11 @@ export function createApp({
   api.use(createProblemsRouter(prisma, auth, { judge: queuedJudge }));
   api.use(createCopyRouter(prisma, auth));
   api.use(
-    createBattleRouter(prisma, auth, { queue: battleQueue, judge: queuedJudge }),
+    createBattleRouter(prisma, auth, {
+      queue: battleQueue,
+      judge: queuedJudge,
+      notifier: battleNotifier,
+    }),
   );
   api.use((_req, _res, next) =>
     next(new AppError(404, "NOT_FOUND", "API route not found")),
@@ -154,6 +160,7 @@ export async function startServer({
   staticDirectory,
 } = {}) {
   const battleQueue = new MatchmakingQueue(prisma);
+  const battleNotifier = createBattleNotifier();
   const judgeQueue = createJudgeQueue(judge, {
     concurrency: config.judgeConcurrency,
     maxQueued: config.judgeQueueLimit,
@@ -163,20 +170,16 @@ export async function startServer({
     config,
     judgeQueue,
     battleQueue,
+    battleNotifier,
     staticDirectory,
   });
   const server = http.createServer(app);
   const io = await attachBattleSocket(server, prisma, {
     queue: battleQueue,
     judge: judgeQueue,
+    notifier: battleNotifier,
     cors: socketCors(config.origins),
-  });
-  io.use((socket, next) => {
-    const origin = socket.handshake.headers?.origin;
-    if (origin && !config.origins.includes(origin)) {
-      return next(new Error("ORIGIN_NOT_ALLOWED"));
-    }
-    return next();
+    allowedOrigins: (origin) => !origin || config.origins.includes(origin),
   });
   await new Promise((resolveListen, reject) => {
     server.once("error", reject);

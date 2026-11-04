@@ -42,3 +42,27 @@ test('ranked queue blocks a player from rejoining while a pair is being created'
   assert.equal(result.match.status, 'ACTIVE');
   assert.equal(queue.pairingUsers.size, 0);
 });
+
+
+test('ranked pairing drops a waiting ticket whose session is no longer valid', async () => {
+  const validUsers = new Set(['player-2']);
+  const prisma = {
+    problem: {
+      findMany: async () => [{ id: 'problem-1' }],
+      findFirst: async () => ({ id: 'problem-1', language: 'python', functionName: 'solve',
+        testCases: [{ argsJson: '[]', expectedJson: '0' }] })
+    },
+    $transaction: async callback => callback({
+      rating: { upsert: async ({ where }) => ({ userId: where.userId, points: 1000 }) },
+      match: { create: async ({ data }) => ({ id: 'ranked-valid', ...data }) }
+    })
+  };
+  const queue = new MatchmakingQueue(prisma, { validateUser: async userId => validUsers.has(userId) });
+  validUsers.add('player-1');
+  await queue.join('player-1');
+  validUsers.delete('player-1');
+  const result = await queue.join('player-2');
+  assert.equal(result.status, 'QUEUED');
+  assert.equal(queue.waiting.size, 1);
+  assert.equal([...queue.waiting.values()][0].userId, 'player-2');
+});

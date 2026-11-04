@@ -146,7 +146,7 @@ test("Socket.IO shares the same matchmaking queue and authenticates the session"
 
   io.connectionHandler(socket);
   let acknowledgement;
-  handlers.get("ranked:leave")(undefined, (payload) => {
+  await handlers.get("ranked:leave")(undefined, (payload) => {
     acknowledgement = payload;
   });
   assert.deepEqual(acknowledgement, { ok: true, status: "LEFT_QUEUE" });
