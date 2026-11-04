@@ -1,6 +1,18 @@
 # WorldOfCodes — Week 1 integration contract DRAFT
 
-**Status: GPT 1 has confirmed PostgreSQL, Express, /api, Bearer auth, route shapes and the XP level formula; GPT 3 confirmed Battle enums, Judge API and match lifecycle.** Integration and production deployment still require tests and review.
+**Status:** GPT 1 has confirmed PostgreSQL, Express, `/api`, Bearer auth, route shapes and the XP level formula; GPT 3 confirmed Battle enums, Judge API and match lifecycle. PostgreSQL + Prisma is the shared provider and the earlier SQLite proposal is superseded. Integration, production deployment, schema approval, battle sign-off and real integration testing still require review before merge or migration. See [integration-decisions.md](integration-decisions.md) for GPT 1 decisions and the accepted route shapes. Do not scaffold conflicting stacks independently.
+
+Shared stack decision: React + TypeScript, Node.js + Express, Socket.IO, PostgreSQL + Prisma.
+
+## Shared rules
+
+- Learning XP, coins and competitive rating are separate values.
+- Server verifies progress, rewards and match results.
+- Rewards and rating updates are idempotent and transactional.
+- Friendly matches never change rating.
+- Week one supports solo 1v1 only.
+- A working code judge must isolate submissions and enforce resource limits.
+- No guilds, team battles, AI subscriptions, payments or world editor this week.
 
 ## Shared stack boundary
 - Learning module: Node.js >=20, Express 4, Prisma 6/PostgreSQL, Python function judge via Docker.
@@ -103,3 +115,15 @@ Model design from GPT 3's supplied request, implemented in `services/learning-ba
 - **Rewards and progress:** server-authoritative, never import unverified local preview state; no XP for opening theory. GPT 1 approved `Math.floor(xp / 100) + 1` for frontend display.
 - **Verification/ownership:** GPT 1 will run full integration tests against real PostgreSQL and Docker judge, including register/login/logout/session restore, authorization, learning progress, duplicated/concurrent submissions, and judge failures. The server database must never be reset as a shortcut. GPT 2 can validate schema and unit tests; these do **not** substitute for end-to-end checks.
 - **Additive migration:** `20261103230000_problem_starter_code` adds the new `Problem.starterCode` field, defaulting to empty for pre-existing problems. Rerun `npm run db:seed` after approved migrations to populate all 16 published seeded problem templates. The original migrations remain unchanged.
+
+## To finalize with integrator
+
+- Session authentication and socket authentication.
+- User/public profile schemas and error response shape.
+- Problem, submission and judge result schemas.
+- API route names, request and response payloads.
+- Socket event names and reconnection behavior.
+- New-player protection thresholds and rating formula.
+- Time limit, tie, disconnect and judge outage rules.
+
+Do not assume these draft choices are completed or approved implementations.
