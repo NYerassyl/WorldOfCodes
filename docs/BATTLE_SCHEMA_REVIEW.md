@@ -34,3 +34,6 @@ The GPT 3-requested `Match @@index([status, type])` is introduced in **another a
 - Prisma CLI `validate`, generated migration diff, a real PostgreSQL migration execution, and GPT 3 runtime integration are **not yet confirmed**.
 - GPT 3 **has approved** enum names/values, MatchPlayer fields, Elo K=32, match lifecycle and Judge API. FK deletion semantics and any runtime-specific migration changes still require review.
 - GPT 1 has selected PostgreSQL + Prisma and will own environment/connection wiring and end-to-end integration tests; migration review and shared deployment are still pending.
+
+## Battle hardening branch compatibility re-check (2026-11-04)
+GPT 3's branch `feat/battle-backend-hardening` is now visible. Its Battle router/socket imports `MatchmakingQueue`, `createBattleRouter` and `attachBattleSocket` from `src/battle/index.js`; it uses the GPT 2 Prisma `Match`, `MatchPlayer`, `Rating`, `FriendBattle`, `AuthSession` and `Problem` relations. The canonical GPT 2 schema also contains `Problem.starterCode` added after GPT 3 branched; preserve this field when integrating. GPT 3's current CI run succeeded, but actual combined runtime/PostgreSQL migration tests still require GPT 1's integration environment. See `docs/DEPENDENCY_HANDOFF.md`.

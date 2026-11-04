@@ -1,0 +1,47 @@
+name: Learning backend validation
+
+on:
+  push:
+    branches:
+      - feat/learning-backend
+  pull_request:
+    paths:
+      - 'services/learning-backend/**'
+      - '.github/workflows/learning-backend-validation.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/learning-backend
+    env:
+      DATABASE_URL: postgresql://worldofcodes:test@localhost:5432/worldofcodes?schema=public
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install service dependencies
+        run: npm install --ignore-scripts --no-audit --no-fund
+      - name: Validate Prisma schema
+        run: npx prisma validate --schema prisma/schema.prisma
+      - name: Generate Prisma Client
+        run: npx prisma generate --schema prisma/schema.prisma
+      - name: Verify generated Battle model delegates
+        run: |
+          node --input-type=module -e '
+            import assert from "node:assert/strict";
+            import { PrismaClient } from "@prisma/client";
+            const prisma = new PrismaClient();
+            for (const name of ["match", "matchPlayer", "rating", "friendBattle", "user", "problem"]) {
+              assert.ok(prisma[name], "Missing generated Prisma delegate " + name);
+              assert.equal(typeof prisma[name].findMany, "function");
+            }
+            await prisma.$disconnect();
+          '
+      - name: Run Learning backend regression tests
+        run: npm test

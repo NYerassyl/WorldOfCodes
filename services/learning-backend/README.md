@@ -76,3 +76,6 @@ See `../../docs/contracts.md` (proposed integration contract), `../../docs/INTEG
 ```
 
 The editor should submit the **complete Python function source** via `POST /api/problems/:id/submit` with `{"code":"def rectangle_area(width, height):\n    return width * height"}`, not stdin/stdout. The judge calls the function with server-side hidden tests. Other frontend languages must not grant server-verified XP, coins or rating. Apply the reviewed `20261103230000_problem_starter_code` migration and run `npm run db:seed` to backfill seeded problem templates.
+
+## Socket.IO and npm workspaces
+Battle hardening uses the Socket.IO 4 runtime dependency now declared in this service manifest. GPT 1's shared server/HTTP wiring and shared `MatchmakingQueue` are described in `docs/DEPENDENCY_HANDOFF.md`. GPT 1's root npm workspace manages its own authoritative root `package-lock.json`. Do not create a second service lockfile; GPT 1 must regenerate the root workspace lock after incorporating this manifest change.
