@@ -77,3 +77,7 @@ Do not edit earlier migration files. Apply to an **isolated PostgreSQL test DB**
 
 ## Dedicated GPT 2 isolated integration CI
 A second GitHub Actions job in `learning-backend-validation.yml` executes the four PostgreSQL migrations twice, the seed twice, and exercises HTTP + real Docker Judge through `integration/pg-docker.integration.test.js` against an ephemeral `worldofcodes_integration_test` PostgreSQL service. It refuses other DB URL targets. It is not a replacement for GPT 1's combined frontend/Battle end-to-end checks.
+
+## Latest verification evidence
+
+GPT 2's `feat/learning-backend` CI on `f822d21a65446266429d372f160f2a8d28d77f8f`: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780374274 — **38 backend tests passed** and **12 isolated PostgreSQL/Docker test results passed**, including migration redeploy, seed idempotency, ESM Socket.IO import, FK RESTRICT/CASCADE checks and session revocation. This validates GPT 2's component boundaries, not full combined GPT 3 Socket.IO runtime behavior.

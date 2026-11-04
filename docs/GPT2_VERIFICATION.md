@@ -28,3 +28,30 @@ Migration validation is designed for an **isolated** PostgreSQL database. Shared
 - `postgresql-docker-integration`: ephemeral Postgres service, schema/client generation, 4 migrations deployed twice, seed twice, real HTTP/Judge and concurrency tests. **See GitHub Actions for status**; this report is updated after successful verification.
 - GPT 3's Battle hardening CI separately passed its tests; GPT 1 must still join the Battle router and Socket.IO server with a single shared MatchmakingQueue, regenerate the authoritative root workspace lockfile, and run combined real Battle/auth tests.
 - In-memory MatchmakingQueue is single-instance only; production concurrency/worker isolation, secrets and deployment are not tested here.
+
+## Verified CI results — 2026-11-04
+
+**Latest code commit:** `f822d21a65446266429d372f160f2a8d28d77f8f`. GitHub Actions: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780374274
+
+| Check | Observed result |
+| --- | --- |
+| Service package dependencies | `@prisma/client ^6.0.0`, `express ^4.21.2`, `socket.io ^4.8.4` |
+| ESM dynamic import of `socket.io` | PASS; `Server` and `Socket` exports verified |
+| Prisma validate | PASS on PostgreSQL schema |
+| Prisma generate | PASS, Prisma Client **v6.19.3**; all required Battle model delegates present |
+| Backend tests | **38 passed / 0 failed** |
+| Isolated PostgreSQL 16 + real Docker Judge tests | **12 passed / 0 failed** (11 subtests + parent) |
+| Migration deploy #1 | All four migrations applied in declared order |
+| Migration deploy #2 | **No pending migrations to apply** |
+| Seed runs | Two consecutive runs succeeded; verified one course, six lessons, sixteen problems, **50 test cases**, three copy exercises |
+| Migration integrity | SHA-256 of four source migration files matched `_prisma_migrations` |
+| Auth and session | Verified register/login/logout, SHA-256 hash, malformed/expired/revoked session rejection and profile privacy against real PostgreSQL |
+| Hidden tests | All 16 problem public endpoints return **sample only**; private judge access returns additional hidden cases |
+| Rewards | Simultaneous correct learning submissions and copy attempts awarded **once**; error verdicts and Judge 503 earned nothing |
+| Docker Judge | Verified ACCEPTED, WRONG_ANSWER, RUNTIME_ERROR, TIME_LIMIT, forced container cleanup; missing Docker image produced 503 |
+| PostgreSQL constraints | Verified MatchPlayer/User and Match/Problem **RESTRICT**; deleting Match cascades MatchPlayer and FriendBattle; deleting User cascades Rating |
+| Learning XP and Battle rating | Distinct tables/columns; creating Rating/Match did not alter User.xp/User.coins |
+
+The **Socket.IO event-time revalidation** remains a GPT 3 action. This report verifies the shared lookup and session revocation against PostgreSQL, **not** live websocket submission/settlement in the combined Battle app. GPT 1 must regenerate the authoritative **root workspace `package-lock.json`**, connect REST and Socket.IO with one `MatchmakingQueue`, and run combined Battle end-to-end tests.
+
+**Security/deployment limitations:** Docker resource flags and cleanup were checked, but full hostile-code sandbox penetration testing, distributed judge workers, distributed matchmaking, production rate-limits, TLS/hosting and production secret provisioning remain outside this verification. No shared or production database was migrated or reset.

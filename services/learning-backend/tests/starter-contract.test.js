@@ -49,3 +49,19 @@ test('starterCode schema migration is additive and follows earlier migrations', 
   assert.match(migration,/ALTER TABLE "Problem" ADD COLUMN "starterCode" TEXT NOT NULL DEFAULT '';/);
   assert.doesNotMatch(migration,/DROP TABLE|DROP COLUMN|DELETE FROM|TRUNCATE/);
 });
+
+test('every starter function has argument count matching all hidden and sample judge cases',()=>{
+  const problems=[...syllabus.flatMap(topic=>topic.problems),...algorithms];
+  for(const problem of problems){
+    const signature=problem.starterCode.split(String.fromCharCode(10))[0];
+    const prefix='def '+problem.functionName+'(';
+    assert.ok(signature.startsWith(prefix) && signature.endsWith('):'),'Bad signature for '+problem.id);
+    const argList=signature.slice(prefix.length,-2);
+    const params=argList ? argList.split(',').map(v=>v.trim()) : [];
+    assert.equal(new Set(params).size,params.length,'duplicate parameter '+problem.id);
+    for(const [args] of problem.cases){
+      assert.ok(Array.isArray(args),'Expected positional JSON arguments '+problem.id);
+      assert.equal(args.length,params.length,'Argument mismatch in '+problem.id);
+    }
+  }
+});
