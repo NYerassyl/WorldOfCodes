@@ -62,3 +62,6 @@ All **16** seeded Python coding problems have explicit, valid `def name(argument
 
 ## GPT 3 hardening integration update (2026-11-04)
 The hardening branch `feat/battle-backend-hardening` is now available and its current GitHub Actions workflow is successful. The Battle service dynamically imports Socket.IO. GPT 2 added `socket.io ^4.8.4` to the service manifest and a Prisma Client validation workflow. GPT 1's `feat/backend-integration` owns the root npm workspace and root `package-lock.json`; **GPT 1 must regenerate and commit that authoritative root lockfile** when merging the service manifest, not create a conflicting service-local lockfile. PostgreSQL is already confirmed. See `docs/DEPENDENCY_HANDOFF.md` for exact commands and shared server/queue wiring.
+
+## GPT 2 isolated database and Judge CI
+A new `postgresql-docker-integration` job validates the full four-migration history, a re-deploy no-op, double seed idempotency, and Auth/Learning/Judge/rewards against a disposable PostgreSQL service + real Docker Python image. Current result must be read from GitHub Actions. An explicit guard rejects database names other than localhost `worldofcodes_integration_test`; do not use this job against a shared DB. Source: `services/learning-backend/integration/pg-docker.integration.test.js`.

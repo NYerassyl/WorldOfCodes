@@ -11,7 +11,8 @@
     "start": "node --env-file=.env src/standalone.js",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate deploy",
-    "db:seed": "node --env-file=.env prisma/seed.js"
+    "db:seed": "node --env-file=.env prisma/seed.js",
+    "test:integration": "node --test integration/pg-docker.integration.test.js"
   },
   "dependencies": {
     "@prisma/client": "^6.0.0",

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { asyncRoute, ensureKeys, notFound, requireString, badRequest, AppError } from '../lib/errors.js';
 import { createSessionToken, hashSessionToken, hashPassword, verifyPassword, normalizeEmail, normalizeNickname, publicUser, privateUser } from '../lib/security.js';
+import { resolveAuthSession } from './session.js';
 import { editOwnProfile } from './service.js';
 const SESSION_DAYS = 30;
 
@@ -9,9 +10,9 @@ export function makeRequireAuth(prisma) {
     const header = req.get('authorization') || '';
     const token = /^Bearer ([A-Za-z0-9_-]{32,128})$/.exec(header)?.[1];
     if (!token) throw new AppError(401,'UNAUTHORIZED','Bearer token required');
-    const session = await prisma.authSession.findUnique({where:{tokenHash:hashSessionToken(token)},include:{user:true}});
-    if (!session || session.revokedAt || session.expiresAt <= new Date()) throw new AppError(401,'UNAUTHORIZED','Invalid or expired session');
-    req.auth = {userId:session.userId, sessionId:session.id, user:session.user}; next();
+    const auth = await resolveAuthSession(prisma, token, {includeUser:true});
+    if (!auth) throw new AppError(401,'UNAUTHORIZED','Invalid or expired session');
+    req.auth = auth; next();
   });
 }
 async function startSession(prisma, userId) {

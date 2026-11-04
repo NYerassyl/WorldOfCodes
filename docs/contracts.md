@@ -130,3 +130,12 @@ The stack and REST/auth decisions are accepted as recorded in
 feat/backend-integration and merged into integration/all. Main is not merged. Deployment
 and Battle runtime sign-off remain separate from local learning integration verification.
 
+## Canonical AuthSession lookup for GPT 3 and GPT 1
+
+Export `resolveAuthSession(prisma, token, { includeUser?: boolean })` from `services/learning-backend/src/index.js`.
+
+- Validates the opaque token syntax, hashes it using `hashSessionToken` (SHA-256), looks up `AuthSession`, and returns `null` if missing, expired or revoked.
+- If `includeUser:false` (default), returns `{ userId, sessionId }`; if true, returns `{userId,sessionId,user}` from a single query (same shape used by `makeRequireAuth`).
+- Database errors propagate; callers must reject/abort rather than authorize.
+- **Socket.IO:** use the same helper at handshake **and before every protected event**, passing the raw opaque token from `socket.handshake.auth.token`, then verify the returned `userId` still matches the socket identity. Do not trust a supplied userId. GPT 3 owns the changes in its Socket.IO module; GPT 2 does not rewrite it.
+- Logout changes `revokedAt` in PostgreSQL. An already connected socket must not retain access after revocation; revalidation is required.
