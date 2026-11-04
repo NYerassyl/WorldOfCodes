@@ -52,7 +52,7 @@ Migration validation is designed for an **isolated** PostgreSQL database. Shared
 | PostgreSQL constraints | Verified MatchPlayer/User and Match/Problem **RESTRICT**; deleting Match cascades MatchPlayer and FriendBattle; deleting User cascades Rating |
 | Learning XP and Battle rating | Distinct tables/columns; creating Rating/Match did not alter User.xp/User.coins |
 
-The **Socket.IO event-time revalidation** remains a GPT 3 action. This report verifies the shared lookup and session revocation against PostgreSQL, **not** live websocket submission/settlement in the combined Battle app. GPT 1 must regenerate the authoritative **root workspace `package-lock.json`**, connect REST and Socket.IO with one `MatchmakingQueue`, and run combined Battle end-to-end tests.
+GPT 3's newer hardening branch implements Socket.IO event-time revalidation; this GPT 2 report checks session revocation against PostgreSQL, not an end-to-end real websocket event flow on the consolidated server. This report verifies the shared lookup and session revocation against PostgreSQL, **not** live websocket submission/settlement in the combined Battle app. GPT 1 has generated the root workspace `package-lock.json` on `integration/all`; root `npm ci` was replayed successfully on pinned SHA `c907eab6`. GPT 1/GPT 4 must still run full Battle and frontend acceptance on the final combined commit.
 
 **Security/deployment limitations:** Docker resource flags and cleanup were checked, but full hostile-code sandbox penetration testing, distributed judge workers, distributed matchmaking, production rate-limits, TLS/hosting and production secret provisioning remain outside this verification. No shared or production database was migrated or reset.
 
@@ -67,3 +67,19 @@ The shared integration branch `integration/all` is currently at `c907eab63713f45
 A dedicated `integrated-root-lock-verification` CI job now checks out that *exact immutable integration SHA*, runs root `npm ci`, then `npm ls`, `prisma validate/generate`, Socket.IO ESM imports and all 18 generated Prisma model delegates. It runs full and production-only `npm audit --json` and records advisories, rather than guessing about a historical Prisma transitive advisory. The job never writes to the root lockfile or any shared database. **Check the run result before claiming it passed.**
 
 The isolated PostgreSQL/Docker integration suite also re-runs the four migrations and the course seed **after** an account has completed lessons and earned XP/coins; it verifies that User, progress, completions, ledger, copy results, Rating and submission records are unchanged. Existing migrations remain immutable. This is not a claim of a production database test.
+
+## Dependency security and persistent-progress acceptance — verified 2026-11-04
+
+**CI evidence:** [GitHub Actions run 41782463093](https://github.com/NYerassyl/WorldOfCodes/actions/runs/41782463093) on GPT 2 code commit `c5805a0e7716384e87713ddb71a4a69fee0225c1`: all **three jobs concluded SUCCESS**.
+
+- Root workspace install validation checked out **exact integration SHA** `c907eab63713f45415e9bd556082932c9f285c1c` into a disposable CI directory. `npm ci --no-audit --no-fund` installed **221 packages** using GPT 1's root `package-lock.json`. No edits were made to that lockfile.
+- Actual installed imports: `socket.io@4.8.4` ESM `Server`/`Socket` exports PASS; `prisma@6.19.3`, `@prisma/client@6.19.3`; `prisma validate` PASS; `prisma generate` PASS; **18** Account/Learning/Battle client delegates PASS.
+- Learning regression suite: **39 passed, zero failed**.
+- Actual PostgreSQL 16 + Docker integration suite: **13 passed, zero failed** (12 subtests plus parent). Four migrations deployed; replay produced *No pending migrations*. Seed run twice from empty DB, and then **two more migrate/seed cycles with an existing account, completed lesson and rewards**; the User row, lesson progress, problem completions, rewards, copy completions, Rating, submissions, and test/problem counts remained identical.
+- Account/session verification includes private/public projections, token SHA-256 storage, server-side logout revocation, expiration, re-login progress persistence. Learning XP/coins remain separate from Battle Rating. Docker judge timeout/unavailability returned no false ACCEPTED or rewards.
+
+### npm audit finding — NOT resolved
+
+The pinned root lockfile contains `deepmerge-ts@7.1.5` through `prisma@6.19.3 → @prisma/config → deepmerge-ts`. Both `npm audit --json` and `npm audit --omit=dev --json` returned **3 high, 0 critical** (one underlying advisory propagated as findings for `deepmerge-ts`, `@prisma/config`, and `prisma`). This was a **non-blocking audit reporting step**: green CI means the install/functionality checks passed, **not** that dependency security passed.
+
+Root-package ownership belongs to GPT 1. This branch deliberately did not edit root `package.json`/lockfile or perform any unapproved major Prisma upgrade. Detailed risk, affected versions, link and proposed tested remediation are in `docs/SECURITY_AUDIT_GPT2.md`. The security decision must be explicit before production deployment, with a fresh audit on the final integrated lockfile.

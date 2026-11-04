@@ -84,3 +84,9 @@ GPT 2's `feat/learning-backend` CI on `50a809c41b0c59ad81f78f4fa5a1edbb87d975ab`
 
 ## Updated shared workspace status
 GPT 1 has now published `integration/all` at `c907eab63713f45415e9bd556082932c9f285c1c` with an authoritative root `package-lock.json`. Both root and service socket.io declarations are `^4.8.4`. Earlier instructions to **generate** the initial root lock are superseded for this snapshot; GPT 1 must **regenerate it again only when new workspace manifest changes land**, such as GPT 5's `socket.io-client`. The `integrated-root-lock-verification` job checks the pinned combined snapshot through actual root `npm ci`, Prisma/Socket.IO imports and npm audit, without editing GPT 1-owned root files.
+
+## Verified root install and outstanding security advisory (2026-11-04)
+
+The pinned `integration/all` commit `c907eab63713f45415e9bd556082932c9f285c1c` was actually installed with root `npm ci` on [GitHub Actions run 41782463093](https://github.com/NYerassyl/WorldOfCodes/actions/runs/41782463093). Socket.IO ESM imports, Prisma schema/client generation and all 18 model delegates passed. This supersedes earlier speculative warnings that the root lockfile was absent; it is now present and verified for **this exact SHA only**.
+
+**Outstanding:** npm audit reported 3 High findings (one DeepMergeTS advisory chained through Prisma). Detailed security assessment and GPT 1 action in `docs/SECURITY_AUDIT_GPT2.md`. GPT 1 must re-run `npm ci` and `npm audit` after integrating GPT 5's `socket.io-client` frontend manifest or changing root dependencies. Root lock ownership stays GPT 1.
