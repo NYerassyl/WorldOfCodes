@@ -239,6 +239,40 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal((await request('/users/me')).body.xp,beforeXp);
       assert.equal(await prisma.match.count({where:{status:'COMPLETED'}}),0);
     });
+    await t.test('re-running migrations and seed preserves an existing account, completed lesson and rewards',async()=>{
+      const before={
+        account:await prisma.user.findUnique({where:{id:user.id}}),
+        lessons:await prisma.lessonProgress.findMany({where:{userId:user.id},orderBy:{lessonId:'asc'}}),
+        completed:await prisma.problemCompletion.findMany({where:{userId:user.id},orderBy:{problemId:'asc'}}),
+        rewards:await prisma.rewardLedger.findMany({where:{userId:user.id},orderBy:{id:'asc'}}),
+        copy:await prisma.copyCompletion.findMany({where:{userId:user.id},orderBy:{exerciseId:'asc'}}),
+        ratings:await prisma.rating.findUnique({where:{userId:user.id}}),
+        submissions:await prisma.submission.count({where:{userId:user.id}}),
+        cases:await prisma.testCase.count(),
+        problems:await prisma.problem.count()
+      };
+      assert.ok(before.account?.xp > 0);
+      assert.ok(before.lessons.some(x=>x.completedAt));
+      assert.ok(before.rewards.length >= 3);
+      // The test file has a hard guard against non-local database names before connecting.
+      for(let cycle=0;cycle<2;cycle++){
+        const m=await exec('npx',['prisma','migrate','deploy','--schema','prisma/schema.prisma'],{timeout:120000});
+        assert.match(m.stdout,/No pending migrations to apply/);
+        await exec('node',['prisma/seed.js'],{timeout:120000});
+      }
+      const after={
+        account:await prisma.user.findUnique({where:{id:user.id}}),
+        lessons:await prisma.lessonProgress.findMany({where:{userId:user.id},orderBy:{lessonId:'asc'}}),
+        completed:await prisma.problemCompletion.findMany({where:{userId:user.id},orderBy:{problemId:'asc'}}),
+        rewards:await prisma.rewardLedger.findMany({where:{userId:user.id},orderBy:{id:'asc'}}),
+        copy:await prisma.copyCompletion.findMany({where:{userId:user.id},orderBy:{exerciseId:'asc'}}),
+        ratings:await prisma.rating.findUnique({where:{userId:user.id}}),
+        submissions:await prisma.submission.count({where:{userId:user.id}}),
+        cases:await prisma.testCase.count(),
+        problems:await prisma.problem.count()
+      };
+      assert.deepEqual(after,before);
+    });
     await t.test('logout revokes the HTTP and Socket.IO session, progress persists after next login',async()=>{
       const before=(await request('/users/me')).body;
       const expiredToken=token;

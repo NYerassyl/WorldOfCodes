@@ -59,3 +59,11 @@ The **Socket.IO event-time revalidation** remains a GPT 3 action. This report ve
 ## Final CI confirmation for the same 2026-11-04 code
 
 GitHub Actions run `41780676514` completed **successfully** on `50a809c41b0c59ad81f78f4fa5a1edbb87d975ab`: 39/39 backend unit/contract tests and 12/12 real isolated PostgreSQL/Docker test results passed. The additional unit case verified that argument counts in **all 16** `starterCode` function signatures match every sample and hidden `cases` input. No shared/prod DB mutation or root lockfile edit was performed.
+
+## Root workspace reconciliation follow-up (2026-11-04)
+
+The shared integration branch `integration/all` is currently at `c907eab63713f45415e9bd556082932c9f285c1c`, with the **authoritative root workspace `package-lock.json` already present**. Inspected lock metadata: both root and service declare `socket.io ^4.8.4`; locked versions include `socket.io 4.8.4`, Prisma CLI `6.19.3`, and `deepmerge-ts 7.1.5`. The frontend Battle client branch is still separate; this snapshot does not include `socket.io-client`.
+
+A dedicated `integrated-root-lock-verification` CI job now checks out that *exact immutable integration SHA*, runs root `npm ci`, then `npm ls`, `prisma validate/generate`, Socket.IO ESM imports and all 18 generated Prisma model delegates. It runs full and production-only `npm audit --json` and records advisories, rather than guessing about a historical Prisma transitive advisory. The job never writes to the root lockfile or any shared database. **Check the run result before claiming it passed.**
+
+The isolated PostgreSQL/Docker integration suite also re-runs the four migrations and the course seed **after** an account has completed lessons and earned XP/coins; it verifies that User, progress, completions, ledger, copy results, Rating and submission records are unchanged. Existing migrations remain immutable. This is not a claim of a production database test.

@@ -81,3 +81,6 @@ A second GitHub Actions job in `learning-backend-validation.yml` executes the fo
 ## Latest verification evidence
 
 GPT 2's `feat/learning-backend` CI on `50a809c41b0c59ad81f78f4fa5a1edbb87d975ab`: https://github.com/NYerassyl/WorldOfCodes/actions/runs/41780676514 — **39 backend tests passed** and **12 isolated PostgreSQL/Docker test results passed**, including migration redeploy, seed idempotency, ESM Socket.IO import, FK RESTRICT/CASCADE checks and session revocation. This validates GPT 2's component boundaries, not full combined GPT 3 Socket.IO runtime behavior.
+
+## Updated shared workspace status
+GPT 1 has now published `integration/all` at `c907eab63713f45415e9bd556082932c9f285c1c` with an authoritative root `package-lock.json`. Both root and service socket.io declarations are `^4.8.4`. Earlier instructions to **generate** the initial root lock are superseded for this snapshot; GPT 1 must **regenerate it again only when new workspace manifest changes land**, such as GPT 5's `socket.io-client`. The `integrated-root-lock-verification` job checks the pinned combined snapshot through actual root `npm ci`, Prisma/Socket.IO imports and npm audit, without editing GPT 1-owned root files.
