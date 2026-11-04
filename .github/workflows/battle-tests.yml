@@ -1,0 +1,25 @@
+name: Battle backend tests
+
+on:
+  push:
+    branches:
+      - feat/battle-backend-hardening
+  pull_request:
+    paths:
+      - 'services/learning-backend/src/battle/**'
+      - 'services/learning-backend/tests/battle-*.test.js'
+      - '.github/workflows/battle-tests.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: services/learning-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Run backend tests
+        run: node --test tests/*.test.js
