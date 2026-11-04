@@ -13,7 +13,7 @@ const tempDir = mkdtempSync(join(tmpdir(), "woc-api-"));
 const bundlePath = join(tempDir, "api.mjs");
 
 execFileSync(
-  join(frontendDir, "node_modules", ".bin", "esbuild"),
+  fileURLToPath(import.meta.resolve('esbuild/bin/esbuild')),
   [
     join(frontendDir, "src", "lib", "api.ts"),
     "--bundle",

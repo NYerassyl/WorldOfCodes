@@ -1,0 +1,18 @@
+import express from 'express';
+import { PrismaClient } from '@prisma/client';
+import { createAuthRouter, makeRequireAuth, createLearningRouter, createProblemsRouter, createCopyRouter } from './index.js';
+import { errorMiddleware } from './lib/errors.js';
+const prisma = new PrismaClient();
+const app = express();
+app.disable('x-powered-by');
+app.use(express.json({limit:'32kb'}));
+const auth = makeRequireAuth(prisma);
+app.use('/api',createAuthRouter(prisma));
+app.use('/api',createLearningRouter(prisma,auth));
+app.use('/api',createProblemsRouter(prisma,auth));
+app.use('/api',createCopyRouter(prisma,auth));
+app.use(errorMiddleware);
+const server=app.listen(Number(process.env.PORT||4001),()=>console.log('Learning backend listening'));
+const shutdown=async()=>{server.close();await prisma.$disconnect();};
+process.on('SIGTERM',shutdown);
+process.on('SIGINT',shutdown);

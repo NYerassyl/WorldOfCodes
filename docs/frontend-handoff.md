@@ -1,3 +1,5 @@
+> Integration update (2026-11-03): see [the verified integration report](integration-report.md) and [Battle runtime review](battle-integration-review.md). The historical handoff below describes the earlier branch state.
+
 # Frontend handoff
 
 ## Status

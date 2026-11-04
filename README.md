@@ -1,29 +1,50 @@
 # WorldOfCodes
 
-Код үйрену, практика және 1v1 жарыс платформасы.
+An English learning workspace for Python foundations, algorithm practice and typing exercises, with account progress stored in PostgreSQL.
 
-## Бірінші апта
+## Run the integrated application
 
-Профиль, оқу, алгоритм есептері, рейтингтік дуэль, достық батл,
-кодты дәл көшіру жаттығуы.
+Requirements: Node.js 22.12+, PostgreSQL, and a running Docker engine for Python judging.
 
-## Parallel development
+```sh
+npm ci
+cp .env.example .env
+# Set DATABASE_URL to your own database and CORS_ORIGINS to your frontend origin.
+npm run db:generate
+npm run db:validate
+npm run db:migrate
+npm run db:seed
+docker pull python:3.12-alpine
+npm run build
+npm start
+```
 
-| Branch | Owner | Scope |
-| --- | --- | --- |
-| feat/frontend | GPT 1 | UI, design, editor, integration |
-| feat/learning-backend | GPT 2 | Auth, profile, courses, problems, progress, rewards, database schema |
-| feat/battle-backend | GPT 3 | Matchmaking, rooms, sockets, match lifecycle, rating |
+Open http://127.0.0.1:4001. For frontend development, run `npm run dev:web` separately; Vite proxies `/api` to port 4001. PostgreSQL credentials are server-only. Never put DATABASE_URL in a VITE_ variable or commit .env files.
 
-Use one isolated worktree or clone per task. Open pull requests into main.
-Only the integrator merges them after checking the full user flow.
+The judge creates temporary files that Docker must be able to mount. On macOS/Colima set TMPDIR to a directory mounted into the VM and set DOCKER_HOST to that profile's socket. The API never executes user Python in its own process.
 
-This branch includes the frontend demo; server functionality is not implemented.
-The earlier HTML/CSS design draft is separate and incomplete.
-Read AGENTS.md and docs/contracts.md before implementation.
+## Verification
 
-## Frontend preview
+```sh
+npm test
+npm run build
+# Point .env.test at an isolated localhost PostgreSQL database ending in _test.
+# Apply the same migrations and seed there first; tests never reset a database.
+npm run test:integration
+# With Playwright available and the app running:
+node tests/browser-integration.mjs
+```
 
-The frontend now lives in `frontend/`. Run `npm ci` followed by `npm run dev`
-from that directory. See `frontend/README.md` for implemented demo behavior and limits.
-See `docs/frontend-handoff.md` for backend integration requirements.
+Browser test overrides: APP_URL, PLAYWRIGHT_MODULE and CHROME_PATH. Test accounts are unique per run and remain in the isolated test database.
+
+## Integration status and ownership
+
+See [integration report](docs/integration-report.md), [API contracts](docs/contracts.md) and [Battle review](docs/battle-integration-review.md).
+
+- GPT 1: frontend, root manifest, server entrypoint, environment wiring and integration tests.
+- GPT 2: Learning & Account backend, Prisma, judging and learning rewards.
+- GPT 3: Battle endpoints, Socket.IO, matchmaking and rating settlement.
+
+The integration branch preserves the existing frontend and GPT 2 history. GPT 3's branch is under contract review; Battle remains a frontend rehearsal until its lifecycle and session issues are resolved. Five non-Python language tracks remain local practice, without account XP or coins.
+
+Do not merge into main until integration and contract reviews pass. Never reset a shared database to resolve migration drift.

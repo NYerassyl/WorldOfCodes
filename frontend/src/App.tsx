@@ -2,11 +2,15 @@ import { useEffect, useRef, useState } from "react";
 import { Provider, useStore } from "./lib/store";
 import { Provider as AuthProvider, useAuth } from "./lib/auth";
 import { Icon, Heading } from "./components/UI";
-import { levelFor } from "./lib/progress.mjs";
+
 import Home from "./pages/Home";
 import Learn from "./pages/Learn";
-import Algorithms from "./pages/Algorithms";
-import Copy from "./pages/Copy";
+import {
+  ServerLearning,
+  ServerProblems,
+  ServerCopy,
+} from "./pages/ServerPractice";
+
 import Profile from "./pages/Profile";
 import Arena from "./pages/Arena";
 const routes = [
@@ -81,7 +85,7 @@ function Shell() {
         <div className="mobile-controls">
           <span className="mobile-coins">
             <Icon name="coin" />
-            {state.coins}
+            {user?.coins ?? 0}
           </span>
           <button
             aria-label={menuOpen ? "Close navigation" : "Open navigation"}
@@ -135,23 +139,24 @@ function Shell() {
                 </span>
                 <span>YOUR NEXT LEVEL</span>
                 <strong>
-                  {String(levelFor(state.xp) + 1).padStart(2, "0")}
+                  {String((user?.level ?? 1) + 1).padStart(2, "0")}
                 </strong>
               </div>
               <div className="journey-progress">
-                <span style={{ width: `${(state.xp % 200) / 2}%` }} />
+                <span style={{ width: `${(user?.xp ?? 0) % 100}%` }} />
               </div>
               <p>
-                <b>{state.xp % 200}</b> / 200 XP <span>Keep building.</span>
+                <b>{(user?.xp ?? 0) % 100}</b> / 100 XP{" "}
+                <span>Keep building.</span>
               </p>
             </div>
             <a href="#profile" className="account">
               <span className={`avatar frame-${state.frame}`}>
-                {state.avatar}
+                {user?.nickname.slice(0, 1).toUpperCase() ?? "E"}
               </span>
               <span>
-                {state.name}
-                <small>Level {levelFor(state.xp)} · Explorer</small>
+                {user?.nickname ?? "Explorer"}
+                <small>Level {user?.level ?? 1} · Explorer</small>
               </span>
               <Icon name="settings" />
             </a>
@@ -167,11 +172,11 @@ function Shell() {
           </div>
           <div className="header-right">
             <span className="demo">
-              <i /> Preview workspace
+              <i /> {user ? "Account connected" : "Sign in to save progress"}
             </span>
             <span className="balance">
               <Icon name="coin" />
-              <b>{state.coins}</b>
+              <b>{user?.coins ?? 0}</b>
               <span>coins</span>
             </span>
             <a
@@ -179,7 +184,7 @@ function Shell() {
               aria-label="Open profile"
               className={`avatar small frame-${state.frame}`}
             >
-              {state.avatar}
+              {user?.nickname.slice(0, 1).toUpperCase() ?? "E"}
             </a>
           </div>
         </header>
@@ -193,11 +198,15 @@ function Shell() {
           {page === "home" ? (
             <Home />
           ) : page === "learn" ? (
-            <Learn key={route} languageId={id} lessonId={sub} />
+            id === "python" ? (
+              <ServerLearning key={route} lessonId={sub} />
+            ) : (
+              <Learn key={route} languageId={id} lessonId={sub} />
+            )
           ) : page === "algorithms" ? (
-            <Algorithms key={route} id={id} />
+            <ServerProblems key={route} id={id} />
           ) : page === "copy" ? (
-            <Copy />
+            <ServerCopy />
           ) : page === "profile" ? (
             <Profile />
           ) : page === "duel" || page === "friends" ? (

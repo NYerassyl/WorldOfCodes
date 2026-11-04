@@ -1,3 +1,4 @@
+import { useAuth } from "../lib/auth";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PASS_MARK,
@@ -32,28 +33,23 @@ function Missing({ title, body }: { title: string; body: string }) {
 }
 
 function LanguagePicker() {
+  const { user } = useAuth();
   const { state } = useStore();
-  const totalPassed = languages.reduce(
-    (sum, language) => sum + trackProgress(state.practice, language),
-    0,
-  );
-  const totalLessons = languages.reduce(
-    (sum, language) => sum + language.lessons.length,
-    0,
-  );
   return (
     <>
       <Heading
         title="Choose your language."
-        description="Six tracks. Each lesson has a full lecture, ten quiz tasks and a hands-on code lab."
+        description="Python foundations with verified rewards, plus five tracks for local practice."
       >
-        <span className="lesson-summary">
-          {totalPassed} of {totalLessons} lessons passed
-        </span>
+        <span className="lesson-summary">Python syncs with your account</span>
       </Heading>
       <div className="language-grid">
         {languages.map((language) => {
-          const done = trackProgress(state.practice, language);
+          const isPython = language.id === "python";
+          const count = isPython ? 6 : language.lessons.length;
+          const done = isPython
+            ? (user?.completedLessons ?? 0)
+            : trackProgress(state.practice, language);
           const next = firstUnfinished(state.practice, language);
           return (
             <a
@@ -64,7 +60,7 @@ function LanguagePicker() {
             >
               <div className="language-card-top">
                 <span className="language-badge">{language.badge}</span>
-                <span className="tag">{language.lessons.length} lessons</span>
+                <span className="tag">{count} lessons</span>
               </div>
               <h2>{language.name}</h2>
               <p>{language.tagline}</p>
@@ -72,19 +68,21 @@ function LanguagePicker() {
                 <div className="progress">
                   <span
                     style={{
-                      width: `${(done / language.lessons.length) * 100}%`,
+                      width: `${(done / count) * 100}%`,
                     }}
                   />
                 </div>
                 <small>
-                  {done} of {language.lessons.length} lessons passed
+                  {done} of {count} lessons passed
                 </small>
               </div>
               <div className="language-card-foot">
                 <span>
-                  {done
-                    ? `Continue: ${next.title}`
-                    : `Start with ${language.lessons[0].title}`}
+                  {isPython
+                    ? "Open Python foundations"
+                    : done
+                      ? `Continue: ${next.title}`
+                      : `Start with ${language.lessons[0].title}`}
                 </span>
                 <span className="round-arrow">
                   <Icon name="arrow" />
@@ -96,7 +94,8 @@ function LanguagePicker() {
       </div>
       <Notice>
         Pick any language at any time. Quiz answers and code-lab drafts are
-        saved in this browser.
+        saved in this browser. Only verified Python and typing exercises earn
+        account XP and coins.
       </Notice>
     </>
   );
@@ -543,7 +542,7 @@ function LessonView({
                 <div className="lesson-pass">
                   <span className="tag">Lesson passed ✓</span>
                   <p>
-                    +40 XP and +15 coins are granted once.{" "}
+                    Local practice completed.{" "}
                     {nextLesson
                       ? "The next lesson is now unlocked."
                       : "You finished this language track."}
@@ -687,7 +686,7 @@ function LessonView({
                       Accepted — all {labChecks.length} tests passed.
                     </strong>{" "}
                     {labAwarded
-                      ? "+10 XP and +5 coins are granted once."
+                      ? "Practice saved on this device."
                       : labDone
                         ? "This lab was already completed."
                         : ""}{" "}
@@ -767,11 +766,11 @@ function LessonView({
           <div className="lesson-reward">
             <span>◈</span>
             <div>
-              <strong>+40 XP · +15 coins</strong>
+              <strong>Local quiz progress</strong>
               <p>
                 {state.completed.includes(key)
-                  ? "You have earned this lesson reward."
-                  : `Complete ${PASS_MARK} of 10 quiz tasks to earn it once.`}
+                  ? "You have completed this local lesson."
+                  : `Complete ${PASS_MARK} of 10 quiz tasks to complete this lesson.`}
               </p>
             </div>
           </div>
@@ -779,17 +778,18 @@ function LessonView({
             <div className="lesson-reward">
               <span>⌘</span>
               <div>
-                <strong>+10 XP · +5 coins</strong>
+                <strong>Local lab progress</strong>
                 <p>
                   {labDone
                     ? "Code lab completed."
-                    : "Pass every lab test to earn it once."}
+                    : "Pass every lab test to complete this practice."}
                 </p>
               </div>
             </div>
           )}
           <Notice>
-            Quiz answers and progress are saved in this browser. Code-lab runs
+            Quiz answers and progress are saved in this browser. Only verified
+            Python and typing exercises earn account XP and coins. Code-lab runs
             are sent to an external sandbox; account sync is coming later.
           </Notice>
         </aside>

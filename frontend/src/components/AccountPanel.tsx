@@ -57,9 +57,9 @@ function SignedOut() {
           <button
             className="btn secondary"
             type="button"
-            onClick={() => void logout()}
+            onClick={() => void logout().catch(() => {})}
           >
-            Sign out on this device
+            Revoke session and sign out
           </button>
         </div>
       </>
@@ -116,8 +116,9 @@ function SignedOut() {
       </div>
       <p className="account-note">
         An account keeps your nickname, level, XP and coins on the WorldOfCodes
-        server. Lessons, quizzes and labs still record progress on this device
-        until the learning sync endpoints are available.
+        server. Python lessons, challenges and typing exercises sync with your
+        account. Other language tracks are local practice without account
+        rewards.
       </p>
       <form className="account-form" onSubmit={submit}>
         <label>
@@ -209,7 +210,13 @@ function SignedIn() {
 
   async function signOut() {
     setBusy(true);
-    await logout();
+    try {
+      await logout();
+    } catch (caught) {
+      setNotice({ tone: "error", text: authErrorMessage(caught) });
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -254,9 +261,9 @@ function SignedIn() {
         )}
       </dl>
       <p className="account-note">
-        These values come from the server and are separate from the preview XP
-        and coins on this device. Lesson and lab rewards are not sent to the
-        server yet, so they will not change this account.
+        Your XP and coins are awarded after the server verifies your work.
+        Repeating an exercise lets you practice without earning duplicate
+        rewards.
       </p>
       <form className="account-form" onSubmit={save}>
         <label>
