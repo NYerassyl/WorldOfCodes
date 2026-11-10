@@ -7,3 +7,5 @@ export { submitProblem, getPublicProblemBank, getJudgableProblem } from './probl
 export { judgePython } from './problems/dockerJudge.js';
 
 export { resolveAuthSession } from './auth/session.js';
+
+export { createTraceRouter } from "./trace/router.js";

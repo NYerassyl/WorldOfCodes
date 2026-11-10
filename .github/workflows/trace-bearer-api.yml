@@ -1,0 +1,78 @@
+name: Trace Express Bearer API and PostgreSQL attempts
+on:
+  push:
+    branches:
+      - feat/trace-bearer-express-gpt2
+  pull_request:
+    paths:
+      - 'services/learning-backend/src/trace/**'
+      - 'services/learning-backend/prisma/**'
+      - 'server/app.js'
+      - 'server/trace.test.js'
+      - 'services/learning-backend/src/index.js'
+      - '.github/workflows/trace-bearer-api.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  node-postgres:
+    name: Express route, Prisma migration and real Bearer attempt
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: trace_ci
+          POSTGRES_PASSWORD: trace_ci_only
+          POSTGRES_DB: worldofcodes_trace_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U trace_ci -d worldofcodes_trace_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://trace_ci:trace_ci_only@127.0.0.1:5432/worldofcodes_trace_test?schema=public
+      CORS_ORIGINS: http://localhost:5173
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install locked workspace dependencies
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Validate and generate Prisma schema
+        run: |
+          npx prisma validate --schema services/learning-backend/prisma/schema.prisma
+          npx prisma generate --schema services/learning-backend/prisma/schema.prisma
+          node --input-type=module -e 'import { PrismaClient } from "@prisma/client"; const db = new PrismaClient(); if (!db.traceAttempt || typeof db.traceAttempt.create !== "function") throw new Error("Missing TraceAttempt delegate"); await db.$disconnect();'
+      - name: Apply additive migrations to an isolated PostgreSQL
+        run: |
+          npx prisma migrate deploy --schema services/learning-backend/prisma/schema.prisma
+          npx prisma migrate deploy --schema services/learning-backend/prisma/schema.prisma
+      - name: Run complete backend HTTP route tests
+        run: node --test server/*.test.js
+      - name: Run all learning-backend unit tests
+        run: node --test services/learning-backend/tests/*.test.js
+      - name: Real Bearer attempt against a fresh PostgreSQL database
+        run: node tests/trace-bearer-postgres.mjs
+
+  python-catalog:
+    name: Recheck all 50 original Python stdout answers
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: services/fastapi-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install FastAPI test dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run original 50 snippet checks and full FastAPI regression suite
+        run: python -m pytest -q

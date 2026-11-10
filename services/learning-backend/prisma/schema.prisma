@@ -54,6 +54,7 @@ model User {
   submissions        Submission[]
   completions        ProblemCompletion[]
   lessonProgress     LessonProgress[]
+  traceAttempts      TraceAttempt[]
   copyAttempts       CopyAttempt[]
   copyCompletions    CopyCompletion[]
   rewards            RewardLedger[]
@@ -206,6 +207,20 @@ model CopyCompletion {
   user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   exercise    CopyExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
   @@unique([userId, exerciseId])
+}
+
+// User-owned guesses for trusted, static Python Trace catalog entries.
+// exerciseId intentionally has no database FK; catalog IDs live in JSON files.
+model TraceAttempt {
+  id              String   @id @default(uuid())
+  userId          String
+  exerciseId      String
+  submittedOutput String   @db.Text
+  isCorrect       Boolean
+  createdAt       DateTime @default(now())
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, exerciseId, createdAt])
 }
 
 model RewardLedger {
