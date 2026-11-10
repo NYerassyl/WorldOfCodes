@@ -58,6 +58,7 @@ test('GET /battle/state returns active match and queue recovery state', async ()
   } } };
   const router = createBattleRouter(prisma, (_req, _res, next) => next(), { queue });
   const handler = routeHandler(router, 'get', '/battle/state');
+  assert.equal(handler.length, 3, 'recovery endpoint handler is asyncRoute(req, res, next)');
   let response;
   await handler({ auth: { userId: 'player-1' } }, {
     json(payload) { response = payload; return this; }
