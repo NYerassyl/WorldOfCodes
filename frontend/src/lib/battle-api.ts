@@ -32,7 +32,7 @@ export type PublicBattleProblem = {
   starterCode: string;
   rewardXp: number;
   rewardCoins: number;
-  testCases: { argsJson: string; expectedJson: string }[];
+  examples: { args: unknown[]; expected: unknown }[];
 };
 export type Rating = { points: number; wins: number; losses: number; draws: number };
 export type Invite = { matchId: string; inviteCode: string; expiresInSeconds: number };
@@ -47,6 +47,11 @@ export type Verdict = {
 export type RankedQueueResult =
   | { status: "QUEUED"; ticketId: string }
   | { status: "MATCHED"; match: BattleMatch };
+export type QueueState =
+  | { status: "NOT_QUEUED" }
+  | { status: "QUEUED"; ticketId: string; position: number; joinedAt: string }
+  | { status: "MATCHMAKING" };
+export type BattleStateSnapshot = { match: BattleMatch | null; queue: QueueState };
 
 let baseUrl = "/api";
 export function configureBattleApi(options: { baseUrl?: string }) {
@@ -94,6 +99,10 @@ async function request<T>(
 
 export function getBattleMatch(id: string, signal?: AbortSignal) {
   return request<BattleMatch>(`/battle/matches/${encodeURIComponent(id)}`, { signal });
+}
+/** Authoritative recovery snapshot: the active match and queue ticket for this account. */
+export function getBattleState(signal?: AbortSignal) {
+  return request<BattleStateSnapshot>("/battle/state", { signal });
 }
 export async function getBattleProblem(id: string, signal?: AbortSignal) {
   const result = await request<{ problem: PublicBattleProblem }>(`/problems/${encodeURIComponent(id)}`, { signal });

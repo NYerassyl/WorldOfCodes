@@ -1,358 +1,537 @@
-import { useEffect, useState } from "react";
-import { useStore } from "../lib/store";
-import { problems, difficultyNames } from "../lib/data";
-import { Heading, Editor, Notice, Modal, Icon } from "../components/UI";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { useAuth, getToken, setToken } from "../lib/auth";
+import { BattleSession } from "../lib/battle-session";
+import type { BattleMatch } from "../lib/battle-api";
+import { Heading, Editor, Notice, Icon } from "../components/UI";
+import "../components/battle/battle.css";
+
 export default function Arena({ friendly = false }: { friendly?: boolean }) {
-  const { state, draft } = useStore();
-  const [topic, setTopic] = useState("Arrays");
-  const [difficulty, setDifficulty] = useState("easy");
-  const [active, setActive] = useState(false);
-  const [deadline, setDeadline] = useState(0);
-  const [remaining, setRemaining] = useState(900);
-  const [modal, setModal] = useState(false);
-  const [room, setRoom] = useState("");
-  const [roomMessage, setRoomMessage] = useState("");
-  const [roomTab, setRoomTab] = useState("create");
-  const problem = problems.find(
-    (p) => p.topic === topic && p.difficulty === difficulty,
-  );
-  useEffect(() => {
-    if (!active) return;
-    const timer = setInterval(
-      () =>
-        setRemaining(Math.max(0, Math.ceil((deadline - Date.now()) / 1000))),
-      500,
-    );
-    return () => clearInterval(timer);
-  }, [active, deadline]);
-  if (active && problem)
+  const auth = useAuth();
+  const token = getToken();
+  if (auth.status === "loading") return <Notice>Restoring your session…</Notice>;
+  if (auth.status !== "authenticated" || !auth.user || !token)
     return (
       <>
         <Heading
-          title="Your practice arena"
-          description="Solo rehearsal. No opponent or rating changes in this preview."
-        >
-          <span className="timer">
-            ◷{" "}
-            {Math.floor(remaining / 60)
-              .toString()
-              .padStart(2, "0")}
-            :{(remaining % 60).toString().padStart(2, "0")}
-          </span>
-        </Heading>
-        <div className="match-strip">
-          <span className="avatar small">{state.avatar}</span>
-          <strong>{state.name}</strong>
-          <span>VS</span>
-          <span className="avatar small ghost">?</span>
-          <strong>No opponent connected</strong>
-          <button className="btn secondary" onClick={() => setModal(true)}>
-            End rehearsal
-          </button>
-        </div>
-        {remaining === 0 && (
-          <div className="result" role="status">
-            Time is up. Your draft is saved. No match result is recorded.
-          </div>
-        )}
-        <div className="two-cols">
-          <section className="panel">
-            <span className={`difficulty ${problem.difficulty}`}>
-              {difficultyNames[problem.difficulty]}
-            </span>
-            <h2 style={{ marginTop: 20 }}>{problem.title}</h2>
-            <p>{problem.description}</p>
-            <pre className="code">
-              Input: {problem.input}
-              {"\n"}Output: {problem.output}
-            </pre>
-            <Notice>
-              Practice writing your solution. Code evaluation is not available
-              in this preview.
-            </Notice>
-          </section>
-          <section>
-            <Editor
-              value={state.drafts[`arena:${problem.id}`] ?? problem.starter}
-              onChange={(v) => draft(`arena:${problem.id}`, v)}
-            />
-            <div className="inline-actions">
-              <button className="btn" disabled>
-                Submit solution
-              </button>
-              <span className="muted">Live evaluation coming soon</span>
-            </div>
-          </section>
-        </div>
-        {modal && (
-          <Modal
-            title="Finish this practice session?"
-            onClose={() => setModal(false)}
-          >
-            <p>
-              Your code draft stays saved in this browser. Your rating will not
-              change.
-            </p>
-            <button
-              className="btn"
-              onClick={() => {
-                setActive(false);
-                setModal(false);
-              }}
-            >
-              Finish session
+          title={friendly ? "Bring a friend." : "Meet your next challenge."}
+          description="Real opponents. One Python problem. Results recorded by the server."
+        />
+        <section className="panel battle-signin">
+          <Icon name={friendly ? "friends" : "duel"} />
+          <h2>Sign in to enter the arena.</h2>
+          <p>
+            Your account connects you to live matchmaking and your saved battle
+            results. Learning XP and coins stay separate from battle rating.
+          </p>
+          <a className="btn" href="#profile">
+            Go to account
+          </a>
+          {auth.status === "unavailable" && (
+            <button className="btn secondary" onClick={() => void auth.retry()}>
+              Retry session
             </button>
-          </Modal>
-        )}
+          )}
+        </section>
       </>
     );
   return (
-    <>
-      <Heading
-        title={friendly ? "Better with a rival." : "Meet your next challenge."}
-        description={
-          friendly
-            ? "Challenge a friend. Learn from each other."
-            : "Pick your topic. Set your difficulty. Find your focus."
-        }
-      />
-      <div className="two-cols">
-        <section className="panel">
-          <span className="eyebrow">
-            {friendly ? "FRIENDLY MATCH" : "SOLO · 1 VS 1"}
+    <BattleRuntime
+      key={`${auth.user.id}:${token}`}
+      friendly={friendly}
+      userId={auth.user.id}
+    />
+  );
+}
+
+function BattleRuntime({
+  friendly,
+  userId,
+}: {
+  friendly: boolean;
+  userId: string;
+}) {
+  const { retry } = useAuth();
+  const [session, setSession] = useState<BattleSession | null>(null);
+  useEffect(() => {
+    let storage: Storage | null = null;
+    try {
+      storage = localStorage;
+    } catch {
+      /* Private browsing may deny storage. */
+    }
+    const next = new BattleSession({
+      userId,
+      storage,
+      onExpired: () => {
+        setToken(null);
+        void retry();
+      },
+    });
+    setSession(next);
+    next.start();
+    return () => next.stop();
+  }, [userId, retry]);
+  return session ? (
+    <BattleView session={session} friendly={friendly} userId={userId} />
+  ) : (
+    <Notice>Connecting to the arena…</Notice>
+  );
+}
+
+function Players({ match, userId }: { match: BattleMatch; userId: string }) {
+  return (
+    <div className="battle-players" aria-label="Match participants">
+      {match.players.map((player) => (
+        <div className="battle-player" key={player.userId}>
+          <span className="avatar small" aria-hidden="true">
+            {player.user.nickname.slice(0, 1).toUpperCase()}
           </span>
-          <div className="arena-stage">
-            <div className="arena-symbol">
-              <Icon name={friendly ? "friends" : "duel"} />
-            </div>
-            <h2>
-              {friendly
-                ? "A little friendly competition."
-                : "One problem. Your best thinking."}
-            </h2>
-            <p className="muted">
-              {friendly
-                ? "Friendly matches never change your rating."
-                : "Same problem. Same clock. Your solution."}
-            </p>
-            <div className="versus">
-              <div>
-                <span className={`avatar frame-${state.frame}`}>
-                  {state.avatar}
-                </span>
-                <b>{state.name}</b>
-                <small>You</small>
-              </div>
-              <strong>VS</strong>
-              <div>
-                <span className="avatar ghost">?</span>
-                <b>{friendly ? "Your friend" : "Opponent"}</b>
-                <small>Not connected</small>
-              </div>
-            </div>
+          <div>
+            <strong>{player.user.nickname}</strong>
+            <small>{player.userId === userId ? "You" : "Opponent"}</small>
           </div>
-          <Notice>
-            {friendly
-              ? "Live private rooms are coming soon. Explore the format with a solo rehearsal for now."
-              : "Live matchmaking is coming soon. Explore the arena with a solo rehearsal for now."}
-          </Notice>
-        </section>
-        <section className="panel">
-          {friendly && (
-            <div className="tabbar" role="tablist" aria-label="Room options">
-              <button
-                role="tab"
-                aria-selected={roomTab === "create"}
-                className={roomTab === "create" ? "selected" : ""}
-                onClick={() => {
-                  setRoomTab("create");
-                  setRoomMessage("");
-                }}
-              >
-                Create a room
-              </button>
-              <button
-                role="tab"
-                aria-selected={roomTab === "join"}
-                className={roomTab === "join" ? "selected" : ""}
-                onClick={() => {
-                  setRoomTab("join");
-                  setRoomMessage("");
-                }}
-              >
-                Join with a code
-              </button>
-            </div>
+          <div className="battle-player-result">
+            <span>
+              {player.verdict?.replaceAll("_", " ") ?? "No accepted submission"}
+            </span>
+            {match.type === "RANKED" && match.status === "COMPLETED" && (
+              <strong>
+                {player.ratingDelta === null || player.ratingDelta === undefined
+                  ? "Rating pending"
+                  : `${player.ratingDelta > 0 ? "+" : ""}${player.ratingDelta} rating`}
+              </strong>
+            )}
+          </div>
+        </div>
+      ))}
+      {match.players.length < 2 && (
+        <div className="battle-player">
+          <span className="avatar small ghost">?</span>
+          <div>
+            <strong>Waiting for your friend</strong>
+            <small>Share your invitation code</small>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BattleView({
+  session,
+  friendly,
+  userId,
+}: {
+  session: BattleSession;
+  friendly: boolean;
+  userId: string;
+}) {
+  const state = useSyncExternalStore(session.subscribe, session.getSnapshot);
+  const [inviteCode, setInviteCode] = useState("");
+  const [restoreId, setRestoreId] = useState("");
+  const [copied, setCopied] = useState("");
+  const { match, problem, busy } = state;
+  const locked = Boolean(busy);
+  const terminal = Boolean(
+    match && !["ACTIVE", "PENDING"].includes(match.status),
+  );
+  const me = match?.players.find((player) => player.userId === userId);
+  const canSubmit =
+    match?.status === "ACTIVE" &&
+    problem &&
+    !locked &&
+    !me?.submittedAt &&
+    Boolean(state.code.trim()) &&
+    state.code.length <= 20000;
+  const copyInvite = async () => {
+    try {
+      await navigator.clipboard.writeText(state.invite!.inviteCode);
+      setCopied("Invitation code copied.");
+    } catch {
+      setCopied("Clipboard unavailable. Select the invitation code and copy it manually.");
+    }
+  };
+  const resultHeading =
+    match?.status === "COMPLETED"
+      ? match.winnerId
+        ? `${match.players.find((player) => player.userId === match.winnerId)?.user.nickname ?? "A player"} won.`
+        : "Match completed. No winner recorded."
+      : match?.status === "EXPIRED"
+        ? "This invitation has expired."
+        : "This match was cancelled.";
+  return (
+    <div className="battle-page">
+      <Heading
+        title={
+          match
+            ? match.type === "FRIENDLY"
+              ? "A friendly rivalry."
+              : "The arena is yours."
+            : friendly
+              ? "Better with a rival."
+              : "Meet your next challenge."
+        }
+        description={
+          match
+            ? "Server-verified Python battles. No client-calculated results."
+            : friendly
+              ? "Invite a friend. Same problem, no rating at stake."
+              : "One opponent. One problem. Your best thinking."
+        }
+      >
+        <div className="battle-connection" role="status">
+          <span
+            className={`battle-dot ${
+              state.connection === "synced"
+                ? "online"
+                : state.connection === "offline"
+                  ? "offline"
+                  : ""
+            }`}
+          />
+          {state.connection === "synced"
+            ? "Synced with server"
+            : state.connection === "connecting"
+              ? "Syncing…"
+              : "Server connection lost"}
+          {state.connection !== "synced" && (
+            <button className="battle-text-button" onClick={session.reload}>
+              Retry
+            </button>
           )}
-          {friendly && roomTab === "join" ? (
-            <form
-              className="profile-form"
-              onSubmit={(e) => {
-                e.preventDefault();
-                setRoomMessage(
-                  /^[A-Z0-9]{6}$/.test(room)
-                    ? "Valid code format. Live room lookup is not available yet."
-                    : "Enter a 6-character code using letters A–Z and numbers.",
-                );
-              }}
-            >
-              <h2>Have an invite?</h2>
-              <label>
-                Room code
-                <input
-                  placeholder="ABC123"
-                  value={room}
-                  maxLength={6}
-                  onChange={(e) => setRoom(e.target.value.toUpperCase())}
-                  autoComplete="off"
-                  required
-                />
-              </label>
-              <button className="btn" type="submit">
-                Validate code
-              </button>
-              {roomMessage && (
-                <p className="result" role="status">
-                  {roomMessage}
+        </div>
+      </Heading>
+      {state.error && (
+        <div className="battle-error" role="alert">
+          <span>{state.error}</span>
+          <button onClick={session.dismissError} aria-label="Dismiss battle error">
+            ×
+          </button>
+        </div>
+      )}
+      {state.notice && (
+        <div className="notice" role="status">
+          {state.notice}
+        </div>
+      )}
+      {state.matchId && !match && (
+        <section className="panel" aria-busy="true">
+          <h2>Restoring the server match…</h2>
+          <p>
+            Match ID: <code className="battle-id">{state.matchId}</code>
+          </p>
+          <div className="inline-actions">
+            <button className="btn secondary" onClick={session.reload}>
+              Retry match
+            </button>
+            <button className="battle-text-button" disabled={locked} onClick={session.clearMatch}>
+              Clear unavailable saved reference
+            </button>
+          </div>
+        </section>
+      )}
+      {match && (
+        <>
+          <div className="battle-match-meta">
+            <span className="eyebrow">
+              {match.type} · {match.status}
+            </span>
+            <span>
+              Match ID: <code className="battle-id">{match.id}</code>
+            </span>
+            <button className="battle-text-button" onClick={session.reload}>
+              Refresh server state
+            </button>
+          </div>
+          <Players match={match} userId={userId} />
+          {match.type === "FRIENDLY" && (
+            <Notice>
+              Friendly match: no rating changes. Battle results do not award
+              learning XP or coins.
+            </Notice>
+          )}
+          {match.status === "PENDING" && (
+            <section className="panel battle-invite-panel">
+              <span className="eyebrow">WAITING FOR PLAYER TWO</span>
+              <h2>Your friend has a seat.</h2>
+              {state.invite ? (
+                <>
+                  <p>
+                    Share this private invitation. Invitations last 30 minutes
+                    from creation and can only be used once.
+                  </p>
+                  <label htmlFor="battle-share-code">Invitation code</label>
+                  <div className="battle-input-row">
+                    <input
+                      id="battle-share-code"
+                      readOnly
+                      value={state.invite.inviteCode}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                    <button className="btn secondary" onClick={() => void copyInvite()}>
+                      Copy code
+                    </button>
+                  </div>
+                  <p role="status" className="muted">
+                    {copied || "The match starts when your friend joins."}
+                  </p>
+                </>
+              ) : (
+                <p>
+                  Waiting for the second player. The match starts as soon as the
+                  invitation is accepted.
                 </p>
               )}
-            </form>
-          ) : (
-            <>
-              <h2>Make it your match</h2>
-              <div className="profile-form">
-                <label>
-                  Topic
-                  <select
-                    value={topic}
-                    onChange={(e) => setTopic(e.target.value)}
-                  >
-                    {[...new Set(problems.map((p) => p.topic))].map((t) => (
-                      <option key={t}>{t}</option>
+              <Notice>
+                Closing or refreshing this page does not cancel the invitation;
+                the server restores it when you come back.
+              </Notice>
+            </section>
+          )}
+          {terminal && (
+            <section className="battle-result" role="status">
+              <span className="eyebrow">SERVER RESULT</span>
+              <h2>{resultHeading}</h2>
+              <p>
+                {match.type === "FRIENDLY"
+                  ? "Your rating is unchanged."
+                  : "Rating changes above are read from the settled match."}
+              </p>
+              <button className="btn" disabled={locked} onClick={session.clearMatch}>
+                Back to matchmaking
+              </button>
+            </section>
+          )}
+          {match.status === "ACTIVE" && (
+            <div className="two-cols battle-workspace">
+              <section className="panel" aria-busy={!problem}>
+                {problem ? (
+                  <>
+                    <span className={`difficulty ${problem.difficulty.toLowerCase()}`}>
+                      {problem.difficulty}
+                    </span>
+                    <h2>{problem.title}</h2>
+                    <p className="battle-statement">{problem.statement}</p>
+                    <h3>Public examples</h3>
+                    {problem.examples.map((sample, index) => (
+                      <pre className="code" key={index}>
+                        Arguments: {JSON.stringify(sample.args)}
+                        {"\n"}Returns: {JSON.stringify(sample.expected)}
+                      </pre>
                     ))}
-                  </select>
-                </label>
-                <label>
-                  Difficulty
-                  <select
-                    value={difficulty}
-                    onChange={(e) => setDifficulty(e.target.value)}
-                  >
-                    {Object.entries(difficultyNames).map(([k, v]) => (
-                      <option key={k} value={k}>
-                        {v}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <div className="match-details">
-                  <span>
-                    Format <b>1 vs 1</b>
-                  </span>
-                  <span>
-                    Practice time <b>15 minutes</b>
-                  </span>
-                  <span>
-                    Rating{" "}
-                    <b>
-                      {friendly ? "Unchanged" : "Available with live matches"}
-                    </b>
-                  </span>
-                </div>
-                {!problem && (
-                  <p className="result">
-                    No preview problem for this combination. Try another topic
-                    or difficulty.
-                  </p>
+                    <Notice>
+                      Write the complete <code>{problem.functionName}</code> Python
+                      function. Return the result, do not read stdin. Hidden tests
+                      stay on the server.
+                    </Notice>
+                  </>
+                ) : (
+                  <>
+                    <h2>Loading the problem…</h2>
+                    <p>The starter function comes from the public problem API.</p>
+                    <button className="btn secondary" onClick={session.reload}>
+                      Retry problem
+                    </button>
+                  </>
                 )}
+              </section>
+              <section className="battle-solution" aria-label="Python solution">
+                <Editor
+                  title="solution.py · Python"
+                  value={state.code}
+                  onChange={session.setCode}
+                  placeholder="Loading the server starter function…"
+                />
+                <div className="inline-actions">
+                  <button
+                    className="btn"
+                    disabled={!canSubmit}
+                    onClick={() => void session.submit()}
+                  >
+                    {busy === "submit" ? "Judging…" : "Submit full function"}
+                  </button>
+                  <small className="muted">
+                    {state.code.length.toLocaleString()} / 20,000 characters
+                  </small>
+                </div>
+                {state.verdict && (
+                  <div className="battle-verdict" role="status">
+                    <strong>{state.verdict.status.replaceAll("_", " ")}</strong>
+                    <span>
+                      {state.verdict.passedCases} / {state.verdict.totalCases} tests
+                      passed
+                    </span>
+                    <p>
+                      {state.verdict.status === "ACCEPTED"
+                        ? "The server checks the authoritative match result after every accepted solution."
+                        : "Edit your function and try again while this match is active."}
+                    </p>
+                  </div>
+                )}
+                <p className="muted battle-presence">
+                  Opponent presence is not reported by this server. The match only
+                  ends when the server records a result.
+                </p>
+              </section>
+            </div>
+          )}
+          {state.syncedAt && (
+            <p className="muted battle-sync">
+              Last server check:{" "}
+              {new Date(state.syncedAt).toLocaleTimeString("en-GB")}. Active matches
+              refresh every 2.5 seconds.
+            </p>
+          )}
+        </>
+      )}
+      {!state.matchId && (
+        <div className="two-cols">
+          <section className="panel">
+            <span className="eyebrow">{friendly ? "FRIENDLY MATCH" : "RANKED · 1 VS 1"}</span>
+            <div className="arena-stage">
+              <div className="arena-symbol">
+                <Icon name={friendly ? "friends" : "duel"} />
+              </div>
+              <h2>
+                {friendly
+                  ? "A little friendly competition."
+                  : "One problem. Your best thinking."}
+              </h2>
+              <p className="muted">
+                {friendly
+                  ? "Bring someone who makes you think."
+                  : "The first accepted solution wins. The server settles the rating."}
+              </p>
+            </div>
+            <div className="battle-rating">
+              <span>Your server rating</span>
+              <strong>{state.rating?.points ?? "…"}</strong>
+              <small>
+                {state.rating
+                  ? `${state.rating.wins} wins · ${state.rating.losses} losses · ${state.rating.draws} draws`
+                  : "Loading from your account"}
+              </small>
+            </div>
+            <Notice>
+              No topic filters, spectator access or beginner rating protection in
+              this version. Python functions only.
+            </Notice>
+          </section>
+          <section className="panel battle-controls">
+            {state.queue !== "idle" ? (
+              <>
+                <span className="eyebrow">
+                  {state.queue === "queued" ? "MATCHMAKING" : "QUEUE UNCONFIRMED"}
+                </span>
+                <h2>
+                  {state.queue === "queued"
+                    ? "Finding your next rival…"
+                    : "Check your queue connection."}
+                </h2>
+                <p>
+                  Keep this page open. Cancel before switching modes or trying
+                  again.
+                </p>
+                <button
+                  className="btn secondary"
+                  disabled={locked}
+                  onClick={() => void session.leaveRanked()}
+                >
+                  {busy === "leave" ? "Cancelling…" : "Cancel queue"}
+                </button>
+              </>
+            ) : friendly ? (
+              <>
+                <h2>Invite or join.</h2>
+                <p>Create a one-use code for a private match.</p>
                 <button
                   className="btn"
-                  disabled={!problem}
-                  onClick={() => {
-                    setDeadline(Date.now() + 900000);
-                    setRemaining(900);
-                    setActive(true);
+                  disabled={locked}
+                  onClick={() => void session.createInvite()}
+                >
+                  {busy === "invite" ? "Creating invitation…" : "Create invitation"}
+                </button>
+                <div className="battle-divider">or join a friend</div>
+                <form
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    void session.joinInvite(inviteCode);
                   }}
                 >
-                  Start a rehearsal →
-                </button>
-                <p className="screen-label">
-                  {friendly
-                    ? "Rehearsal does not create an online room."
-                    : "Rehearsal does not join the matchmaking queue."}
+                  <label htmlFor="battle-invite-code">Invitation code</label>
+                  <input
+                    id="battle-invite-code"
+                    value={inviteCode}
+                    onChange={(event) => setInviteCode(event.target.value)}
+                    autoComplete="off"
+                    autoCapitalize="characters"
+                    maxLength={128}
+                    required
+                  />
+                  <button
+                    className="btn secondary"
+                    disabled={locked || !inviteCode.trim()}
+                  >
+                    {busy === "join" ? "Joining…" : "Join invitation"}
+                  </button>
+                </form>
+              </>
+            ) : (
+              <>
+                <h2>Ready when you are.</h2>
+                <p>
+                  Join the shared queue. Both players receive the same
+                  server-selected problem.
                 </p>
-              </div>
-            </>
-          )}
-        </section>
-      </div>
-      <section className="how-it-works">
-        <div className="section-head">
-          <div>
-            <span className="eyebrow">HOW IT WORKS</span>
-            <h2>
-              {friendly
-                ? "A private room. Zero pressure."
-                : "From focus to first move."}
-            </h2>
-          </div>
+                <button
+                  className="btn"
+                  disabled={locked || state.connection === "offline"}
+                  onClick={() => void session.joinRanked()}
+                >
+                  {busy === "queue" ? "Joining queue…" : "Find ranked opponent"}
+                </button>
+                <p className="muted">
+                  Queue positions expire after about a minute. A lost answer is
+                  never treated as a confirmed match.
+                </p>
+              </>
+            )}
+            <a className="battle-mode-link" href={friendly ? "#duel" : "#friends"}>
+              {friendly ? "Go to ranked arena" : "Play a friendly match"}{" "}
+              <Icon name="arrow" />
+            </a>
+            <details className="battle-recovery">
+              <summary>Restore a match by ID</summary>
+              <p>
+                An active match and your queue ticket recover automatically from
+                the server when this page loads. If you saved a match ID from
+                another browser, paste it here.
+              </p>
+              <form
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void session.recoverMatch(restoreId);
+                }}
+              >
+                <label htmlFor="battle-restore-id">Match ID</label>
+                <input
+                  id="battle-restore-id"
+                  value={restoreId}
+                  onChange={(event) => setRestoreId(event.target.value)}
+                  required
+                  maxLength={128}
+                />
+                <button
+                  className="btn secondary"
+                  disabled={locked || !restoreId.trim() || state.queue !== "idle"}
+                >
+                  Restore match
+                </button>
+              </form>
+            </details>
+          </section>
         </div>
-        <div className="step-grid">
-          {(friendly
-            ? [
-                {
-                  title: "Create a private room",
-                  body: "Pick a topic and difficulty, then share the six-character room code.",
-                },
-                {
-                  title: "Both players ready up",
-                  body: "The match begins only when both sides are ready. No third player can join.",
-                },
-                {
-                  title: "Solve side by side",
-                  body: "Same problem, same clock. Friendly results never touch your rating.",
-                },
-              ]
-            : [
-                {
-                  title: "Choose your focus",
-                  body: "Filter by topic and difficulty to line up the challenge you want.",
-                },
-                {
-                  title: "Get matched",
-                  body: "A rival receives the same problem and the same server-timed clock.",
-                },
-                {
-                  title: "Solve it first",
-                  body: "The first correct solution wins. Equal outcomes end in a draw.",
-                },
-              ]
-          ).map((step, i) => (
-            <article className="step-card" key={step.title}>
-              <span className="step-number">0{i + 1}</span>
-              <h3>{step.title}</h3>
-              <p>{step.body}</p>
-            </article>
-          ))}
-        </div>
-        <div className="rating-note">
-          <span className="rating-note-icon">
-            <Icon name={friendly ? "friends" : "trophy"} />
-          </span>
-          <div>
-            <strong>
-              {friendly
-                ? "Friendly battles are always unrated."
-                : "Rating stays separate from learning XP."}
-            </strong>
-            <p>
-              {friendly
-                ? "Play as often as you like. Nothing here affects your competitive standing."
-                : "New-player protection and rating thresholds will be configured before live matches launch."}
-            </p>
-          </div>
-        </div>
-      </section>
-    </>
+      )}
+    </div>
   );
 }
