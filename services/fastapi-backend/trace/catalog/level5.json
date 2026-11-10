@@ -1,0 +1,112 @@
+[
+  {
+    "id": "trace-5-01",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Backtrack to Target Five",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "path = []\ndef search(start, remaining):\n    if remaining == 0:\n        print(path[:])\n        return\n    for value in range(start, 5):\n        if value > remaining:\n            break\n        path.append(value)\n        search(value + 1, remaining - value)\n        path.pop()\nsearch(1, 5)\nprint(\"restored\", path)",
+    "expected_stdout": "[1, 4]\n[2, 3]\nrestored []\n",
+    "explanation": "Depth-first search first reaches [1,4], then [2,3]. pop restores the shared path after every recursive call, so it ends empty."
+  },
+  {
+    "id": "trace-5-02",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "DFS Neighbor Ordering",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "graph = {\"A\": [\"B\", \"C\"], \"B\": [\"D\"], \"C\": [\"D\", \"E\"], \"D\": [], \"E\": []}\nvisited = set()\ndef dfs(node):\n    if node in visited:\n        return\n    visited.add(node)\n    print(\"enter\", node)\n    for next_node in graph[node]:\n        dfs(next_node)\n    if node in (\"B\", \"C\"):\n        print(\"leave\", node)\ndfs(\"A\")\nprint(\"count\", len(visited))",
+    "expected_stdout": "enter A\nenter B\nenter D\nleave B\nenter C\nenter E\nleave C\ncount 5\n",
+    "explanation": "DFS visits B and D before exploring C. D is skipped when reached again from C; leave prints happen after each selected node's children."
+  },
+  {
+    "id": "trace-5-03",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Filtered Permutations",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "used = [False, False, False]\npath = []\nitems = [1, 2, 3]\ndef visit():\n    if len(path) == 3:\n        if path[0] + path[-1] == 4:\n            print(*path)\n        return\n    for index, value in enumerate(items):\n        if used[index]:\n            continue\n        used[index] = True\n        path.append(value)\n        visit()\n        path.pop()\n        used[index] = False\nvisit()",
+    "expected_stdout": "1 2 3\n3 2 1\n",
+    "explanation": "Only permutations with first plus last equal to four are printed. The boolean used flags and path entries are restored after recursion."
+  },
+  {
+    "id": "trace-5-04",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Subsets Without Neighbors",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "chosen = []\nnumbers = [1, 2, 3, 4]\ndef build(index):\n    if index == len(numbers):\n        if len(chosen) == 2:\n            print(chosen[:])\n        return\n    build(index + 1)\n    if not chosen or chosen[-1] != numbers[index] - 1:\n        chosen.append(numbers[index])\n        build(index + 1)\n        chosen.pop()\nbuild(0)\nprint(\"end\", chosen)",
+    "expected_stdout": "[2, 4]\n[1, 4]\n[1, 3]\nend []\n",
+    "explanation": "Skip-first recursion means larger-index choices are considered first. Adjacent selected numbers are rejected; pop restores chosen after each include branch."
+  },
+  {
+    "id": "trace-5-05",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Memoized Branch Count",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "memo = {0: 1, 1: 1}\ndef ways(n):\n    if n in memo:\n        return memo[n]\n    left = ways(n - 1)\n    right = ways(n - 2)\n    memo[n] = left + right\n    print(\"cache\", n, memo[n])\n    return memo[n]\nanswer = ways(5)\nprint(\"answer\", answer)\nprint(\"keys\", sorted(memo))",
+    "expected_stdout": "cache 2 2\ncache 3 3\ncache 4 5\ncache 5 8\nanswer 8\nkeys [0, 1, 2, 3, 4, 5]\n",
+    "explanation": "Cache entries are printed after both smaller calls complete. Repeated subproblems return from memo without additional print."
+  },
+  {
+    "id": "trace-5-06",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Backtrack with a Running Sum",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "path = []\ndef walk(index, total):\n    if index == 3:\n        if total == 1:\n            print(\"match\", \"\".join(path))\n        return\n    for sign, change in [(\"+\", 1), (\"-\", -1)]:\n        path.append(sign)\n        walk(index + 1, total + change)\n        path.pop()\nwalk(0, 0)\nprint(\"depth\", len(path))",
+    "expected_stdout": "match ++-\nmatch +-+\nmatch -++\ndepth 0\n",
+    "explanation": "The plus branch is explored before the minus branch. Exactly two plus signs and one minus sign give a sum of one."
+  },
+  {
+    "id": "trace-5-07",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "DFS Paths with a Back Edge",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "graph = {\"A\": [\"B\", \"C\"], \"B\": [\"C\", \"D\"], \"C\": [\"A\", \"D\"], \"D\": []}\npath = []\ndef paths(node):\n    if node in path:\n        return\n    path.append(node)\n    if node == \"D\":\n        print(\"->\".join(path))\n    else:\n        for next_node in graph[node]:\n            paths(next_node)\n    path.pop()\npaths(\"A\")\nprint(path)",
+    "expected_stdout": "A->B->C->D\nA->B->D\nA->C->D\n[]\n",
+    "explanation": "The current path blocks cycles such as C→A without globally excluding C. Each backtrack pop allows other simple paths to D."
+  },
+  {
+    "id": "trace-5-08",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Pruned Number Partitions",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "parts = []\ndef split(rest, smallest):\n    if rest == 0:\n        if len(parts) == 2:\n            print(parts[:])\n        return\n    for number in range(smallest, rest + 1):\n        if len(parts) >= 2:\n            break\n        parts.append(number)\n        split(rest - number, number)\n        parts.pop()\nsplit(5, 1)\nprint(\"clear\", parts)",
+    "expected_stdout": "[1, 4]\n[2, 3]\nclear []\n",
+    "explanation": "Nondecreasing parts prevent duplicate partitions. Length pruning stops deeper branches; pop restores parts before the next candidate."
+  },
+  {
+    "id": "trace-5-09",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Memoized Grid Routes",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "cache = {}\nblocked = {(1, 1)}\ndef count(r, c):\n    if (r, c) in blocked:\n        return 0\n    if r == 2 and c == 2:\n        return 1\n    if r > 2 or c > 2:\n        return 0\n    if (r, c) not in cache:\n        cache[(r, c)] = count(r + 1, c) + count(r, c + 1)\n        print(\"memo\", r, c, cache[(r, c)])\n    return cache[(r, c)]\nprint(\"paths\", count(0, 0))",
+    "expected_stdout": "memo 2 1 1\nmemo 2 0 1\nmemo 1 0 1\nmemo 1 2 1\nmemo 0 2 1\nmemo 0 1 1\nmemo 0 0 2\npaths 2\n",
+    "explanation": "The downward recursive call runs before the rightward one. A blocked center cell returns zero; each memo print occurs after its child calls."
+  },
+  {
+    "id": "trace-5-10",
+    "level": 5,
+    "difficulty": "hard",
+    "topic": "backtracking-dfs-memoization",
+    "title": "Tree Search with State Rollback",
+    "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
+    "code": "tree = {\"root\": [\"L\", \"R\"], \"L\": [\"LL\", \"LR\"], \"R\": [\"RL\"], \"LL\": [], \"LR\": [], \"RL\": []}\nweights = {\"root\": 1, \"L\": 2, \"R\": 3, \"LL\": 4, \"LR\": 1, \"RL\": 2}\npath = []\ndef visit(node, score):\n    path.append(node)\n    score += weights[node]\n    if not tree[node]:\n        if score % 2 == 1:\n            print(\"/\".join(path), score)\n    else:\n        for child in tree[node]:\n            visit(child, score)\n    path.pop()\nvisit(\"root\", 0)\nprint(\"rooted\", len(path))",
+    "expected_stdout": "root/L/LL 7\nrooted 0\n",
+    "explanation": "Leaves are visited left to right, and only odd-score leaves print. Shared path is restored by pop before returning to the parent."
+  }
+]
