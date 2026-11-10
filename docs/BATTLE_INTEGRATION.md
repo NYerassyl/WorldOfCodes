@@ -34,6 +34,7 @@ All routes are mounted under /api. Except the leaderboard, routes require the ex
 |---|---|---|
 | GET | /api/battle/leaderboard | Public rating leaderboard |
 | GET | /api/battle/rating/me | Current user's rating |
+| GET | /api/battle/state | Recover the caller's active match and ranked queue state |
 | POST | /api/battle/ranked/queue | Join ranked queue |
 | DELETE | /api/battle/ranked/queue | Leave ranked queue |
 | POST | /api/battle/friendly | Create a 30-minute invite |
@@ -47,7 +48,7 @@ REST submit body: { "code": "..." }. Unknown body keys are rejected. Source is l
 
 Connect using the existing token: io(API_ORIGIN, { auth: { token: opaqueSessionToken } }).
 
-The server hashes the opaque token with the shared SHA-256 helper and validates it at handshake and before every protected event. A revoked or expired session is rejected, disconnected and removed from queue when it is the user's last connected tab. Never trust a userId supplied by the client.
+The shared `resolveAuthSession` helper hashes the opaque token with SHA-256 and validates it at handshake and before every protected event. A revoked or expired session is rejected and disconnected with `SESSION_INVALID`; a session-store/database error fails closed with `SESSION_UNAVAILABLE`. In either case, the queue ticket is removed when this is the user's last connected tab. Never trust a userId supplied by the client.
 
 WebSocket Origin is checked against an explicit allowlist. Missing and unlisted origins are rejected. Configure allowedOrigins as an array of exact origins or a trusted predicate; do not use wildcard origins with credentials.
 
@@ -76,6 +77,7 @@ The public match snapshot is allowlisted and excludes source code, hidden tests 
 
 UNAUTHORIZED: invalid handshake session.
 SESSION_INVALID: session expired or revoked after connection.
+SESSION_UNAVAILABLE: session validation store is temporarily unavailable; the socket is disconnected.
 ALREADY_QUEUED: user already has a queue ticket.
 MATCHMAKING_IN_PROGRESS: pair creation is in progress.
 OPPONENT_SESSION_INVALID: waiting player's session is no longer active.
@@ -90,7 +92,7 @@ INTERNAL_ERROR: unexpected server failure.
 
 ## Reconnect and multiple tabs
 
-Reconnect using the opaque token. Re-fetch GET /api/battle/matches/:matchId after reconnect; REST is the authoritative snapshot. Rejoin the room with match:watch for realtime updates.
+Reconnect using the opaque token. Call GET /api/battle/state after initial load and every reconnect. It returns `{ match, queue }`, where `match` is the caller's active participant match or `null`, and `queue` is `QUEUED` (ticketId, position, joinedAt), `MATCHMAKING`, or `NOT_QUEUED`. If a match is returned, call GET /api/battle/matches/:matchId for its full public snapshot and rejoin the room with match:watch for realtime updates. The database is authoritative for active matches; the in-memory queue state is process-local and is lost on server restart.
 
 Multiple local tabs are tracked per authenticated user. Closing one tab does not remove another tab's queue ticket. The queue ticket is removed when the last local socket disconnects or its session is invalidated. Socket submission cooldown is keyed by userId rather than socket ID, so reconnecting or opening another tab does not reset it.
 
