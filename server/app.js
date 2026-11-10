@@ -22,6 +22,7 @@ import {
   AppError,
   errorMiddleware,
 } from "../services/learning-backend/src/lib/errors.js";
+import { createTraceRouter } from "../services/learning-backend/src/trace/router.js";
 import { readConfig } from "./config.js";
 import { createJudgeQueue } from "./judge-queue.js";
 
@@ -91,6 +92,7 @@ export function createApp({
     [
       "/problems/:id/submit",
       "/copy-exercises/:id/submit",
+      "/trace/exercises/:exerciseId/attempts",
       "/battle/matches/:matchId/submit",
     ],
     limiter(
@@ -110,6 +112,7 @@ export function createApp({
   api.use(createLearningRouter(prisma, auth));
   api.use(createProblemsRouter(prisma, auth, { judge: queuedJudge }));
   api.use(createCopyRouter(prisma, auth));
+  api.use(createTraceRouter(prisma, auth));
   api.use(
     createBattleRouter(prisma, auth, {
       queue: battleQueue,
