@@ -163,3 +163,43 @@ test('Socket.IO transport limit accepts max-code ASCII JSON and rejects multibyt
   assert.ok(Buffer.byteLength(maxCodeUtf8, 'utf8') > limit);
   assert.ok(Buffer.byteLength(transportOverflow, 'utf8') > limit);
 });
+
+
+test('match:submit rejects oversized match IDs without consuming the submission cooldown', async () => {
+  let matchLookupCalls = 0;
+  const prisma = {
+    authSession: { findUnique: async () => ({ ...session, userId: 'player-regression' }) },
+    match: {
+      findFirst: async () => {
+        matchLookupCalls += 1;
+        return null;
+      }
+    }
+  };
+  await attachBattleSocket({}, prisma, {
+    ServerClass: FakeSocketServer,
+    submissionCooldownMs: 60_000
+  });
+  const socket = await FakeSocketServer.instance.connect(validToken, 'player-regression');
+
+  let invalidAck;
+  await socket.trigger('match:submit', {
+    matchId: 'm'.repeat(129),
+    code: 'print("hello")'
+  }, result => { invalidAck = result; });
+
+  assert.equal(invalidAck.ok, false);
+  assert.equal(invalidAck.code, 'INVALID_INPUT');
+  assert.equal(matchLookupCalls, 0);
+
+  let validAck;
+  await socket.trigger('match:submit', {
+    matchId: 'valid-match-id',
+    code: 'print("hello")'
+  }, result => { validAck = result; });
+
+  assert.equal(validAck.ok, false);
+  assert.notEqual(validAck.code, 'RATE_LIMITED');
+  assert.equal(validAck.code, 'ACTIVE_MATCH_NOT_FOUND');
+  assert.equal(matchLookupCalls, 1);
+});
