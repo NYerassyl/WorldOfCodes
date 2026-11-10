@@ -54,7 +54,7 @@ test("match is raw, IDs are encoded, auth uses the shared opaque token", async (
 test("public problem unwraps only the documented problem envelope", async () => {
   const problem = { id: "p1", lessonId: null, title: "Sort", statement: "Sort values", language: "python",
     topicSlug: "sorting", difficulty: "EASY", functionName: "solve", starterCode: "def solve(nums):\n    pass\n",
-    rewardXp: 10, rewardCoins: 2, testCases: [{ argsJson: "[[2,1]]", expectedJson: "[1,2]" }] };
+    rewardXp: 10, rewardCoins: 2, examples: [{ args: [[2, 1]], expected: [1, 2] }] };
   payload = { problem };
   assert.deepEqual(await api.getBattleProblem("p/1"), problem);
   assert.equal(requests[0].url, "/api/problems/p%2F1");
