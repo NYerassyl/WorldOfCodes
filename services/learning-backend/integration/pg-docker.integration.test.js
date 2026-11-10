@@ -211,7 +211,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     await t.test('rating and battle models do not alter learning XP or coins',async()=>{
       const before=await prisma.user.findUnique({where:{id:user.id},select:{xp:true,coins:true}});
       const ratingsBefore=await prisma.rating.count();
-      const rating=await prisma.rating.create({data:{userId:user.id}});
+      const rating=await prisma.rating.upsert({where:{userId:user.id},create:{userId:user.id},update:{}});
       assert.equal(rating.points,1000);
       const after=await prisma.user.findUnique({where:{id:user.id},select:{xp:true,coins:true}});
       assert.deepEqual(after,before);
@@ -240,6 +240,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     });
     await t.test('missing Docker image causes 503 without accepted submission, reward, or winner',async()=>{
       const before=await prisma.submission.count({where:{userId:user.id}});
+      const completedMatchesBefore=await prisma.match.count({where:{status:'COMPLETED'}});
       const beforeXp=(await request('/users/me')).body.xp;
       const failApp=express();
       failApp.use(express.json());
@@ -260,7 +261,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       }finally{await new Promise(resolve=>otherServer.close(resolve))}
       assert.equal(await prisma.submission.count({where:{userId:user.id}}),before);
       assert.equal((await request('/users/me')).body.xp,beforeXp);
-      assert.equal(await prisma.match.count({where:{status:'COMPLETED'}}),0);
+      assert.equal(await prisma.match.count({where:{status:'COMPLETED'}}),completedMatchesBefore);
     });
     await t.test('logout revokes the HTTP and Socket.IO session, progress persists after next login',async()=>{
       const before=(await request('/users/me')).body;
