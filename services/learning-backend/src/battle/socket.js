@@ -1,4 +1,5 @@
 import { resolveAuthSession } from '../auth/session.js';
+import { resolveAuthSession } from '../auth/session.js';
 import { MatchmakingQueue } from './matchmaking.js';
 import { getMatchForUser, submitBattleSolution } from './service.js';
 
