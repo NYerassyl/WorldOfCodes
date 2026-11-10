@@ -168,3 +168,26 @@ before every test. It covers success paths plus `401`, `403`, `404`, `409`,
 Swagger does not have an Authorize button for this demo because identity is a
 plain header: expand an endpoint, choose **Try it out**, and add `X-User-Id` in
 the header fields before **Execute**.
+
+## Python Trace Practice (five levels, 50 exercises)
+
+The separate FastAPI module provides three additional endpoints:
+
+- `GET /api/trace/exercises` — list 50 exercises; filter using `level=1..5`,
+  `difficulty=easy|easy-medium|medium|medium-hard|hard`, and `topic`.
+- `GET /api/trace/exercises/{exercise_id}` — view English title,
+  instructions and fixed Python snippet, without the expected output.
+- `POST /api/trace/exercises/{exercise_id}/submit` — submit
+  `{"answer":"printed line 1\\nprinted line 2"}` with demo
+  `X-User-Id: 1`; returns correctness, actual expected output,
+  explanation and attempt number **after** submission.
+
+Inputs are embedded in 10–20-line deterministic snippets. This exercises
+hand-tracing only; players submit text, not runnable code. A user may omit
+the terminal newline from the typed answer; interior spaces and line breaks
+must match exactly. All explanations appear in English.
+
+`tests/test_trace_practice.py` executes all 50 repository snippets via
+Python subprocess and checks saved stdout, counts (10 per level), code
+length, answer privacy and the three API contracts. See
+`docs/PYTHON_TRACE_PRACTICE_GPT2.md` for five complete examples and CI.

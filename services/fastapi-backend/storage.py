@@ -83,6 +83,7 @@ class Storage:
 
     def reset(self) -> None:
         with self.lock:
+            self.trace_attempts: dict[tuple[int, str], int] = {}
             self.users: dict[int, UserRecord] = {}
             self.lessons: dict[int, LessonRecord] = {}
             self.completions: dict[tuple[int, int], CompletionRecord] = {}
