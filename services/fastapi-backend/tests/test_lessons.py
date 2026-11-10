@@ -163,3 +163,80 @@ def test_reset_missing_progress_returns_404(client):
     response = client.delete("/api/users/2/progress/1", headers=headers(2))
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "PROGRESS_NOT_FOUND"
+
+
+def test_complete_progress_requires_header_and_changes_nothing(client):
+    before_user = client.get("/api/users/2").json()
+    before_progress = client.get("/api/users/2/progress").json()
+
+    response = client.post("/api/users/2/progress", json={"lesson_id": 1})
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "AUTH_REQUIRED"
+    assert client.get("/api/users/2").json() == before_user
+    assert client.get("/api/users/2/progress").json() == before_progress
+
+
+def test_complete_progress_rejects_other_user_and_changes_nothing(client):
+    before_user = client.get("/api/users/1").json()
+    before_progress = client.get("/api/users/1/progress").json()
+
+    response = client.post(
+        "/api/users/1/progress", json={"lesson_id": 2}, headers=headers(2)
+    )
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+    assert client.get("/api/users/1").json() == before_user
+    assert client.get("/api/users/1/progress").json() == before_progress
+
+
+def test_complete_progress_owner_succeeds(client):
+    response = client.post(
+        "/api/users/2/progress", json={"lesson_id": 1}, headers=headers(2)
+    )
+    assert response.status_code == 201
+    assert response.json()["xp_awarded"] == 20
+    assert client.get("/api/users/2/progress").json()["completed_lessons"][0][
+        "lesson_id"
+    ] == 1
+
+
+def test_reset_progress_requires_header_and_changes_nothing(client):
+    client.post(
+        "/api/users/2/progress", json={"lesson_id": 1}, headers=headers(2)
+    )
+    before_user = client.get("/api/users/2").json()
+    before_progress = client.get("/api/users/2/progress").json()
+
+    response = client.delete("/api/users/2/progress/1")
+
+    assert response.status_code == 401
+    assert response.json()["error"]["code"] == "AUTH_REQUIRED"
+    assert client.get("/api/users/2").json() == before_user
+    assert client.get("/api/users/2/progress").json() == before_progress
+
+
+def test_reset_progress_rejects_other_user_and_changes_nothing(client):
+    client.post(
+        "/api/users/2/progress", json={"lesson_id": 1}, headers=headers(2)
+    )
+    before_user = client.get("/api/users/2").json()
+    before_progress = client.get("/api/users/2/progress").json()
+
+    response = client.delete("/api/users/2/progress/1", headers=headers(1))
+
+    assert response.status_code == 403
+    assert response.json()["error"]["code"] == "FORBIDDEN"
+    assert client.get("/api/users/2").json() == before_user
+    assert client.get("/api/users/2/progress").json() == before_progress
+
+
+def test_reset_progress_owner_succeeds(client):
+    client.post(
+        "/api/users/2/progress", json={"lesson_id": 1}, headers=headers(2)
+    )
+    response = client.delete("/api/users/2/progress/1", headers=headers(2))
+    assert response.status_code == 204
+    assert client.get("/api/users/2").json()["xp"] == 0
+    assert client.get("/api/users/2/progress").json()["completed_lessons"] == []

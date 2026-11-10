@@ -15,6 +15,7 @@ from services import (
     complete_lesson,
     create_lesson,
     delete_lesson,
+    ensure_progress_owner,
     get_lesson,
     get_progress,
     list_lessons,
@@ -83,7 +84,8 @@ def progress_route(user_id: int):
 
 
 @progress_router.post("/{user_id}/progress", response_model=CompletionResponse, status_code=201)
-def complete_lesson_route(user_id: int, payload: CompletionCreate):
+def complete_lesson_route(user_id: int, payload: CompletionCreate, actor_id: ActorId):
+    ensure_progress_owner(store, user_id, actor_id)
     completion, user = complete_lesson(store, user_id, payload.lesson_id)
     lesson = get_lesson(store, payload.lesson_id)
     return CompletionResponse(
@@ -97,5 +99,6 @@ def complete_lesson_route(user_id: int, payload: CompletionCreate):
 
 
 @progress_router.delete("/{user_id}/progress/{lesson_id}", status_code=204)
-def reset_lesson_route(user_id: int, lesson_id: int) -> None:
+def reset_lesson_route(user_id: int, lesson_id: int, actor_id: ActorId) -> None:
+    ensure_progress_owner(store, user_id, actor_id)
     reset_lesson(store, user_id, lesson_id)
