@@ -7,7 +7,18 @@ import { getActiveMatchForUser } from '../src/battle/service.js';
 function routeHandler(router, method, path) {
   const layer = router.stack.find(item => item.route?.path === path && item.route.methods[method]);
   assert.ok(layer, `Missing route ${method.toUpperCase()} ${path}`);
-  return layer.route.stack[0].handle;
+  // Protected Express routes register auth middleware before the async handler.
+  return layer.route.stack.at(-1).handle;
+}
+
+async function readBattleState({ prisma, queue, userId = 'player-1' }) {
+  const router = createBattleRouter(prisma, (_req, _res, next) => next(), { queue });
+  const handler = routeHandler(router, 'get', '/battle/state');
+  let response;
+  await handler({ auth: { userId } }, {
+    json(payload) { response = payload; return this; }
+  }, error => { throw error; });
+  return response;
 }
 
 test('queue state reports queued ticket, position, and not-queued state', () => {
@@ -47,24 +58,44 @@ test('active match recovery is scoped to the authenticated participant', async (
   assert.equal(query.orderBy.startedAt, 'desc');
 });
 
-test('GET /battle/state returns active match and queue recovery state', async () => {
-  const match = { id: 'match-1', status: 'ACTIVE', players: [{ userId: 'player-1' }] };
+test('re-entering Battle restores the waiting queue ticket and position', async () => {
   const queue = new MatchmakingQueue({});
   const ticket = { userId: 'player-1', ticketId: 'ticket-state', joinedAt: Date.now() };
   queue.waiting.set(ticket.ticketId, ticket);
-  const prisma = { match: { findFirst: async args => {
-    assert.deepEqual(args.where, { status: 'ACTIVE', players: { some: { userId: 'player-1' } } });
-    return match;
-  } } };
-  const router = createBattleRouter(prisma, (_req, _res, next) => next(), { queue });
-  const handler = routeHandler(router, 'get', '/battle/state');
-  let response;
-  await handler({ auth: { userId: 'player-1' } }, {
-    json(payload) { response = payload; return this; }
-  }, error => { throw error; });
-  assert.equal(response.match, match);
-  assert.deepEqual(response.queue, {
-    status: 'QUEUED', ticketId: ticket.ticketId, position: 1,
+  const prisma = { match: { findFirst: async () => null } };
+
+  // Simulate a fresh page load/reconnect: the client asks the recovery endpoint again.
+  const state = await readBattleState({ prisma, queue });
+  assert.equal(state.match, null);
+  assert.deepEqual(state.queue, {
+    status: 'QUEUED',
+    ticketId: ticket.ticketId,
+    position: 1,
     joinedAt: new Date(ticket.joinedAt).toISOString()
   });
+});
+
+test('re-entering Battle restores the active match from the database', async () => {
+  const activeMatch = {
+    id: 'match-active-1',
+    status: 'ACTIVE',
+    players: [{ userId: 'player-1' }, { userId: 'player-2' }]
+  };
+  // Queue is empty: the active match must be recovered from persistent DB state.
+  const queue = new MatchmakingQueue({});
+  const prisma = {
+    match: {
+      findFirst: async args => {
+        assert.deepEqual(args.where, {
+          status: 'ACTIVE',
+          players: { some: { userId: 'player-1' } }
+        });
+        return activeMatch;
+      }
+    }
+  };
+
+  const state = await readBattleState({ prisma, queue });
+  assert.deepEqual(state.match, activeMatch);
+  assert.deepEqual(state.queue, { status: 'NOT_QUEUED' });
 });
