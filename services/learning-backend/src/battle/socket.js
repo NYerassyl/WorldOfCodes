@@ -35,7 +35,7 @@ export async function attachBattleSocket(server, prisma, {
 } = {}) {
   const SocketServer = ServerClass || (await import('socket.io')).Server;
   const io = new SocketServer(server, {
-    cors, serveClient: false, maxHttpBufferSize: 16 * 1024,
+    cors, serveClient: false, maxHttpBufferSize: 32 * 1024,
     allowRequest: (request, callback) => callback(null, originAllowed(request.headers?.origin, allowedOrigins))
   });
 
