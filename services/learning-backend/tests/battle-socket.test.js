@@ -148,3 +148,58 @@ test('protected socket events revalidate revoked sessions and remove the last ta
   assert.equal(socket.disconnected, true);
   assert.equal(leaveCalls, 1);
 });
+
+
+
+test('Socket.IO transport limit accepts max-code ASCII JSON and rejects multibyte overflow', async () => {
+  const prisma = { authSession: { findUnique: async () => session } };
+  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer });
+  const limit = FakeSocketServer.instance.options.maxHttpBufferSize;
+  assert.equal(limit, 32 * 1024);
+  const maxCodeAscii = JSON.stringify({ matchId: 'm', code: 'a'.repeat(20_000) });
+  const maxCodeUtf8 = JSON.stringify({ matchId: 'm', code: 'é'.repeat(20_000) });
+  const transportOverflow = JSON.stringify({ matchId: 'm', code: 'é'.repeat(17_000) });
+  assert.ok(Buffer.byteLength(maxCodeAscii, 'utf8') < limit);
+  assert.ok(Buffer.byteLength(maxCodeUtf8, 'utf8') > limit);
+  assert.ok(Buffer.byteLength(transportOverflow, 'utf8') > limit);
+});
+
+
+test('match:submit rejects oversized match IDs without consuming the submission cooldown', async () => {
+  let matchLookupCalls = 0;
+  const prisma = {
+    authSession: { findUnique: async () => ({ ...session, userId: 'player-regression' }) },
+    match: {
+      findFirst: async () => {
+        matchLookupCalls += 1;
+        return null;
+      }
+    }
+  };
+  await attachBattleSocket({}, prisma, {
+    ServerClass: FakeSocketServer,
+    submissionCooldownMs: 60_000
+  });
+  const socket = await FakeSocketServer.instance.connect(validToken, 'player-regression');
+
+  let invalidAck;
+  await socket.trigger('match:submit', {
+    matchId: 'm'.repeat(129),
+    code: 'print("hello")'
+  }, result => { invalidAck = result; });
+
+  assert.equal(invalidAck.ok, false);
+  assert.equal(invalidAck.code, 'INVALID_INPUT');
+  assert.equal(matchLookupCalls, 0);
+
+  let validAck;
+  await socket.trigger('match:submit', {
+    matchId: 'valid-match-id',
+    code: 'print("hello")'
+  }, result => { validAck = result; });
+
+  assert.equal(validAck.ok, false);
+  assert.notEqual(validAck.code, 'RATE_LIMITED');
+  assert.equal(validAck.code, 'ACTIVE_MATCH_NOT_FOUND');
+  assert.equal(matchLookupCalls, 1);
+});
