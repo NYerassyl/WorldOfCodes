@@ -7,6 +7,7 @@ export {
   createFriendlyInvite,
   joinFriendlyInvite,
   getMatchForUser,
+  getActiveMatchForUser,
   submitBattleSolution,
   getLeaderboard,
   getMyRating
