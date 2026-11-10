@@ -34,6 +34,7 @@ All routes are mounted under /api. Except the leaderboard, routes require the ex
 |---|---|---|
 | GET | /api/battle/leaderboard | Public rating leaderboard |
 | GET | /api/battle/rating/me | Current user's rating |
+| GET | /api/battle/state | Recover current active match and local queue state |
 | POST | /api/battle/ranked/queue | Join ranked queue |
 | DELETE | /api/battle/ranked/queue | Leave ranked queue |
 | POST | /api/battle/friendly | Create a 30-minute invite |
@@ -41,13 +42,26 @@ All routes are mounted under /api. Except the leaderboard, routes require the ex
 | GET | /api/battle/matches/:matchId | Read own match |
 | POST | /api/battle/matches/:matchId/submit | Submit Python code |
 
+### Battle state recovery
+
+Authenticated `GET /api/battle/state` returns:
+
+```json
+{
+  "match": null,
+  "queue": { "status": "QUEUED", "ticketId": "opaque-ticket-id", "position": 1, "joinedAt": "2026-11-04T10:00:00.000Z" }
+}
+```
+
+When a match is active, `match` contains the same participant-only public match projection returned by `GET /api/battle/matches/:matchId`. Queue states are `QUEUED`, `MATCHMAKING`, or `NOT_QUEUED`. The database is authoritative for active matches; the queue ticket is process-local and visible only to the server instance handling the request. In a multi-instance deployment, use a shared queue adapter before claiming cross-instance recovery.
+
 REST submit body: { "code": "..." }. Unknown body keys are rejected. Source is limited to 20,000 characters. Both transports must use the same injected Judge Queue and settlement service.
 
 ## Socket authentication and origin
 
 Connect using the existing token: io(API_ORIGIN, { auth: { token: opaqueSessionToken } }).
 
-The server hashes the opaque token with the shared SHA-256 helper and validates it at handshake and before every protected event. A revoked or expired session is rejected, disconnected and removed from queue when it is the user's last connected tab. Never trust a userId supplied by the client.
+The server uses the canonical `resolveAuthSession` helper and validates the opaque session at handshake and before every protected event. A revoked or expired session is rejected, disconnected and removed from queue when it is the user's last connected tab. A database error during revalidation fails closed with `SESSION_UNAVAILABLE`; it never authorizes the action.
 
 WebSocket Origin is checked against an explicit allowlist. Missing and unlisted origins are rejected. Configure allowedOrigins as an array of exact origins or a trusted predicate; do not use wildcard origins with credentials.
 
@@ -74,30 +88,22 @@ The public match snapshot is allowlisted and excludes source code, hidden tests 
 
 ## Error codes
 
-UNAUTHORIZED: invalid handshake session.
-SESSION_INVALID: session expired or revoked after connection.
-ALREADY_QUEUED: user already has a queue ticket.
-MATCHMAKING_IN_PROGRESS: pair creation is in progress.
-OPPONENT_SESSION_INVALID: waiting player's session is no longer active.
-INVALID_MATCH_ID / INVALID_INPUT: malformed payload.
-BATTLE_NOT_FOUND: match does not belong to this user.
-ACTIVE_MATCH_NOT_FOUND: no active participant match.
-ALREADY_SOLVED: accepted submission was already recorded.
-SUBMISSION_ALREADY_PROCESSED: concurrent accepted submission was processed first.
-RATE_LIMITED: user-level socket submission cooldown.
-JUDGE_UNAVAILABLE: judge infrastructure failed; no winner is awarded.
-INTERNAL_ERROR: unexpected server failure.
+- UNAUTHORIZED: invalid handshake session.
+- SESSION_INVALID: session expired or revoked after connection.
+- SESSION_UNAVAILABLE: session store cannot be checked; event fails closed.
+- ALREADY_QUEUED: user already has a queue ticket.
+- MATCHMAKING_IN_PROGRESS: pair creation is in progress.
+- OPPONENT_SESSION_INVALID: waiting player's session is no longer active.
+- INVALID_MATCH_ID / INVALID_INPUT: malformed payload.
+- BATTLE_NOT_FOUND: match does not belong to this user.
+- ACTIVE_MATCH_NOT_FOUND: no active participant match.
+- ALREADY_SOLVED: accepted submission was already recorded.
+- SUBMISSION_ALREADY_PROCESSED: concurrent accepted submission was processed first.
+- JUDGE_UNAVAILABLE: judge infrastructure failed; no winner is awarded.
+- RATE_LIMITED: submission cooldown is active.
 
-## Reconnect and multiple tabs
+## Operational limitations
 
-Reconnect using the opaque token. Re-fetch GET /api/battle/matches/:matchId after reconnect; REST is the authoritative snapshot. Rejoin the room with match:watch for realtime updates.
-
-Multiple local tabs are tracked per authenticated user. Closing one tab does not remove another tab's queue ticket. The queue ticket is removed when the last local socket disconnects or its session is invalidated. Socket submission cooldown is keyed by userId rather than socket ID, so reconnecting or opening another tab does not reset it.
-
-## Scope and operational notes
-
-Ranked/Friendly lifecycle, Elo and conditional transactional settlement remain as implemented. Friendly matches do not change competitive rating; Learning XP/coins remain separate.
-
-Beginner protection, spectator access and algorithm-filtered matching are NOT implemented and must not be advertised. Queue and cooldown are process-local MVP mechanisms; use a shared store/lock before horizontal scaling.
-
-GPT 4 must run end-to-end checks with two real accounts, PostgreSQL, Docker Judge and Socket.IO. Unit tests alone do not prove production integration.
+- MatchmakingQueue is in-memory and process-local. Run one application instance for the MVP, or replace it with a shared queue before horizontal scaling.
+- Judge execution must use GPT 1's bounded shared Judge Queue. Never instantiate a second queue or execute untrusted code in the Node process.
+- Run the PostgreSQL migrations only against an approved isolated or provisioned database. Never reset a shared database to make tests pass.
