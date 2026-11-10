@@ -447,7 +447,12 @@ export function ServerCopy() {
             </pre>
           </div>
           <div>
-            <Editor title="practice.py" value={code} onChange={setCode} />
+            <Editor
+              title="practice.py"
+              value={code}
+              onChange={setCode}
+              smartEditing={false}
+            />
             {user ? (
               <button
                 className="btn"

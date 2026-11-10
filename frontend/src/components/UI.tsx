@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { handleEditorKeyDown } from "../lib/editor-keys";
 import {
   House,
   BookOpen,
@@ -126,11 +127,13 @@ export function Editor({
   onChange,
   title = "solution.js",
   placeholder,
+  smartEditing = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   title?: string;
   placeholder?: string;
+  smartEditing?: boolean;
 }) {
   return (
     <div className="editor">
@@ -144,6 +147,9 @@ export function Editor({
         aria-label="Code editor"
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(event) =>
+          smartEditing && handleEditorKeyDown(event, value, onChange)
+        }
         placeholder={placeholder}
         spellCheck={false}
         autoCapitalize="off"

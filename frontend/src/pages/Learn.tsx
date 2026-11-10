@@ -17,6 +17,7 @@ import {
   type Lesson,
 } from "../lib/curriculum";
 import { evaluateLab } from "../lib/labRunner";
+import { handleEditorKeyDown } from "../lib/editor-keys";
 import { buildRenderDocument } from "../lib/renderCheck";
 import { useStore } from "../lib/store";
 import { Heading, Notice, Icon } from "../components/UI";
@@ -633,6 +634,9 @@ function LessonView({
                   spellCheck={false}
                   rows={12}
                   onChange={(event) => editLab(event.target.value)}
+                  onKeyDown={(event) =>
+                    handleEditorKeyDown(event, labDraft, editLab)
+                  }
                 />
                 {labIsRender && (
                   <div className="lab-preview">

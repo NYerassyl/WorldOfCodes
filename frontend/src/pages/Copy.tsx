@@ -125,6 +125,7 @@ export default function Copy() {
           <Editor
             title="practice.txt"
             value={value}
+            smartEditing={false}
             placeholder="Type the snippet here. Spaces, capitalization and line breaks all count."
             onChange={(v) => {
               if (!start) setStart(Date.now());
