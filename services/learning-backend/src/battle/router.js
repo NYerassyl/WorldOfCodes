@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncRoute, ensureKeys } from '../lib/errors.js';
-import { createFriendlyInvite, getLeaderboard, getMatchForUser, getMyRating, joinFriendlyInvite, submitBattleSolution } from './service.js';
+import { createFriendlyInvite, getActiveMatchForUser, getLeaderboard, getMatchForUser, getMyRating, joinFriendlyInvite, submitBattleSolution } from './service.js';
 import { MatchmakingQueue } from './matchmaking.js';
 
 export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(prisma), judge, notifier } = {}) {
@@ -11,6 +11,15 @@ export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(
     res.json({ items: await getLeaderboard(prisma, req.query.limit) })));
   router.get('/battle/rating/me', auth, asyncRoute(async (req, res) =>
     res.json(await getMyRating(prisma, req.auth.userId))));
+
+  router.get('/battle/state', auth, asyncRoute(async (req, res) => {
+    const userId = req.auth.userId;
+    const [match, queueState] = await Promise.all([
+      getActiveMatchForUser(prisma, userId),
+      Promise.resolve(queue.getStatus(userId))
+    ]);
+    res.json({ match, queue: queueState });
+  }));
 
   router.post('/battle/ranked/queue', auth, asyncRoute(async (req, res) => {
     ensureKeys(req.body || {}, []);

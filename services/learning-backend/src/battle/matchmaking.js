@@ -67,6 +67,17 @@ export class MatchmakingQueue {
     return { status: 'LEFT_QUEUE' };
   }
 
+
+  getStatus(userId) {
+    this.prune();
+    if (this.pairingUsers.has(userId)) return { status: 'MATCHMAKING' };
+    const entries = [...this.waiting.entries()];
+    const index = entries.findIndex(([, ticket]) => ticket.userId === userId);
+    if (index < 0) return { status: 'NOT_QUEUED' };
+    const [ticketId, ticket] = entries[index];
+    return { status: 'QUEUED', ticketId, position: index + 1, joinedAt: new Date(ticket.joinedAt).toISOString() };
+  }
+
   prune() {
     const cutoff = Date.now() - this.maxWaitMs;
     for (const [id, ticket] of this.waiting) if (ticket.joinedAt < cutoff) this.waiting.delete(id);

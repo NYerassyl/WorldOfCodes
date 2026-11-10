@@ -167,6 +167,14 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       claimed = await prisma.$transaction(async tx => {
+    // Serialize accepted submissions on the match row before either transaction
+    // claims a MatchPlayer row. Without this gate, opposite winners can lock
+    // opposite player rows and deadlock while each settles the same match.
+    const lock = await tx.match.updateMany({
+      where: { id: matchId, status: 'ACTIVE' },
+      data: { status: 'ACTIVE' }
+    });
+    if (lock.count !== 1) return false;
     // The match may complete while the external judge is running.
     const current = await tx.match.findUnique({ where: { id: matchId }, include: { players: true } });
     if (!current || current.status !== 'ACTIVE' || current.type !== match.type ||
@@ -176,19 +184,35 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
       data: { submittedAt: new Date(), verdict: 'ACCEPTED' }
     });
     if (update.count !== 1) return false;
-    if (current.type === 'RANKED') return settleRankedMatch(tx, matchId, userId);
-    if (current.type === 'FRIENDLY') {
+    let settled = false;
+    if (current.type === 'RANKED') {
+      settled = await settleRankedMatch(tx, matchId, userId);
+    } else if (current.type === 'FRIENDLY') {
       const ended = await tx.match.updateMany({
         where: { id: matchId, type: 'FRIENDLY', status: 'ACTIVE' },
         data: { status: 'COMPLETED', winnerId: userId, completedAt: new Date() }
       });
-      return ended.count === 1;
+      settled = ended.count === 1;
     }
-    return false;
+
+    // The ACCEPTED claim above must never commit unless match settlement commits too.
+    // Throwing aborts the interactive transaction and rolls back submittedAt/verdict.
+    if (!settled) {
+      const conflict = new Error('Battle settlement lost its conditional update');
+      conflict.code = 'BATTLE_SETTLEMENT_CONFLICT';
+      throw conflict;
+    }
+    return true;
       }, { isolationLevel: 'Serializable' });
       break;
     } catch (error) {
-      if (error?.code !== 'P2034' || attempt === 2) throw error;
+      if (error?.code === 'BATTLE_SETTLEMENT_CONFLICT') {
+        claimed = false;
+        break;
+      }
+      const retryableDeadlock = ['P2034', '40P01'].includes(error?.code)
+        || /deadlock detected|40P01/i.test(String(error?.message || ''));
+      if (!retryableDeadlock || attempt === 2) throw error;
     }
   }
   const latest = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, winnerId: true } });
@@ -196,6 +220,14 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
     throw new AppError(409, 'SUBMISSION_ALREADY_PROCESSED', 'Another accepted submission was processed first');
   }
   return { ...verdict, matchCompleted: latest?.status === 'COMPLETED', winnerId: latest?.winnerId || null, settled: claimed };
+}
+
+export async function getActiveMatchForUser(prisma, userId) {
+  return prisma.match.findFirst({
+    where: { status: 'ACTIVE', players: { some: { userId } } },
+    orderBy: { startedAt: 'desc' },
+    select: publicMatchSelect
+  });
 }
 
 export async function getLeaderboard(prisma, take = 20) {

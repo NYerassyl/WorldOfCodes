@@ -148,3 +148,18 @@ test('protected socket events revalidate revoked sessions and remove the last ta
   assert.equal(socket.disconnected, true);
   assert.equal(leaveCalls, 1);
 });
+
+
+
+test('Socket.IO transport limit accepts max-code ASCII JSON and rejects multibyte overflow', async () => {
+  const prisma = { authSession: { findUnique: async () => session } };
+  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer });
+  const limit = FakeSocketServer.instance.options.maxHttpBufferSize;
+  assert.equal(limit, 32 * 1024);
+  const maxCodeAscii = JSON.stringify({ matchId: 'm', code: 'a'.repeat(20_000) });
+  const maxCodeUtf8 = JSON.stringify({ matchId: 'm', code: 'é'.repeat(20_000) });
+  const transportOverflow = JSON.stringify({ matchId: 'm', code: 'é'.repeat(17_000) });
+  assert.ok(Buffer.byteLength(maxCodeAscii, 'utf8') < limit);
+  assert.ok(Buffer.byteLength(maxCodeUtf8, 'utf8') > limit);
+  assert.ok(Buffer.byteLength(transportOverflow, 'utf8') > limit);
+});

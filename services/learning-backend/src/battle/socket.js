@@ -1,4 +1,4 @@
-import { hashSessionToken } from '../lib/security.js';
+import { resolveAuthSession } from '../auth/session.js';
 import { MatchmakingQueue } from './matchmaking.js';
 import { getMatchForUser, submitBattleSolution } from './service.js';
 
@@ -35,7 +35,7 @@ export async function attachBattleSocket(server, prisma, {
 } = {}) {
   const SocketServer = ServerClass || (await import('socket.io')).Server;
   const io = new SocketServer(server, {
-    cors, serveClient: false, maxHttpBufferSize: 16 * 1024,
+    cors, serveClient: false, maxHttpBufferSize: 32 * 1024,
     allowRequest: (request, callback) => callback(null, originAllowed(request.headers?.origin, allowedOrigins))
   });
 
@@ -52,12 +52,8 @@ export async function attachBattleSocket(server, prisma, {
     return sockets.size;
   };
   const readSession = async token => {
-    if (typeof token !== 'string' || !/^[A-Za-z0-9_-]{32,128}$/.test(token)) return null;
-    const session = await prisma.authSession.findUnique({
-      where: { tokenHash: hashSessionToken(token) },
-      select: { id: true, userId: true, expiresAt: true, revokedAt: true }
-    });
-    return session && !session.revokedAt && session.expiresAt && session.expiresAt > new Date() ? session : null;
+    const session = await resolveAuthSession(prisma, token);
+    return session;
   };
 
   io.use(async (socket, next) => {
@@ -93,18 +89,29 @@ export async function attachBattleSocket(server, prisma, {
     socket.join(USER_ROOM(userId));
     register(userId, socket);
 
+    const disconnectInvalidSession = () => {
+      socket.disconnect(true);
+      if (unregister(userId, socket) === 0) {
+        try { queue.leave(userId); } catch { /* Pairing owns its in-flight lock. */ }
+      }
+    };
+
     const guard = handler => async (...args) => {
       const ack = args[args.length - 1];
+      let session;
       try {
-        const session = await readSession(token);
-        if (!session || session.userId !== userId) {
-          safeAck(ack, { ok: false, code: 'SESSION_INVALID', message: 'Session expired or revoked' });
-          socket.disconnect(true);
-          if (unregister(userId, socket) === 0) {
-            try { queue.leave(userId); } catch { /* Pairing owns its in-flight lock. */ }
-          }
-          return;
-        }
+        session = await readSession(token);
+      } catch {
+        safeAck(ack, { ok: false, code: 'SESSION_UNAVAILABLE', message: 'Session validation is temporarily unavailable' });
+        disconnectInvalidSession();
+        return;
+      }
+      if (!session || session.userId !== userId) {
+        safeAck(ack, { ok: false, code: 'SESSION_INVALID', message: 'Session expired or revoked' });
+        disconnectInvalidSession();
+        return;
+      }
+      try {
         await handler(...args);
       } catch (error) {
         safeAck(ack, { ok: false, code: error.code || 'INTERNAL_ERROR', message: error.message || 'Battle action failed' });
@@ -135,7 +142,7 @@ export async function attachBattleSocket(server, prisma, {
 
     socket.on('match:submit', guard(async (payload = {}, ack) => {
       const { matchId, code } = payload || {};
-      if (typeof matchId !== 'string' || !matchId || matchId.length > 128 ||
+      if (typeof matchId !== 'string' || !matchId || matchId.length > CODE_LIMIT ||
           typeof code !== 'string' || code.length < 1 || code.length > CODE_LIMIT) {
         safeAck(ack, { ok: false, code: 'INVALID_INPUT', message: 'matchId and code are required; code limit is 20000 characters' });
         return;
