@@ -167,6 +167,14 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
       claimed = await prisma.$transaction(async tx => {
+    // Serialize accepted submissions on the match row before either transaction
+    // claims a MatchPlayer row. Without this gate, opposite winners can lock
+    // opposite player rows and deadlock while each settles the same match.
+    const lock = await tx.match.updateMany({
+      where: { id: matchId, status: 'ACTIVE' },
+      data: { status: 'ACTIVE' }
+    });
+    if (lock.count !== 1) return false;
     // The match may complete while the external judge is running.
     const current = await tx.match.findUnique({ where: { id: matchId }, include: { players: true } });
     if (!current || current.status !== 'ACTIVE' || current.type !== match.type ||
