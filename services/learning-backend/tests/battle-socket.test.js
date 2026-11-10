@@ -168,7 +168,7 @@ test('Socket.IO transport limit accepts max-code ASCII JSON and rejects multibyt
 test('match:submit rejects oversized match IDs without consuming the submission cooldown', async () => {
   let matchLookupCalls = 0;
   const prisma = {
-    authSession: { findUnique: async () => session },
+    authSession: { findUnique: async () => ({ ...session, userId: 'player-regression' }) },
     match: {
       findFirst: async () => {
         matchLookupCalls += 1;
@@ -180,7 +180,7 @@ test('match:submit rejects oversized match IDs without consuming the submission 
     ServerClass: FakeSocketServer,
     submissionCooldownMs: 60_000
   });
-  const socket = await FakeSocketServer.instance.connect(validToken);
+  const socket = await FakeSocketServer.instance.connect(validToken, 'player-regression');
 
   let invalidAck;
   await socket.trigger('match:submit', {
