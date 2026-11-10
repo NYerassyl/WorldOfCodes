@@ -1,0 +1,45 @@
+name: FastAPI GPT 2 service contract
+
+on:
+  push:
+    branches:
+      - feat/fastapi-services-gpt2
+  pull_request:
+    paths:
+      - 'services/fastapi-backend/**'
+      - '.github/workflows/fastapi-gpt2-services.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: services/fastapi-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install declared Python dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Run all GPT 4 routers and GPT 2 service tests
+        run: python -m pytest -q
+      - name: Verify OpenAPI/Swagger and in-memory health
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+          from storage import store
+
+          store.reset()
+          with TestClient(app) as client:
+              assert client.get("/docs").status_code == 200
+              assert client.get("/openapi.json").status_code == 200
+              data = client.get("/api/health").json()
+              assert (data["users"], data["lessons"], data["problems"]) == (2, 3, 3)
+              print("Swagger/OpenAPI and in-memory health PASS")
+          PY
