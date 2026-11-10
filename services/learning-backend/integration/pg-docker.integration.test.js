@@ -53,10 +53,11 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
   try {
     await prisma.$connect();
     ({server,url}=await startApp());
-    await t.test('four migration checksums match source and seed remains idempotent',async()=>{
+    await t.test('five additive migration checksums match source and seed remains idempotent',async()=>{
       const names=[
         '20261103000000_init','20261103170000_add_battle_models',
-        '20261103220000_match_status_type_index','20261103230000_problem_starter_code'
+        '20261103220000_match_status_type_index','20261103230000_problem_starter_code',
+        '20261110200000_trace_attempts'
       ];
       const entries=await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" ORDER BY migration_name');
       assert.deepEqual(entries.map(x=>x.migration_name),names);
