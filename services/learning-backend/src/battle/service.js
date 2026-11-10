@@ -176,18 +176,32 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
       data: { submittedAt: new Date(), verdict: 'ACCEPTED' }
     });
     if (update.count !== 1) return false;
-    if (current.type === 'RANKED') return settleRankedMatch(tx, matchId, userId);
-    if (current.type === 'FRIENDLY') {
+    let settled = false;
+    if (current.type === 'RANKED') {
+      settled = await settleRankedMatch(tx, matchId, userId);
+    } else if (current.type === 'FRIENDLY') {
       const ended = await tx.match.updateMany({
         where: { id: matchId, type: 'FRIENDLY', status: 'ACTIVE' },
         data: { status: 'COMPLETED', winnerId: userId, completedAt: new Date() }
       });
-      return ended.count === 1;
+      settled = ended.count === 1;
     }
-    return false;
+
+    // The ACCEPTED claim above must never commit unless match settlement commits too.
+    // Throwing aborts the interactive transaction and rolls back submittedAt/verdict.
+    if (!settled) {
+      const conflict = new Error('Battle settlement lost its conditional update');
+      conflict.code = 'BATTLE_SETTLEMENT_CONFLICT';
+      throw conflict;
+    }
+    return true;
       }, { isolationLevel: 'Serializable' });
       break;
     } catch (error) {
+      if (error?.code === 'BATTLE_SETTLEMENT_CONFLICT') {
+        claimed = false;
+        break;
+      }
       if (error?.code !== 'P2034' || attempt === 2) throw error;
     }
   }
