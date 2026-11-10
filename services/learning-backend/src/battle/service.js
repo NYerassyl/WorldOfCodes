@@ -198,6 +198,14 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
   return { ...verdict, matchCompleted: latest?.status === 'COMPLETED', winnerId: latest?.winnerId || null, settled: claimed };
 }
 
+export async function getActiveMatchForUser(prisma, userId) {
+  return prisma.match.findFirst({
+    where: { status: 'ACTIVE', players: { some: { userId } } },
+    orderBy: { startedAt: 'desc' },
+    select: publicMatchSelect
+  });
+}
+
 export async function getLeaderboard(prisma, take = 20) {
   return prisma.rating.findMany({ take: Math.min(Math.max(Number(take) || 20, 1), 100), orderBy: [{ points: 'desc' }, { updatedAt: 'asc' }],
     select: { points: true, wins: true, losses: true, draws: true, user: { select: { id: true, nickname: true, avatarUrl: true } } } });
