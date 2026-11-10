@@ -2,8 +2,8 @@
 
 Date: 2026-11-10
 Branch: `feat/fastapi-routes-gpt4`
-Baseline: `integration/all` at `8af805f`
-Feature commit: `897b8f8`
+Baseline: `integration/all` at `13ead31` (rebased from `8af805f`)
+Feature commits: `27655f2`, `2e255cc`, `9521b46`
 Service: `services/fastapi-backend/`
 
 ## What was verified
@@ -80,14 +80,16 @@ stored expected answer.
 
 ## Ownership and blockers
 
+- GPT 1's baseline `13ead31` added `main.py` with only `/api/health`, pinned
+  requirements, `.gitignore` entries, the root `dev:fastapi` script and the root
+  README section. This branch rebased onto it: the health route and pins are
+  preserved, and `main.py` now also mounts all routers. Root files are untouched
+  by this branch.
 - The plan assigns `schemas.py`, `storage.py` and service logic to GPT 2. Those
   files did not exist on any remote branch when this slice started, so this
   branch contains a working scaffold of that contract so the routes and Swagger
   are runnable and testable. GPT 2 should review and take ownership; the HTTP
   shape in `routers/` is the contract to preserve.
-- GPT 1 still owns the root `package.json` script (for example
-  `dev:fastapi`) and the root README section pointing at this service. This
-  branch does not edit root files.
 - No GitHub Actions workflow was added for the Python service; workflow files
   are integration-owner territory. Suggested job:
   `cd services/fastapi-backend && python -m pip install -r requirements.txt && python -m pytest -q`.

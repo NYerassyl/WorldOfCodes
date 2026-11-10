@@ -27,6 +27,16 @@ command without the venv path works:
 /usr/local/bin/python3 -m uvicorn main:app --reload
 ```
 
+From the repository root you can also use the integrated script after
+activating the virtual environment (or installing the requirements globally):
+
+```bash
+source services/fastapi-backend/.venv/bin/activate
+npm run dev:fastapi
+```
+
+It runs the same app from `services/fastapi-backend` on port 8000.
+
 Open **http://127.0.0.1:8000/docs** for Swagger UI and
 **http://127.0.0.1:8000/redoc** for ReDoc. The OpenAPI document is served at
 `/openapi.json`.
