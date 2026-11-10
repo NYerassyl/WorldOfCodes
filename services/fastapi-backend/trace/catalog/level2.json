@@ -7,8 +7,8 @@
     "title": "First Passing Column",
     "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
     "code": "grid = [[2, 5, 1], [4, 3, 6], [7, 2, 8]]\ntotal = 0\nfor row_index, row in enumerate(grid):\n    chosen = -1\n    for column_index, value in enumerate(row):\n        if value % 2 == 0:\n            continue\n        total += value\n        if total > 9:\n            chosen = column_index\n            break\n    print(row_index, chosen, total)\nprint(\"total\", total)",
-    "expected_stdout": "0 -1 6\n1 1 9\n2 0 16\ntotal 16\n",
-    "explanation": "The inner loop skips even values. Total reaches 6 after row 0, 9 after row 1, and exceeds 9 at the first element of row 2, triggering break."
+    "expected_stdout": "0 -1 6\n1 -1 9\n2 0 16\ntotal 16\n",
+    "explanation": "The inner loop skips even values. Total reaches 6 after row 0 and 9 after row 1, so neither row breaks early. It first exceeds 9 at row 2, column 0."
   },
   {
     "id": "trace-2-02",
@@ -18,7 +18,7 @@
     "title": "Neighbor Index Cascade",
     "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
     "code": "items = [3, 1, 4, 2]\nfor outer in range(3):\n    picked = 0\n    for inner in range(outer, len(items)):\n        if items[inner] % 2 == 0:\n            picked = inner\n            break\n        items[inner] += 1\n    items[outer] += picked\n    print(outer, picked, items[outer])\nprint(items)",
-    "expected_stdout": "0 0 4\n1 1 3\n2 2 6\n[4, 3, 6, 2]\n",
+    "expected_stdout": "0 2 6\n1 1 3\n2 2 6\n[6, 3, 6, 2]\n",
     "explanation": "Each inner loop mutates odd elements before it reaches an even value. The selected index is added to the current outer element."
   },
   {
@@ -40,7 +40,7 @@
     "title": "Pair Search with Early Exit",
     "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
     "code": "numbers = [2, 5, 3, 6]\nmatches = []\nfor first in range(len(numbers)):\n    for second in range(first + 1, len(numbers)):\n        if numbers[first] + numbers[second] < 8:\n            continue\n        matches.append((first, second))\n        if numbers[second] % 2 == 0:\n            break\n    if first % 2 == 1:\n        print(first, len(matches))\nprint(matches)",
-    "expected_stdout": "1 2\n3 3\n[(0, 3), (1, 2), (1, 3)]\n",
+    "expected_stdout": "1 3\n3 4\n[(0, 3), (1, 2), (1, 3), (2, 3)]\n",
     "explanation": "Only pairs reaching the threshold are stored. An even second element ends the current inner scan, but not the outer one."
   },
   {
@@ -84,7 +84,7 @@
     "title": "Mutable Staircase",
     "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
     "code": "stairs = [1, 3, 2, 4]\nfor layer in range(3):\n    gained = 0\n    for index in range(layer, len(stairs)):\n        if stairs[index] == layer:\n            continue\n        stairs[index] += 1\n        gained += stairs[index]\n        if gained > 7:\n            break\n    print(layer, gained, stairs[layer])\nprint(stairs)",
-    "expected_stdout": "0 11 2\n1 9 4\n2 5 5\n[2, 4, 5, 4]\n",
+    "expected_stdout": "0 9 2\n1 9 5\n2 10 5\n[2, 5, 5, 5]\n",
     "explanation": "Inner mutations persist into the next layer. Each layer starts scanning at its own index and stops when gained first exceeds seven."
   },
   {

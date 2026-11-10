@@ -7,7 +7,7 @@
     "title": "Odd-Number Accumulator",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "total = 0\nstep = 2\nvalues = [2, 3, 4, 5, 6, 7]\nfor index, value in enumerate(values, 1):\n    if value % 2:\n        step += 1\n        total += value * step\n    else:\n        total += value\n    if index % 3 == 0:\n        print(index, total)\nprint(\"step\", step)",
-    "expected_stdout": "3 15\n6 64\nstep 5\n",
+    "expected_stdout": "3 15\n6 76\nstep 5\n",
     "explanation": "At iteration 3, the running total is 2 + 9 + 4 = 15. At iteration 6 it is 15 + 20 + 6 + 35 = 76; the odd values increase the multiplier to 5."
   },
   {
@@ -18,7 +18,7 @@
     "title": "Two Counters, One Threshold",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "left = 1\nright = 8\nfor tick in range(1, 6):\n    if tick % 2 == 0:\n        right -= left\n    else:\n        left += tick\n    if left > right:\n        left, right = right, left\n    if tick in (2, 4, 5):\n        print(tick, left, right)\nprint(left + right)",
-    "expected_stdout": "2 2 6\n4 2 4\n5 4 7\n11\n",
+    "expected_stdout": "2 2 6\n4 1 5\n5 5 6\n11\n",
     "explanation": "On ticks 1 and 3, left grows; on even ticks, right shrinks. The values are swapped when left exceeds right, changing which counter is updated next."
   },
   {
@@ -29,7 +29,7 @@
     "title": "Skipping a Changing Step",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "score = 0\nbonus = 1\nfor number in range(1, 8):\n    if number % 3 == 0:\n        bonus += 2\n        continue\n    if number % 2 == 0:\n        score -= bonus\n    else:\n        score += number * bonus\n    if number in (2, 5, 7):\n        print(number, score)\nprint(\"bonus\", bonus)",
-    "expected_stdout": "2 0\n5 12\n7 25\nbonus 5\n",
+    "expected_stdout": "2 0\n5 12\n7 47\nbonus 5\n",
     "explanation": "Numbers 3 and 6 raise the bonus and skip the update. The printed totals are taken after iterations 2, 5, and 7."
   },
   {
@@ -40,7 +40,7 @@
     "title": "Reset at a Boundary",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "total = 0\ncarry = 0\nfor value in [4, 1, 5, 2, 6, 3]:\n    if value > 4:\n        carry += total\n        total = value\n    elif value % 2 == 0:\n        total += value * 2\n    else:\n        total -= value\n    if value in (5, 6, 3):\n        print(value, total, carry)\nprint(total + carry)",
-    "expected_stdout": "5 5 11\n6 6 20\n3 3 20\n23\n",
+    "expected_stdout": "5 5 7\n6 6 16\n3 3 16\n19\n",
     "explanation": "The first reset occurs at 5, moving the previous total to carry. The second reset at 6 transfers the then-current total; the final 3 subtracts from total."
   },
   {
@@ -51,7 +51,7 @@
     "title": "Alternating Direction",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "position = 0\ndirection = 1\ndistance = 1\nfor turn in range(1, 7):\n    position += direction * distance\n    if turn % 2 == 0:\n        direction *= -1\n        distance += 2\n    else:\n        distance += 1\n    if turn in (2, 4, 6):\n        print(turn, position)\nprint(\"next\", direction, distance)",
-    "expected_stdout": "2 3\n4 -4\n6 7\nnext -1 10\n",
+    "expected_stdout": "2 3\n4 -6\n6 9\nnext -1 10\n",
     "explanation": "Both first moves are to the right. Direction reverses after even turns, so the next two moves are leftward, then two rightward."
   },
   {
@@ -62,7 +62,7 @@
     "title": "Digit-Weighted Running Sum",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "result = 0\nfactor = 1\nfor character in \"24135\":\n    digit = int(character)\n    if digit % 2 == 0:\n        factor += digit // 2\n    else:\n        result += factor * digit\n    if digit > 3:\n        result -= 1\n    if digit in (1, 3, 5):\n        print(digit, result)\nprint(\"factor\", factor)",
-    "expected_stdout": "1 3\n3 10\n5 24\nfactor 4\n",
+    "expected_stdout": "1 3\n3 15\n5 34\nfactor 4\n",
     "explanation": "Even digits change factor; odd digits add factor times the digit. Digits 4 and 5 also trigger the subtract-one branch."
   },
   {
@@ -73,8 +73,8 @@
     "title": "Countdown with a Bank",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "bank = 0\ncurrent = 9\njump = 1\nwhile current > 0:\n    if current % 2:\n        bank += current\n        jump += 1\n    else:\n        bank -= jump\n    if current in (9, 5, 2):\n        print(current, bank)\n    current -= jump\nprint(\"end\", current, jump)",
-    "expected_stdout": "9 9\n5 14\n2 10\nend -1 4\n",
-    "explanation": "Starting at 9 increases jump to 2, then 7 increases it to 3, then 4 subtracts 3, and 1 increases jump again. The printed checkpoints depend on visited countdown values."
+    "expected_stdout": "9 9\nend -3 4\n",
+    "explanation": "The loop visits 9, 7, 4, then 1. The odd steps increase jump; at 4 the bank loses three, and the loop ends after jumping below zero."
   },
   {
     "id": "trace-1-08",
@@ -84,7 +84,7 @@
     "title": "Parity Changes the Update",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "x = 2\ny = 3\nfor index in range(1, 6):\n    if (x + y) % 2 == 0:\n        x += index\n    else:\n        y += x\n    if index % 2 == 0:\n        x -= 1\n    else:\n        y -= 2\n    if index >= 3:\n        print(index, x, y)\nprint(\"sum\", x + y)",
-    "expected_stdout": "3 1 10\n4 0 11\n5 0 9\nsum 9\n",
+    "expected_stdout": "3 4 3\n4 3 7\n5 8 5\nsum 13\n",
     "explanation": "Each iteration tests parity before the updates. The even-index decrement happens after the conditional, affecting the next iteration's parity."
   },
   {
@@ -95,7 +95,7 @@
     "title": "Multiples and a Rolling Cap",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "count = 0\nlimit = 4\nfor value in [3, 8, 2, 7, 5, 4, 9]:\n    if value >= limit:\n        count += 2\n        limit += 1\n    else:\n        count -= 1\n    if value % 3 == 0:\n        count += 1\n    if value in (8, 5, 9):\n        print(value, count, limit)\nprint(count)",
-    "expected_stdout": "8 3 5\n5 4 7\n9 6 8\n6\n",
+    "expected_stdout": "8 2 5\n5 2 6\n9 4 7\n4\n",
     "explanation": "The limit rises only when the current value meets it; multiples of three then add an extra point. The print happens after both conditions."
   },
   {
@@ -106,7 +106,7 @@
     "title": "Windowed Running Difference",
     "instructions": "Read the Python program without running it. Enter the exact printed output, preserving spaces and line breaks.",
     "code": "above = 0\nbelow = 0\npivot = 3\nfor step, number in enumerate([1, 4, 2, 6, 3, 5], 1):\n    if number > pivot:\n        above += number - pivot\n    else:\n        below += pivot - number\n    if step % 2 == 0:\n        pivot += 1\n        print(step, above - below, pivot)\nprint(\"totals\", above, below)",
-    "expected_stdout": "2 -1 4\n4 0 5\n6 -3 6\ntotals 3 6\n",
+    "expected_stdout": "2 -1 4\n4 -1 5\n6 -3 6\ntotals 3 6\n",
     "explanation": "The pivot changes only after even-numbered iterations. Both accumulated distances are computed with the pivot value before that update."
   }
 ]

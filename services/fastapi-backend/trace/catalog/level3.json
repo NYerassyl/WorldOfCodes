@@ -7,7 +7,7 @@
     "title": "Shared List, Two Helpers",
     "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
     "code": "def extend(values, number):\n    values.append(number)\n    return len(values)\ndef measure(values, offset):\n    return sum(values[::2]) + offset\nitems = [2, 3, 4]\nfirst = extend(items, 5)\nscore = measure(items, first)\nprint(first, score)\nsecond = extend(items, score % 4)\nprint(items)\nprint(measure(items, second))",
-    "expected_stdout": "4 10\n[2, 3, 4, 5, 2]\n14\n",
+    "expected_stdout": "4 10\n[2, 3, 4, 5, 2]\n13\n",
     "explanation": "extend modifies the shared list before measure reads alternating indices. The second append changes the last alternating-index element."
   },
   {
@@ -95,7 +95,7 @@
     "title": "Composed Return and Side Effect",
     "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
     "code": "def take(values):\n    item = values.pop()\n    return item * 2\ndef push(values, value):\n    values.insert(0, value)\n    return len(values)\ndef run(values):\n    a = take(values)\n    b = push(values, a - 1)\n    return a + b\nnumbers = [2, 4, 6]\nprint(run(numbers))\nprint(numbers)\nprint(run(numbers))",
-    "expected_stdout": "14\n[11, 2, 4]\n10\n",
+    "expected_stdout": "15\n[11, 2, 4]\n11\n",
     "explanation": "The first take removes 6 and returns 12, then inserts 11. The second call removes 4 and inserts 7."
   },
   {

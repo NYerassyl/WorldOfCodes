@@ -39,8 +39,8 @@
     "topic": "backtracking-dfs-memoization",
     "title": "Subsets Without Neighbors",
     "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
-    "code": "chosen = []\nnumbers = [1, 2, 3, 4]\ndef build(index):\n    if index == len(numbers):\n        if len(chosen) == 2:\n            print(chosen[:])\n        return\n    build(index + 1)\n    if not chosen or chosen[-1] != numbers[index] + 1:\n        chosen.append(numbers[index])\n        build(index + 1)\n        chosen.pop()\nbuild(0)\nprint(\"end\", chosen)",
-    "expected_stdout": "[2, 4]\n[1, 4]\n[1, 3]\nend []\n",
+    "code": "chosen = []\nnumbers = [1, 2, 3, 4]\ndef build(index):\n    if index == len(numbers):\n        if len(chosen) == 2:\n            print(chosen[:])\n        return\n    build(index + 1)\n    if not chosen or chosen[-1] != numbers[index] - 1:\n        chosen.append(numbers[index])\n        build(index + 1)\n        chosen.pop()\nbuild(0)\nprint(\"end\", chosen)",
+    "expected_stdout": "[3, 4]\n[2, 4]\n[2, 3]\n[1, 4]\n[1, 3]\n[1, 2]\nend []\n",
     "explanation": "Skip-first recursion means larger-index choices are considered first. Adjacent selected numbers are rejected; pop restores chosen after each include branch."
   },
   {
@@ -106,7 +106,7 @@
     "title": "Tree Search with State Rollback",
     "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
     "code": "tree = {\"root\": [\"L\", \"R\"], \"L\": [\"LL\", \"LR\"], \"R\": [\"RL\"], \"LL\": [], \"LR\": [], \"RL\": []}\nweights = {\"root\": 1, \"L\": 2, \"R\": 3, \"LL\": 4, \"LR\": 1, \"RL\": 2}\npath = []\ndef visit(node, score):\n    path.append(node)\n    score += weights[node]\n    if not tree[node]:\n        if score % 2 == 1:\n            print(\"/\".join(path), score)\n    else:\n        for child in tree[node]:\n            visit(child, score)\n    path.pop()\nvisit(\"root\", 0)\nprint(\"rooted\", len(path))",
-    "expected_stdout": "root/L/LL 7\nroot/R/RL 6\nrooted 0\n",
+    "expected_stdout": "root/L/LL 7\nrooted 0\n",
     "explanation": "Leaves are visited left to right, and only odd-score leaves print. Shared path is restored by pop before returning to the parent."
   }
 ]

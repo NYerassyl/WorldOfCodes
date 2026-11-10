@@ -18,7 +18,7 @@
     "title": "Two Recursive Branches",
     "instructions": "Track recursive calls and determine which prints occur on entry and which occur during return. Enter exact stdout.",
     "code": "def choices(n):\n    if n <= 1:\n        return n + 1\n    left = choices(n - 1)\n    print(\"left\", n, left)\n    right = choices(n - 2)\n    total = left + right\n    if n == 3:\n        print(\"merge\", n, total)\n    return total\nvalue = choices(3)\nprint(\"final\", value)",
-    "expected_stdout": "left 2 2\nleft 3 4\nmerge 3 7\nfinal 7\n",
+    "expected_stdout": "left 2 2\nleft 3 3\nmerge 3 5\nfinal 5\n",
     "explanation": "The left subtree is evaluated fully before the right subtree. The merge print occurs after both branches return."
   },
   {
@@ -51,7 +51,7 @@
     "title": "Loop Inside Recursion",
     "instructions": "Track recursive calls and determine which prints occur on entry and which occur during return. Enter exact stdout.",
     "code": "def echo(depth, width):\n    if depth == 0:\n        return 0\n    subtotal = 0\n    for index in range(width):\n        if index == 1:\n            subtotal += echo(depth - 1, 1)\n        else:\n            subtotal += index + depth\n    print(depth, subtotal)\n    return subtotal\nanswer = echo(2, 3)\nprint(\"sum\", answer)",
-    "expected_stdout": "1 1\n2 6\nsum 6\n",
+    "expected_stdout": "1 1\n2 7\nsum 7\n",
     "explanation": "At depth two, only loop index 1 makes a recursive call. The child prints before its parent prints the subtotal."
   },
   {
