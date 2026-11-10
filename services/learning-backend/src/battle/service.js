@@ -202,7 +202,7 @@ export async function submitBattleSolution(prisma, { matchId, userId, sourceCode
         claimed = false;
         break;
       }
-      if (error?.code !== 'P2034' || attempt === 2) throw error;
+      if (!['P2034', '40P01'].includes(error?.code) || attempt === 2) throw error;
     }
   }
   const latest = await prisma.match.findUnique({ where: { id: matchId }, select: { status: true, winnerId: true } });
