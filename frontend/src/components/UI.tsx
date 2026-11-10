@@ -128,12 +128,16 @@ export function Editor({
   title = "solution.js",
   placeholder,
   smartEditing = true,
+  indent,
+  autoIndent = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   title?: string;
   placeholder?: string;
   smartEditing?: boolean;
+  indent?: string;
+  autoIndent?: boolean;
 }) {
   return (
     <div className="editor">
@@ -148,7 +152,8 @@ export function Editor({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         onKeyDown={(event) =>
-          smartEditing && handleEditorKeyDown(event, value, onChange)
+          smartEditing &&
+          handleEditorKeyDown(event, value, onChange, { indent, autoIndent })
         }
         placeholder={placeholder}
         spellCheck={false}

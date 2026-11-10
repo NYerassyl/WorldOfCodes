@@ -132,6 +132,25 @@ test("Backspace removes an empty pair but keeps pairs with content", () => {
   assert.equal(press("(x)", 2, "Backspace"), null);
 });
 
+test("an explicit indent unit overrides detection in an empty editor", () => {
+  const four = { indent: "    " };
+  const typed = press("if score >= 75:", 15, "Enter", four);
+  assert.equal(typed.value, "if score >= 75:\n    ");
+  assert.equal(typed.selectionStart, 20);
+
+  const tab = press("", 0, "Tab", { indent: "\t" });
+  assert.equal(tab.value, "\t");
+  assert.equal(press("x = 1", 0, "Tab", four).value, "    x = 1");
+});
+
+test("exact-copy mode leaves Enter to the browser while Tab still uses the reference indent", () => {
+  const drill = { indent: "    ", autoIndent: false };
+  assert.equal(press("if score >= 75:", 15, "Enter", drill), null);
+  assert.equal(press("    print(total)", 16, "Enter", drill), null);
+  assert.equal(press("", 0, "Tab", drill).value, "    ");
+  assert.equal(press("    return x", 12, "Tab", { ...drill, shiftKey: true }).value, "return x");
+});
+
 test("modifier shortcuts and ordinary characters are left to the browser", () => {
   assert.equal(press("foo", 3, "(", { ctrlKey: true }), null);
   assert.equal(press("foo", 3, "(", { metaKey: true }), null);

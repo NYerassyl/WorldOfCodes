@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import { Heading, Editor, Notice } from "../components/UI";
 import { useAuth, authErrorMessage } from "../lib/auth";
+import { detectIndent } from "../lib/editor-keys";
 import * as api from "../lib/learning-api";
 import "./server-practice.css";
 function useResource<T>(load: () => Promise<T>, key: string) {
@@ -451,7 +452,8 @@ export function ServerCopy() {
               title="practice.py"
               value={code}
               onChange={setCode}
-              smartEditing={false}
+              indent={detectIndent(detail.data.exercise.templateCode ?? "")}
+              autoIndent={false}
             />
             {user ? (
               <button

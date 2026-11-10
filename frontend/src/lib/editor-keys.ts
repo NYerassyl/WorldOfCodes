@@ -11,6 +11,11 @@ export type EditorKeyInput = {
   ctrlKey?: boolean;
   metaKey?: boolean;
   altKey?: boolean;
+  // Indent unit to use instead of detecting it from the current text. Exact-copy
+  // drills start from an empty editor, so the reference file's unit is passed in.
+  indent?: string;
+  // Exact-copy drills count every space, so Enter must not add indentation there.
+  autoIndent?: boolean;
 };
 
 export type EditorEdit = {
@@ -159,13 +164,16 @@ export function applyEditorKey(input: EditorKeyInput): EditorEdit | null {
   const start = Math.min(input.selectionStart, input.selectionEnd);
   const end = Math.max(input.selectionStart, input.selectionEnd);
 
-  const unit = detectIndent(value);
+  const unit = input.indent ?? detectIndent(value);
   if (key === "Tab") {
     if (input.shiftKey) return dedentLines(value, start, end, unit);
     if (start === end && CLOSERS.has(value[start] ?? "")) return editAt(value, start + 1);
     return indentLines(value, start, end, unit);
   }
-  if (key === "Enter" && !input.shiftKey) return newline(value, start, end, unit);
+  if (key === "Enter" && !input.shiftKey) {
+    if (input.autoIndent === false) return null;
+    return newline(value, start, end, unit);
+  }
   if (key === "Backspace") return backspace(value, start, end);
   if (CLOSERS.has(key) && start === end && value[start] === key) {
     // Overtype the automated closer unless the quote is escaped.
@@ -187,6 +195,7 @@ export function handleEditorKeyDown(
   },
   value: string,
   onChange: (next: string) => void,
+  options: { indent?: string; autoIndent?: boolean } = {},
 ): boolean {
   const target = event.currentTarget;
   const next = applyEditorKey({
@@ -198,6 +207,8 @@ export function handleEditorKeyDown(
     ctrlKey: event.ctrlKey,
     metaKey: event.metaKey,
     altKey: event.altKey,
+    indent: options.indent,
+    autoIndent: options.autoIndent,
   });
   if (!next) return false;
   event.preventDefault();
