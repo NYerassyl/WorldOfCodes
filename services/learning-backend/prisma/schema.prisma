@@ -1,0 +1,283 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Difficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SubmissionStatus {
+  ACCEPTED
+  WRONG_ANSWER
+  RUNTIME_ERROR
+  TIME_LIMIT
+}
+
+enum MatchType {
+  RANKED
+  FRIENDLY
+}
+
+enum MatchStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+  EXPIRED
+}
+
+enum RewardKind {
+  PROBLEM
+  COPY
+}
+
+model User {
+  id                 String              @id @default(uuid())
+  email              String              @unique
+  passwordHash       String
+  nickname           String
+  normalizedNickname String              @unique
+  avatarUrl          String?
+  xp                 Int                 @default(0)
+  coins              Int                 @default(0)
+  nicknameChanges    Int                 @default(0)
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  sessions           AuthSession[]
+  submissions        Submission[]
+  completions        ProblemCompletion[]
+  lessonProgress     LessonProgress[]
+  copyAttempts       CopyAttempt[]
+  copyCompletions    CopyCompletion[]
+  rewards            RewardLedger[]
+  matchPlayers       MatchPlayer[]
+  wonMatches         Match[]           @relation("MatchWinner")
+  rating             Rating?
+  createdFriendBattles FriendBattle[]  @relation("FriendBattleCreator")
+}
+
+model AuthSession {
+  id          String    @id @default(uuid())
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  createdAt   DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@index([userId, expiresAt])
+}
+
+model Course {
+  id          String    @id
+  title       String
+  language    String
+  description String
+  isPublished Boolean   @default(true)
+  topics      Topic[]
+}
+
+model Topic {
+  id       String   @id
+  courseId String
+  title    String
+  position Int
+  course   Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  lessons  Lesson[]
+  @@unique([courseId, position])
+}
+
+model Lesson {
+  id          String           @id
+  topicId     String
+  title       String
+  position    Int
+  theoryMd    String           @db.Text
+  topic       Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
+  problems    Problem[]
+  progresses  LessonProgress[]
+  @@unique([topicId, position])
+}
+
+model Problem {
+  id           String              @id
+  lessonId     String?
+  title        String
+  statement    String              @db.Text
+  language     String              @default("python")
+  topicSlug    String
+  difficulty   Difficulty
+  functionName String
+  starterCode  String              @default("") @db.Text
+  rewardXp     Int                 @default(20)
+  rewardCoins  Int                 @default(5)
+  isPublished  Boolean             @default(true)
+  lesson       Lesson?             @relation(fields: [lessonId], references: [id])
+  testCases    TestCase[]
+  submissions  Submission[]
+  completions  ProblemCompletion[]
+  matches      Match[]
+  @@index([topicSlug, difficulty, isPublished])
+  @@index([lessonId])
+}
+
+model TestCase {
+  id           String    @id
+  problemId    String
+  position     Int
+  argsJson     String    @db.Text
+  expectedJson String    @db.Text
+  isSample     Boolean   @default(false)
+  problem      Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  @@unique([problemId, position])
+}
+
+model Submission {
+  id          String           @id @default(uuid())
+  userId      String
+  problemId   String
+  sourceCode  String           @db.Text
+  status      SubmissionStatus
+  passedCases Int
+  totalCases  Int
+  createdAt   DateTime         @default(now())
+  user        User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem     Problem          @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+  @@index([problemId, createdAt])
+}
+
+model ProblemCompletion {
+  id          String    @id @default(uuid())
+  userId      String
+  problemId   String
+  completedAt DateTime  @default(now())
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  problem     Problem   @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  @@unique([userId, problemId])
+}
+
+model LessonProgress {
+  id          String    @id @default(uuid())
+  userId      String
+  lessonId    String
+  startedAt   DateTime  @default(now())
+  completedAt DateTime?
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
+  @@unique([userId, lessonId])
+}
+
+model CopyExercise {
+  id           String           @id
+  title        String
+  language     String           @default("python")
+  description  String
+  templateCode String           @db.Text
+  rewardXp     Int              @default(5)
+  rewardCoins  Int              @default(1)
+  isPublished  Boolean          @default(true)
+  attempts     CopyAttempt[]
+  completions  CopyCompletion[]
+}
+
+model CopyAttempt {
+  id         String       @id @default(uuid())
+  userId     String
+  exerciseId String
+  isExact    Boolean
+  createdAt  DateTime     @default(now())
+  user       User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise   CopyExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  @@index([userId, createdAt])
+}
+
+model CopyCompletion {
+  id          String       @id @default(uuid())
+  userId      String
+  exerciseId  String
+  completedAt DateTime     @default(now())
+  user        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exercise    CopyExercise @relation(fields: [exerciseId], references: [id], onDelete: Cascade)
+  @@unique([userId, exerciseId])
+}
+
+model RewardLedger {
+  id        String     @id @default(uuid())
+  userId    String
+  kind      RewardKind
+  sourceId  String
+  xp        Int
+  coins     Int
+  createdAt DateTime   @default(now())
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, kind, sourceId])
+}
+
+// Battle schema extension — fields proposed by GPT 3; match/rating business logic remains GPT 3's responsibility.
+// GPT 3 approved enum values and lifecycle. Ranked creation must explicitly use ACTIVE;
+// friendly invitation creation may use the PENDING default, then join transitions to ACTIVE.
+model Match {
+  id          String        @id @default(uuid())
+  type        MatchType
+  status      MatchStatus   @default(PENDING)
+  problemId   String
+  winnerId    String?
+  startedAt   DateTime?
+  completedAt DateTime?
+  problem     Problem       @relation(fields: [problemId], references: [id], onDelete: Restrict)
+  winner      User?         @relation("MatchWinner", fields: [winnerId], references: [id], onDelete: SetNull)
+  players     MatchPlayer[]
+  friendBattle FriendBattle?
+
+  @@index([problemId])
+  @@index([winnerId])
+  @@index([type, status])
+  @@index([status, type])
+}
+
+model MatchPlayer {
+  matchId      String
+  userId       String
+  seat         Int
+  submittedAt  DateTime?
+  verdict      SubmissionStatus?
+  ratingBefore Int?
+  ratingDelta  Int?
+  match        Match             @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  user         User              @relation(fields: [userId], references: [id], onDelete: Restrict)
+
+  @@id([matchId, userId])
+  @@unique([matchId, seat])
+  @@index([userId])
+}
+
+model Rating {
+  userId    String   @id
+  points    Int      @default(1000)
+  wins      Int      @default(0)
+  losses    Int      @default(0)
+  draws     Int      @default(0)
+  updatedAt DateTime @updatedAt
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model FriendBattle {
+  id          String   @id @default(uuid())
+  matchId     String   @unique
+  inviteCode  String   @unique
+  createdById String
+  expiresAt   DateTime
+  createdAt   DateTime @default(now())
+  match       Match    @relation(fields: [matchId], references: [id], onDelete: Cascade)
+  createdBy   User     @relation("FriendBattleCreator", fields: [createdById], references: [id], onDelete: Restrict)
+
+  @@index([createdById])
+  @@index([expiresAt])
+}

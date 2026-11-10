@@ -1,0 +1,28 @@
+{
+  "name": "@worldofcodes/learning-backend-proposal",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "start": "node --env-file=.env src/standalone.js",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate deploy",
+    "db:seed": "node --env-file=.env prisma/seed.js",
+    "test:integration": "node --test integration/pg-docker.integration.test.js"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.0.0",
+    "express": "^4.21.2",
+    "socket.io": "^4.8.4"
+  },
+  "devDependencies": {
+    "prisma": "^6.0.0"
+  },
+  "prisma": {
+    "seed": "node prisma/seed.js"
+  }
+}
