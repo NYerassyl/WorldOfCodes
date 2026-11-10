@@ -65,7 +65,7 @@ test('GET /battle/state returns active match and queue recovery state', async ()
       match: { create: async ({ data }) => ({ id: 'ranked-state-test', ...data }) }
     })
   };
-  const queue = new MatchmakingQueue({});
+  const queue = new MatchmakingQueue(prisma);
   const queued = await queue.join('player-1');
   const router = createBattleRouter(prisma, (_req, _res, next) => next(), { queue });
   const handler = routeHandler(router, 'get', '/battle/state');
