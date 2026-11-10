@@ -148,3 +148,15 @@ test('protected socket events revalidate revoked sessions and remove the last ta
   assert.equal(socket.disconnected, true);
   assert.equal(leaveCalls, 1);
 });
+
+
+test('Socket.IO exposes a 32 KiB transport limit for bounded UTF-8 payloads', async () => {
+  const prisma = { authSession: { findUnique: async () => session } };
+  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer });
+  const limit = FakeSocketServer.instance.options.maxHttpBufferSize;
+  assert.equal(limit, 32 * 1024);
+  const withinLimit = JSON.stringify({ matchId: 'm'.repeat(1), code: 'é'.repeat(20_000) });
+  assert.ok(Buffer.byteLength(withinLimit, 'utf8') < limit);
+  const overLimit = JSON.stringify({ matchId: 'm', code: 'é'.repeat(20_000) + 'é'.repeat(4_000) });
+  assert.ok(Buffer.byteLength(overLimit, 'utf8') > limit);
+});
