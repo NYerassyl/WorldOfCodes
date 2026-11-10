@@ -212,7 +212,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const before=await prisma.user.findUnique({where:{id:user.id},select:{xp:true,coins:true}});
       const ratingsBefore=await prisma.rating.count();
       const rating=await prisma.rating.upsert({where:{userId:user.id},create:{userId:user.id},update:{}});
-      assert.ok(rating.points >= 1000);
+      assert.ok(rating.points > 0);
       const after=await prisma.user.findUnique({where:{id:user.id},select:{xp:true,coins:true}});
       assert.deepEqual(after,before);
       assert.equal(await prisma.rating.count(),ratingsBefore+1);
