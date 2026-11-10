@@ -97,6 +97,27 @@ authority: it returns the `ACTIVE`/`PENDING` match for this account and the queu
 ticket state (`NOT_QUEUED`, `QUEUED` with position/joinedAt, `MATCHMAKING`). The
 client polls it, plus the current match, every 2.5 s while a match is open.
 
+## Invitation cancellation
+
+A `PENDING` friendly invitation previously had no exit: `/battle/state` returns
+active matches only, and the client restored the saved invitation hint with no
+way to free the seat. Both players could create an invitation and get stuck.
+
+- `DELETE /api/battle/matches/:matchId` cancels a `PENDING` friendly match for
+  its owner: the match becomes `CANCELLED` and the invite code row is deleted, so
+  the code can no longer be joined.
+- `404 BATTLE_NOT_FOUND` when the account has no pending invitation with that ID;
+  `409 MATCH_NOT_PENDING` when the battle already started.
+- The pending panel now shows **Cancel invitation**; cancelling clears the local
+  hint and returns to the idle Arena state with a readable notice.
+
+Verified on 2026-11-10 through the public Vercel deployment (real REST calls with
+the browser `Origin`): create invite `201`, cancel `200 CANCELLED`, match
+`CANCELLED` with `completedAt`, `GET /battle/state` → `{"match":null}`, joining
+the cancelled code → `404 INVITE_NOT_FOUND`, and a new invitation can be created
+and cancelled afterwards. `OPTIONS` preflight for `DELETE` returns `204` with
+`Access-Control-Allow-Methods: GET,POST,PATCH,DELETE,OPTIONS`.
+
 ## Notes and limitations
 
 - Background tabs throttle timers, so a hidden tab may show stale "Last server
@@ -108,6 +129,7 @@ client polls it, plus the current match, every 2.5 s while a match is open.
   `ACCEPTED` result is produced.
 - The accounts `arena.alpha@worldofcodes.dev` / `arena.beta@worldofcodes.dev`
   and their matches remain in the local database only.
-- No change was made to `package.json`, `package-lock.json`, `server/index.js`,
-  Prisma schemas or business logic. The only backend dependency is the already
-  merged `GET /battle/state` route.
+- No change was made to `package.json`, `package-lock.json`, `server/index.js` or
+  Prisma schemas. The only shared backend changes are the already merged
+  `GET /battle/state` route and the `DELETE /battle/matches/:matchId`
+  cancellation route described above.

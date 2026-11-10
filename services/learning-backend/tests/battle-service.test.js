@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMatch, createFriendlyInvite, joinFriendlyInvite } from '../src/battle/service.js';
+import { cancelFriendlyInvite, createMatch, createFriendlyInvite, joinFriendlyInvite } from '../src/battle/service.js';
 
 function problemMocks() {
   return {
@@ -103,6 +103,53 @@ test('joining a friendly invite adds seat 1 and atomically activates the match',
   assert.equal(calls.deletedInvite, 'invite-1');
   assert.equal(calls.isolation, 'Serializable');
   assert.equal(match.status, 'ACTIVE');
+});
+
+test('cancelling a pending friendly invite marks it CANCELLED and deletes the code', async () => {
+  const calls = { find: null, updateWhere: null, updateData: null, deletedMatchId: null, isolation: null };
+  const prisma = {
+    $transaction: async (callback, options) => {
+      calls.isolation = options?.isolationLevel;
+      return callback({
+        match: {
+          findFirst: async args => { calls.find = args; return { id: 'friendly-1' }; },
+          updateMany: async args => { calls.updateWhere = args.where; calls.updateData = args.data; return { count: 1 }; }
+        },
+        friendBattle: { deleteMany: async args => { calls.deletedMatchId = args.where.matchId; } }
+      });
+    }
+  };
+
+  const result = await cancelFriendlyInvite(prisma, { matchId: 'friendly-1', userId: 'creator' });
+  assert.equal(calls.find.where.status, 'PENDING');
+  assert.deepEqual(calls.find.where.players, { some: { userId: 'creator' } });
+  assert.equal(calls.updateWhere.status, 'PENDING');
+  assert.equal(calls.updateData.status, 'CANCELLED');
+  assert.ok(calls.updateData.completedAt instanceof Date);
+  assert.equal(calls.deletedMatchId, 'friendly-1');
+  assert.equal(calls.isolation, 'Serializable');
+  assert.deepEqual(result, { matchId: 'friendly-1', status: 'CANCELLED' });
+});
+
+test('cancelling is rejected once the invite is gone or no longer pending', async () => {
+  const makePrisma = found => ({
+    $transaction: async callback => callback({
+      match: {
+        findFirst: async () => (found ? { id: 'friendly-1' } : null),
+        updateMany: async () => ({ count: found ? 0 : 1 })
+      },
+      friendBattle: { deleteMany: async () => assert.fail('must not delete a used invite') }
+    })
+  });
+
+  await assert.rejects(
+    cancelFriendlyInvite(makePrisma(false), { matchId: 'friendly-1', userId: 'creator' }),
+    error => error.code === 'BATTLE_NOT_FOUND'
+  );
+  await assert.rejects(
+    cancelFriendlyInvite(makePrisma(true), { matchId: 'friendly-1', userId: 'creator' }),
+    error => error.code === 'MATCH_NOT_PENDING'
+  );
 });
 
 test('friendly invite cannot be joined by its creator or after expiry', async () => {

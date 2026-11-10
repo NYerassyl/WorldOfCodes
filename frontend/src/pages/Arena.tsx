@@ -283,9 +283,18 @@ function BattleView({
                 </p>
               )}
               <Notice>
-                Closing or refreshing this page does not cancel the invitation;
-                the server restores it when you come back.
+                Closing or refreshing this page keeps the invitation active. Cancel
+                it to free your seat and start a new match.
               </Notice>
+              <div className="battle-input-row">
+                <button
+                  className="btn secondary"
+                  disabled={locked}
+                  onClick={() => void session.cancelInvite()}
+                >
+                  Cancel invitation
+                </button>
+              </div>
             </section>
           )}
           {terminal && (

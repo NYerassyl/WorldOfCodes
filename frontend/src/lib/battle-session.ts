@@ -51,6 +51,8 @@ const messages: Record<string, string> = {
     "This invitation has already been used. Ask your friend for a new code.",
   INVALID_INVITE: "Enter the invitation code your friend shared with you.",
   MATCH_FULL: "This match already has two players.",
+  MATCH_NOT_PENDING:
+    "This battle already started, so the invitation can no longer be cancelled.",
   BATTLE_NOT_FOUND: "This match is not available to this account.",
   ALREADY_QUEUED:
     "You are already waiting. Cancel the queue before joining again.",
@@ -368,6 +370,19 @@ export class BattleSession {
       if (!this.active) return;
       this.update({ invite: null });
       await this.loadMatch(match.id, match);
+    });
+
+  cancelInvite = () =>
+    this.action("cancel", async () => {
+      const match = this.state.match;
+      if (!this.matchId || !match || match.type !== "FRIENDLY" || match.status !== "PENDING")
+        throw new Error("Only a pending friendly invitation can be cancelled.");
+      await this.api.cancelBattleInvite(this.matchId, this.abort.signal);
+      if (!this.active) return;
+      this.dropMatch();
+      this.update({
+        notice: "Invitation cancelled. You can create a new one or join a friend's code.",
+      });
     });
 
   recoverMatch = (id: string) =>

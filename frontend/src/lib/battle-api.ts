@@ -100,6 +100,13 @@ async function request<T>(
 export function getBattleMatch(id: string, signal?: AbortSignal) {
   return request<BattleMatch>(`/battle/matches/${encodeURIComponent(id)}`, { signal });
 }
+/** Cancels a PENDING friendly invitation; the invite code stops working immediately. */
+export function cancelBattleInvite(id: string, signal?: AbortSignal) {
+  return request<{ matchId: string; status: "CANCELLED" }>(
+    `/battle/matches/${encodeURIComponent(id)}`,
+    { method: "DELETE", signal },
+  );
+}
 /** Authoritative recovery snapshot: the active match and queue ticket for this account. */
 export function getBattleState(signal?: AbortSignal) {
   return request<BattleStateSnapshot>("/battle/state", { signal });

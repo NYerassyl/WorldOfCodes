@@ -124,6 +124,30 @@ export async function joinFriendlyInvite(prisma, userId, inviteCode) {
   }
 }
 
+export async function cancelFriendlyInvite(prisma, { matchId, userId }) {
+  const outcome = await prisma.$transaction(async tx => {
+    const match = await tx.match.findFirst({
+      where: { id: matchId, type: 'FRIENDLY', status: 'PENDING', players: { some: { userId } } },
+      select: { id: true }
+    });
+    if (!match) return 'NOT_FOUND';
+    const cancelled = await tx.match.updateMany({
+      where: { id: matchId, type: 'FRIENDLY', status: 'PENDING' },
+      data: { status: 'CANCELLED', completedAt: new Date() }
+    });
+    if (cancelled.count !== 1) return 'NOT_PENDING';
+    await tx.friendBattle.deleteMany({ where: { matchId } });
+    return 'CANCELLED';
+  }, { isolationLevel: 'Serializable' });
+  if (outcome === 'NOT_FOUND') {
+    throw new AppError(404, 'BATTLE_NOT_FOUND', 'No pending friendly invitation was found for this account');
+  }
+  if (outcome === 'NOT_PENDING') {
+    throw new AppError(409, 'MATCH_NOT_PENDING', 'This battle already started and cannot be cancelled');
+  }
+  return { matchId, status: 'CANCELLED' };
+}
+
 export async function getMatchForUser(prisma, matchId, userId) {
   const match = await prisma.match.findFirst({ where: { id: matchId, players: { some: { userId } } }, select: publicMatchSelect });
   if (!match) throw new AppError(404, 'BATTLE_NOT_FOUND', 'Battle not found');

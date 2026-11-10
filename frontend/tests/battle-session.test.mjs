@@ -63,6 +63,7 @@ function setup(t, overrides = {}) {
   const api = {
     getBattleState: async () => ({ match: null, queue: { status: "NOT_QUEUED" } }),
     getBattleMatch: async (id) => clone(activeMatch.id === id ? activeMatch : pendingMatch),
+    cancelBattleInvite: async (id) => ({ matchId: id, status: "CANCELLED" }),
     getBattleProblem: async () => clone(problem),
     getBattleRating: async () => clone(rating),
     createBattleInvite: async () => ({ matchId: "f1", inviteCode: "ABC12345", expiresInSeconds: 1800 }),
@@ -233,6 +234,46 @@ test("an expired session notifies the runtime exactly once", async (t) => {
   await flush();
   assert.equal(expired(), 1);
   assert.match(session.getSnapshot().error ?? "", /session has expired/i);
+});
+
+test("a pending friendly invitation can be cancelled and frees the seat", async (t) => {
+  let cancelled = null;
+  const { session, storage } = setup(t, {
+    cancelBattleInvite: async (id) => {
+      cancelled = id;
+      return { matchId: id, status: "CANCELLED" };
+    },
+  });
+  storage.setItem(
+    "worldofcodes-battle-v1:u1",
+    JSON.stringify({ matchId: "f1", invite: { matchId: "f1", inviteCode: "ABC12345", expiresInSeconds: 1800 } }),
+  );
+  session.start();
+  await flush();
+  assert.equal(session.getSnapshot().match?.status, "PENDING");
+
+  await session.cancelInvite();
+  await flush();
+  const state = session.getSnapshot();
+  assert.equal(cancelled, "f1");
+  assert.equal(state.matchId, null);
+  assert.equal(state.match, null);
+  assert.equal(state.invite, null);
+  assert.match(state.notice ?? "", /cancelled/i);
+  assert.equal(storage.dump()["worldofcodes-battle-v1:u1"], undefined);
+});
+
+test("an active match cannot be cancelled as an invitation", async (t) => {
+  const { session } = setup(t, {
+    getBattleState: async () => ({ match: clone(activeMatch), queue: { status: "NOT_QUEUED" } }),
+  });
+  session.start();
+  await flush();
+  await session.cancelInvite();
+  await flush();
+  const state = session.getSnapshot();
+  assert.equal(state.matchId, "m1");
+  assert.match(state.error ?? "", /only a pending friendly invitation/i);
 });
 
 test("unfinished matches cannot be abandoned from the client", async (t) => {
