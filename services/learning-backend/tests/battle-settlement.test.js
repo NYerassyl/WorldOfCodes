@@ -32,7 +32,7 @@ function createSubmitPrisma({ type = 'RANKED', alreadyCompleted = false } = {}) 
         match: {
           findUnique: async () => matchSnapshot(),
           updateMany: async ({ where, data }) => {
-            if (state.matchStatus !== where.status || matchSnapshot().type !== where.type) return { count: 0 };
+            if (state.matchStatus !== where.status || (where.type && matchSnapshot().type !== where.type)) return { count: 0 };
             state.matchStatus = data.status; state.winnerId = data.winnerId; state.matchUpdates++;
             return { count: 1 };
           }
