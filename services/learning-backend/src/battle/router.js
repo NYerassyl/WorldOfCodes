@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { asyncRoute, ensureKeys } from '../lib/errors.js';
-import { createFriendlyInvite, getActiveMatchForUser, getLeaderboard, getMatchForUser, getMyRating, joinFriendlyInvite, submitBattleSolution } from './service.js';
+import { cancelFriendlyInvite, createFriendlyInvite, getActiveMatchForUser, getLeaderboard, getMatchForUser, getMyRating, joinFriendlyInvite, submitBattleSolution } from './service.js';
 import { MatchmakingQueue } from './matchmaking.js';
 
 export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(prisma), judge, notifier } = {}) {
@@ -43,6 +43,8 @@ export function createBattleRouter(prisma, auth, { queue = new MatchmakingQueue(
   }));
   router.get('/battle/matches/:matchId', auth, asyncRoute(async (req, res) =>
     res.json(await getMatchForUser(prisma, req.params.matchId, req.auth.userId))));
+  router.delete('/battle/matches/:matchId', auth, asyncRoute(async (req, res) =>
+    res.json(await cancelFriendlyInvite(prisma, { matchId: req.params.matchId, userId: req.auth.userId }))));
 
   router.post('/battle/matches/:matchId/submit', auth, asyncRoute(async (req, res) => {
     ensureKeys(req.body, ['code']);
