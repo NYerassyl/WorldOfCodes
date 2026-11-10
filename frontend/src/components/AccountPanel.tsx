@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useRef, useState, type FormEvent } from "react";
 import { useAuth, authErrorMessage } from "../lib/auth";
 import { ApiError } from "../lib/api";
 import AvatarFace from "./Avatar";
@@ -189,6 +189,7 @@ function SignedIn() {
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
+  const dialog=useRef<HTMLDialogElement>(null);
   if (!user) return null;
 
   async function save(event: FormEvent) {
@@ -198,8 +199,9 @@ function SignedIn() {
     try {
       const next = await updateProfile({
         displayName:name.trim(), bio,
-        avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
+        ...(avatarUrl === user?.avatarUrl ? {} : {avatarUrl: avatarUrl.trim() || null}),
       });
+      dialog.current?.close();
       setName(next.displayName ?? next.nickname);
       setAvatarUrl(next.avatarUrl ?? "");
       setNotice({ tone: "ok", text: "Your server profile has been updated." });
@@ -252,58 +254,23 @@ function SignedIn() {
           </div>
         )}
       </dl>
-      <p className="account-note">
-        Your XP and coins are awarded after the server verifies your work.
-        Repeating an exercise lets you practice without earning duplicate
-        rewards.
-      </p>
-      <form className="account-form" onSubmit={save}>
-        <label>
-          Username<input readOnly value={user.nickname}/></label>
-        <label>Display name<input required maxLength={40} value={name} onChange={e=>setName(e.target.value)}/>
-        <small>Change once every 14 days.</small></label>
-        <label>Bio<textarea maxLength={300} value={bio} onChange={e=>setBio(e.target.value)}/></label>
-        <label>Upload avatar<input type="file" accept="image/png,image/jpeg,image/webp" onChange={async e=>{
-          const file=e.target.files?.[0]; if(!file)return;
-          setBusy(true);
-          try {
-            if(file.size>8*1024*1024) throw new Error('Choose an image under 8 MB.');
-            const bitmap=await createImageBitmap(file);
-            const canvas=document.createElement('canvas'); canvas.width=128; canvas.height=128;
-            const ctx=canvas.getContext('2d'); if(!ctx)throw new Error('Image processing unavailable');
-            const side=Math.min(bitmap.width,bitmap.height);
-            ctx.drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,128,128); bitmap.close();
-            setAvatarUrl(canvas.toDataURL('image/jpeg',0.65));
-          } catch(err){setNotice({tone:'error',text:String(err)})} finally{setBusy(false)}
-        }}/>{avatarUrl.startsWith('data:') && <small>Uploaded photo selected</small>}</label>
-        <label>
-          Avatar URL
-          <input
-            type="url"
-            placeholder="https://example.com/avatar.png"
-            maxLength={512}
-            value={avatarUrl.startsWith('data:')?'':avatarUrl}
-            onChange={(event) => setAvatarUrl(event.target.value)}
-          />
-          <small className="account-hint">
-            A public HTTPS image URL, or leave empty to use your initial.
-          </small>
-        </label>
-        <div className="account-actions">
-          <button className="btn" type="submit" disabled={busy}>
-            {busy ? "Saving…" : "Save server profile"}
-          </button>
-          <button
-            className="btn secondary"
-            type="button"
-            disabled={busy}
-            onClick={() => void signOut()}
-          >
-            Sign out
-          </button>
-        </div>
-        <NoticeLine notice={notice} />
-      </form>
+      <div className="account-actions"><button className="btn" onClick={()=>{
+        setName(user.displayName ?? user.nickname); setBio(user.bio ?? ""); setAvatarUrl(user.avatarUrl ?? "");
+        setNotice(null); dialog.current?.showModal();
+      }}>Edit profile</button><button className="btn secondary" disabled={busy} onClick={signOut}>Sign out</button></div>
+      <NoticeLine notice={notice?.tone === "ok" ? notice : null}/>
+      <dialog ref={dialog} className="identity-editor" aria-labelledby="edit-title">
+        <form onSubmit={save}>
+          <header><h2 id="edit-title">Edit profile</h2><button className="btn secondary" type="button" aria-label="Close editor" onClick={()=>dialog.current?.close()}>×</button></header>
+          <div className="edit-avatar"><span className="account-avatar"><AvatarFace url={avatarUrl || null} name={name || user.nickname}/></span><div><strong>{name || user.nickname}</strong><small>@{user.nickname}</small></div></div>
+          <label>Profile photo link<input type="url" pattern="https://.+" placeholder="https://example.com/photo.jpg" maxLength={512} value={avatarUrl.startsWith("data:")?"":avatarUrl} onChange={e=>setAvatarUrl(e.target.value)}/></label>
+          {avatarUrl && <button type="button" className="remove-photo" onClick={()=>setAvatarUrl("")}>Remove photo</button>}
+          <label>Display name<input required maxLength={40} value={name} onChange={e=>setName(e.target.value)}/><small>Change once every 14 days.</small></label>
+          <label>Bio<textarea rows={3} maxLength={300} value={bio} onChange={e=>setBio(e.target.value)}/><small>{bio.length}/300</small></label>
+          <NoticeLine notice={notice?.tone === "error" ? notice : null}/>
+          <footer><button className="btn secondary" type="button" onClick={()=>dialog.current?.close()}>Cancel</button><button className="btn" disabled={busy}>{busy?"Saving…":"Save changes"}</button></footer>
+        </form>
+      </dialog>
     </>
   );
 }
