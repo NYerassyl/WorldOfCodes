@@ -45,6 +45,20 @@ def get_user(store: Storage, user_id: int) -> UserRecord:
         return user
 
 
+def ensure_progress_owner(store: Storage, user_id: int, actor_id: int) -> None:
+    """Authorize progress mutations; called by the GPT 4 router with ActorId.
+
+    The X-User-Id header is demo-only identity, not production authentication.
+    Keep actor_id required so a caller cannot accidentally bypass this check.
+    """
+    with store.lock:
+        get_user(store, user_id)
+        if actor_id != user_id:
+            raise DomainError(
+                403, "FORBIDDEN", "Only the learner can change their progress."
+            )
+
+
 def _ensure_email_available(store: Storage, email: str, exclude_id: int | None = None) -> None:
     for user in store.users.values():
         if user.email == email and user.id != exclude_id:
@@ -221,9 +235,19 @@ def update_lesson(
         lesson = get_lesson(store, lesson_id)
         if lesson.author_id != actor_id:
             raise DomainError(403, "FORBIDDEN", "Only the lesson author can update this lesson.")
-        if payload.prerequisite_lesson_id is not None:
-            _ensure_prerequisite(store, lesson_id, payload.prerequisite_lesson_id)
-            lesson.prerequisite_lesson_id = payload.prerequisite_lesson_id
+        if "prerequisite_lesson_id" in payload.model_fields_set:
+            new_prerequisite_id = payload.prerequisite_lesson_id
+            if new_prerequisite_id != lesson.prerequisite_lesson_id:
+                # Never invalidate already recorded lesson progress by
+                # introducing/removing a prerequisite after completion.
+                if any(key[1] == lesson_id for key in store.completions):
+                    raise DomainError(
+                        409,
+                        "LESSON_HAS_PROGRESS",
+                        "Cannot change prerequisites after a learner completed this lesson.",
+                    )
+                _ensure_prerequisite(store, lesson_id, new_prerequisite_id)
+                lesson.prerequisite_lesson_id = new_prerequisite_id
         if payload.title is not None:
             lesson.title = payload.title
         if payload.description is not None:
