@@ -23,11 +23,12 @@ test('queue state reports queued ticket, position, and not-queued state', async 
   };
   const queue = new MatchmakingQueue(prisma);
   const first = await queue.join('player-1');
-  await queue.join('player-2');
+  const second = await queue.join('player-2');
   assert.deepEqual(queue.getStatus('player-1'), {
     status: 'QUEUED', ticketId: first.ticketId, position: 1,
     joinedAt: new Date([...queue.waiting.values()][0].joinedAt).toISOString()
   });
+  assert.equal(queue.getStatus('player-2').ticketId, second.ticketId);
   assert.equal(queue.getStatus('player-2').position, 2);
   assert.deepEqual(queue.getStatus('player-3'), { status: 'NOT_QUEUED' });
   queue.leave('player-1');
