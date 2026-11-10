@@ -40,7 +40,7 @@
     "title": "Subsets Without Neighbors",
     "instructions": "Track the search tree, print order, memoized calls, and state restoration during backtracking. Enter the exact stdout.",
     "code": "chosen = []\nnumbers = [1, 2, 3, 4]\ndef build(index):\n    if index == len(numbers):\n        if len(chosen) == 2:\n            print(chosen[:])\n        return\n    build(index + 1)\n    if not chosen or chosen[-1] != numbers[index] - 1:\n        chosen.append(numbers[index])\n        build(index + 1)\n        chosen.pop()\nbuild(0)\nprint(\"end\", chosen)",
-    "expected_stdout": "[3, 4]\n[2, 4]\n[2, 3]\n[1, 4]\n[1, 3]\n[1, 2]\nend []\n",
+    "expected_stdout": "[2, 4]\n[1, 4]\n[1, 3]\nend []\n",
     "explanation": "Skip-first recursion means larger-index choices are considered first. Adjacent selected numbers are rejected; pop restores chosen after each include branch."
   },
   {
