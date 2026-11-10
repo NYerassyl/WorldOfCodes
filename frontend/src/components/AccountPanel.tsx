@@ -149,7 +149,7 @@ function SignedOut() {
         </label>
         {mode === "register" && (
           <label>
-            Nickname
+            Username
             <input
               required
               minLength={3}
@@ -184,7 +184,8 @@ function SignedOut() {
 
 function SignedIn() {
   const { user, logout, updateProfile } = useAuth();
-  const [nickname, setNickname] = useState(user?.nickname ?? "");
+  const [name,setName] = useState(user?.displayName ?? user?.nickname ?? "");
+  const [bio,setBio] = useState(user?.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -196,10 +197,10 @@ function SignedIn() {
     setNotice(null);
     try {
       const next = await updateProfile({
-        nickname: nickname.trim(),
+        displayName:name.trim(), bio,
         avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
       });
-      setNickname(next.nickname);
+      setName(next.displayName ?? next.nickname);
       setAvatarUrl(next.avatarUrl ?? "");
       setNotice({ tone: "ok", text: "Your server profile has been updated." });
     } catch (caught) {
@@ -258,28 +259,30 @@ function SignedIn() {
       </p>
       <form className="account-form" onSubmit={save}>
         <label>
-          Nickname
-          <input
-            required
-            minLength={3}
-            maxLength={24}
-            pattern="[A-Za-z0-9_]+"
-            value={nickname}
-            onChange={(event) => setNickname(event.target.value)}
-          />
-          <small className="account-hint">
-            {user.nextNicknameChange === "FREE"
-              ? "Your first nickname change is free."
-              : "Your free nickname change has been used."}
-          </small>
-        </label>
+          Username<input readOnly value={user.nickname}/></label>
+        <label>Display name<input required maxLength={40} value={name} onChange={e=>setName(e.target.value)}/>
+        <small>Change once every 14 days.</small></label>
+        <label>Bio<textarea maxLength={300} value={bio} onChange={e=>setBio(e.target.value)}/></label>
+        <label>Upload avatar<input type="file" accept="image/png,image/jpeg,image/webp" onChange={async e=>{
+          const file=e.target.files?.[0]; if(!file)return;
+          setBusy(true);
+          try {
+            if(file.size>8*1024*1024) throw new Error('Choose an image under 8 MB.');
+            const bitmap=await createImageBitmap(file);
+            const canvas=document.createElement('canvas'); canvas.width=128; canvas.height=128;
+            const ctx=canvas.getContext('2d'); if(!ctx)throw new Error('Image processing unavailable');
+            const side=Math.min(bitmap.width,bitmap.height);
+            ctx.drawImage(bitmap,(bitmap.width-side)/2,(bitmap.height-side)/2,side,side,0,0,128,128); bitmap.close();
+            setAvatarUrl(canvas.toDataURL('image/jpeg',0.65));
+          } catch(err){setNotice({tone:'error',text:String(err)})} finally{setBusy(false)}
+        }}/>{avatarUrl.startsWith('data:') && <small>Uploaded photo selected</small>}</label>
         <label>
           Avatar URL
           <input
             type="url"
             placeholder="https://example.com/avatar.png"
             maxLength={512}
-            value={avatarUrl}
+            value={avatarUrl.startsWith('data:')?'':avatarUrl}
             onChange={(event) => setAvatarUrl(event.target.value)}
           />
           <small className="account-hint">

@@ -28,6 +28,6 @@ export async function verifyPassword(password, stored) {
 export const createSessionToken = () => randomBytes(32).toString('base64url');
 export const hashSessionToken = token => createHash('sha256').update(token).digest('hex');
 export const levelFromXp = xp => Math.floor(Math.max(0,xp)/100)+1;
-export const publicUser = user => ({id:user.id, nickname:user.nickname, avatarUrl:user.avatarUrl, xp:user.xp, level:levelFromXp(user.xp)});
-export const privateUser = user => ({...publicUser(user), email:user.email, coins:user.coins, nicknameChanges:user.nicknameChanges, nextNicknameChange:user.nicknameChanges === 0 ? 'FREE' : 'PAYMENT_REQUIRED'});
+export const publicUser = user => ({id:user.id, displayName:user.displayName ?? user.nickname, bio:user.bio ?? "", nickname:user.nickname, avatarUrl:user.avatarUrl, xp:user.xp, level:levelFromXp(user.xp)});
+export const privateUser = user => ({...publicUser(user), renamedAt:user.renamedAt ?? null, email:user.email, coins:user.coins, nicknameChanges:user.nicknameChanges, nextNicknameChange:user.nicknameChanges === 0 ? 'FREE' : 'PAYMENT_REQUIRED'});
 export const codeMatchesExactly = (input,sample) => typeof input === 'string' && input === sample;

@@ -47,6 +47,13 @@ model User {
   avatarUrl          String?
   xp                 Int                 @default(0)
   coins              Int                 @default(0)
+  displayName        String?
+  bio                String @default("")
+  renamedAt          DateTime?
+  following          Follow[] @relation("Follower")
+  followers          Follow[] @relation("Followed")
+  sentMessages       DirectMessage[] @relation("Sender")
+  receivedMessages   DirectMessage[] @relation("Recipient")
   nicknameChanges    Int                 @default(0)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
@@ -295,4 +302,25 @@ model FriendBattle {
 
   @@index([createdById])
   @@index([expiresAt])
+}
+
+model Follow {
+  followerId String
+  followedId String
+  follower User @relation("Follower", fields: [followerId], references: [id], onDelete: Cascade)
+  followed User @relation("Followed", fields: [followedId], references: [id], onDelete: Cascade)
+  @@id([followerId, followedId])
+  @@index([followedId])
+}
+
+model DirectMessage {
+  id String @id @default(uuid())
+  senderId String
+  recipientId String
+  body String
+  createdAt DateTime @default(now())
+  sender User @relation("Sender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, createdAt])
 }

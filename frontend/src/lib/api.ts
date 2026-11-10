@@ -15,6 +15,7 @@ export class ApiError extends Error {
 }
 
 export type ServerUser = {
+  displayName?: string; bio?: string; renamedAt?: string | null;
   id: string;
   email: string;
   nickname: string;
@@ -162,7 +163,7 @@ export function me() {
 }
 
 export function updateProfile(input: {
-  nickname?: string;
+  displayName?: string; bio?: string; nickname?: string;
   avatarUrl?: string | null;
 }) {
   return request<ServerUser>("/users/me", {

@@ -1,3 +1,4 @@
+import { socialRouter } from './social.js';
 import { Router } from 'express';
 import { asyncRoute, ensureKeys, notFound, requireString, badRequest, AppError } from '../lib/errors.js';
 import { createSessionToken, hashSessionToken, hashPassword, verifyPassword, normalizeEmail, normalizeNickname, publicUser, privateUser } from '../lib/security.js';
@@ -22,6 +23,7 @@ async function startSession(prisma, userId) {
 }
 export function createAuthRouter(prisma) {
   const router=Router(); const auth=makeRequireAuth(prisma);
+  router.use(socialRouter(prisma,auth));
   router.post('/auth/register',asyncRoute(async (req,res)=>{
     ensureKeys(req.body,['email','password','nickname']);
     const email=normalizeEmail(req.body.email), nickname=requireString(req.body.nickname,'nickname',24), normalizedNickname=normalizeNickname(nickname);
@@ -39,9 +41,9 @@ export function createAuthRouter(prisma) {
   }));
   router.post('/auth/logout',auth,asyncRoute(async (req,res)=>{await prisma.authSession.update({where:{id:req.auth.sessionId},data:{revokedAt:new Date()}});res.status(204).end();}));
   router.get('/users/me',auth,asyncRoute(async(req,res)=>{const completedLessons=await prisma.lessonProgress.count({where:{userId:req.auth.userId,completedAt:{not:null}}});res.json({...privateUser(req.auth.user),completedLessons});}));
-  router.patch('/users/me',auth,asyncRoute(async(req,res)=>{ensureKeys(req.body,['nickname','avatarUrl']);if(!Object.keys(req.body).length)throw badRequest('Provide nickname or avatarUrl');res.json(await editOwnProfile(prisma,{userId:req.auth.userId,current:req.auth.user,changes:req.body}));}));
+  router.patch('/users/me',auth,asyncRoute(async(req,res)=>{ensureKeys(req.body,['nickname','avatarUrl','displayName','bio']);if(!Object.keys(req.body).length)throw badRequest('Provide nickname or avatarUrl');res.json(await editOwnProfile(prisma,{userId:req.auth.userId,current:req.auth.user,changes:req.body}));}));
   router.get('/users/:nickname',asyncRoute(async(req,res)=>{
-    const user=await prisma.user.findUnique({where:{normalizedNickname:normalizeNickname(req.params.nickname)},select:{id:true,nickname:true,avatarUrl:true,xp:true}});
+    const user=await prisma.user.findUnique({where:{normalizedNickname:normalizeNickname(req.params.nickname)},select:{id:true,nickname:true,avatarUrl:true,xp:true,displayName:true,bio:true}});
     if(!user)throw notFound();
     const completedLessons=await prisma.lessonProgress.count({where:{userId:user.id,completedAt:{not:null}}});
     res.json({...publicUser(user),completedLessons});

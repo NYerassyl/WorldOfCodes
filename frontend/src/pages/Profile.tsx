@@ -3,6 +3,7 @@ import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { levelFor } from "../lib/progress.mjs";
 import { Heading, Notice, Icon } from "../components/UI";
+import Players from "../components/Players";
 import AccountPanel from "../components/AccountPanel";
 import AvatarFace from "../components/Avatar";
 export default function Profile() {
@@ -52,8 +53,8 @@ export default function Profile() {
     });
     setMessage("Your profile has been saved in this browser.");
   }
-  const displayName = account?.nickname ?? state.name;
-  const handle = displayName.trim().toLowerCase().replace(/\s+/g, "_");
+  const displayName = account?.displayName ?? account?.nickname ?? state.name;
+  const handle = (account?.nickname ?? displayName).trim().toLowerCase().replace(/\s+/g, "_");
   const activeDays = Object.keys(state.activity).filter((d) =>
     days.includes(d),
   ).length;
@@ -85,7 +86,7 @@ export default function Profile() {
               <h2>{displayName}</h2>
               <span className="tag profile-level">LVL {level} · BEGINNER</span>
             </div>
-            <p>{state.bio}</p>
+            <p>{account ? account.bio : state.bio}</p>
           </div>
           <div className="identity-xp">
             <span>
@@ -98,6 +99,7 @@ export default function Profile() {
         </div>
       </section>
       <AccountPanel />
+      {account && <Players key={account.id} me={account.id}/>}
       <div className="profile-layout">
         <section className="panel">
           <div className="section-head">
@@ -153,7 +155,7 @@ export default function Profile() {
           <form className="profile-form" onSubmit={save}>
             {signedIn ? (
               <p className="muted">
-                Your display name is your account nickname. Change it in the
+                Edit your public profile in the
                 Account panel above.
               </p>
             ) : (
@@ -175,14 +177,14 @@ export default function Profile() {
                 </small>
               </>
             )}
-            <label>
+            {!signedIn && <label>
               About you
               <input
                 maxLength={100}
                 value={bio}
                 onChange={(e) => setBio(e.target.value)}
               />
-            </label>
+            </label>}
             <fieldset className="frame-picker">
               <legend>Avatar frame · free collection</legend>
               {[

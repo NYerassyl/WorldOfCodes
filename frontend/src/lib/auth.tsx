@@ -25,7 +25,7 @@ type AuthValue = {
   logout: () => Promise<void>;
   retry: () => Promise<void>;
   updateProfile: (input: {
-    nickname?: string;
+    displayName?: string; bio?: string; nickname?: string;
     avatarUrl?: string | null;
   }) => Promise<ServerUser>;
 };
@@ -117,7 +117,7 @@ export function Provider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(
-    async (input: { nickname?: string; avatarUrl?: string | null }) => {
+    async (input: { displayName?: string; bio?: string; nickname?: string; avatarUrl?: string | null }) => {
       try {
         const next = await api.updateProfile(input);
         const merged: ServerUser = {
