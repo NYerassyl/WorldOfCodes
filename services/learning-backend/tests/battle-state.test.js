@@ -7,7 +7,7 @@ import { getActiveMatchForUser } from '../src/battle/service.js';
 function routeHandler(router, method, path) {
   const layer = router.stack.find(item => item.route?.path === path && item.route.methods[method]);
   assert.ok(layer, `Missing route ${method.toUpperCase()} ${path}`);
-  return layer.route.stack[0].handle;
+  return layer.route.stack.at(-1).handle;
 }
 
 test('queue state reports queued ticket, position, and not-queued state', () => {
