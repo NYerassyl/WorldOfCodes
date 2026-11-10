@@ -1,0 +1,112 @@
+[
+  {
+    "id": "trace-2-01",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "First Passing Column",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "grid = [[2, 5, 1], [4, 3, 6], [7, 2, 8]]\ntotal = 0\nfor row_index, row in enumerate(grid):\n    chosen = -1\n    for column_index, value in enumerate(row):\n        if value % 2 == 0:\n            continue\n        total += value\n        if total > 9:\n            chosen = column_index\n            break\n    print(row_index, chosen, total)\nprint(\"total\", total)",
+    "expected_stdout": "0 -1 6\n1 1 9\n2 0 16\ntotal 16\n",
+    "explanation": "The inner loop skips even values. Total reaches 6 after row 0, 9 after row 1, and exceeds 9 at the first element of row 2, triggering break."
+  },
+  {
+    "id": "trace-2-02",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Neighbor Index Cascade",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "items = [3, 1, 4, 2]\nfor outer in range(3):\n    picked = 0\n    for inner in range(outer, len(items)):\n        if items[inner] % 2 == 0:\n            picked = inner\n            break\n        items[inner] += 1\n    items[outer] += picked\n    print(outer, picked, items[outer])\nprint(items)",
+    "expected_stdout": "0 0 4\n1 1 3\n2 2 6\n[4, 3, 6, 2]\n",
+    "explanation": "Each inner loop mutates odd elements before it reaches an even value. The selected index is added to the current outer element."
+  },
+  {
+    "id": "trace-2-03",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Reverse Row Scan",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "matrix = [[1, 2, 3], [4, 5, 6], [7, 8, 9]]\nseen = []\nfor row_number in range(len(matrix)):\n    row = matrix[row_number]\n    for offset in range(len(row)):\n        index = len(row) - 1 - offset\n        if (row_number + index) % 2 == 0:\n            continue\n        seen.append(row[index])\n        if row[index] % 3 == 0:\n            break\n    print(row_number, seen[-1] if seen else 0)\nprint(seen)",
+    "expected_stdout": "0 2\n1 6\n2 8\n[2, 6, 8]\n",
+    "explanation": "Rows are scanned backwards. The parity guard skips some cells; encountering 6 on row 1 ends that inner scan immediately."
+  },
+  {
+    "id": "trace-2-04",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Pair Search with Early Exit",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "numbers = [2, 5, 3, 6]\nmatches = []\nfor first in range(len(numbers)):\n    for second in range(first + 1, len(numbers)):\n        if numbers[first] + numbers[second] < 8:\n            continue\n        matches.append((first, second))\n        if numbers[second] % 2 == 0:\n            break\n    if first % 2 == 1:\n        print(first, len(matches))\nprint(matches)",
+    "expected_stdout": "1 2\n3 3\n[(0, 3), (1, 2), (1, 3)]\n",
+    "explanation": "Only pairs reaching the threshold are stored. An even second element ends the current inner scan, but not the outer one."
+  },
+  {
+    "id": "trace-2-05",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Diagonal Avoidance",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "table = [[2, 1, 4], [5, 3, 2], [1, 6, 3]]\nrow_scores = []\nfor r in range(3):\n    score = 0\n    for c in range(3):\n        if r == c:\n            continue\n        score += table[r][c] * (c + 1)\n        if score > 12:\n            break\n    row_scores.append(score)\n    print(r, score)\nprint(\"sum\", sum(row_scores))",
+    "expected_stdout": "0 14\n1 11\n2 13\nsum 38\n",
+    "explanation": "Diagonal entries never contribute. The row score uses the column weight, and early exit prevents later cells from being examined."
+  },
+  {
+    "id": "trace-2-06",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Carry from an Inner Loop",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "values = [4, 1, 3, 2]\ncarry = 1\nfor outer in range(3):\n    local = carry\n    for inner in range(len(values)):\n        if inner == outer:\n            continue\n        local += values[inner]\n        if local >= 7:\n            break\n    carry = local - outer\n    print(outer, local, carry)\nprint(\"done\", carry)",
+    "expected_stdout": "0 7 7\n1 11 10\n2 14 12\ndone 12\n",
+    "explanation": "Each outer iteration starts from the previous carry. The inner loop skips one index and stops at the first total at least seven."
+  },
+  {
+    "id": "trace-2-07",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "First Smaller Candidate",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "left = [6, 3, 5]\nright = [7, 2, 4, 1]\nlocations = []\nfor i, target in enumerate(left):\n    choice = None\n    for j in range(len(right)):\n        if j % 2 == 0:\n            continue\n        if right[j] < target:\n            choice = j\n            break\n    locations.append(choice)\n    print(i, choice)\nprint(\"used\", len(set(locations)))",
+    "expected_stdout": "0 1\n1 1\n2 1\nused 1\n",
+    "explanation": "Only odd column indices are checked, so all three left values select right[1] = 2."
+  },
+  {
+    "id": "trace-2-08",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Mutable Staircase",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "stairs = [1, 3, 2, 4]\nfor layer in range(3):\n    gained = 0\n    for index in range(layer, len(stairs)):\n        if stairs[index] == layer:\n            continue\n        stairs[index] += 1\n        gained += stairs[index]\n        if gained > 7:\n            break\n    print(layer, gained, stairs[layer])\nprint(stairs)",
+    "expected_stdout": "0 11 2\n1 9 4\n2 5 5\n[2, 4, 5, 4]\n",
+    "explanation": "Inner mutations persist into the next layer. Each layer starts scanning at its own index and stops when gained first exceeds seven."
+  },
+  {
+    "id": "trace-2-09",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Nested Budget Search",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "costs = [[2, 5, 1], [3, 2, 4], [1, 6, 2]]\nbudget = 7\nfor row_index, row in enumerate(costs):\n    used = 0\n    for col_index, cost in enumerate(row):\n        if cost > budget:\n            continue\n        budget -= cost\n        used += 1\n        if budget < 3:\n            break\n    print(row_index, used, budget)\nprint(\"left\", budget)",
+    "expected_stdout": "0 2 0\n1 0 0\n2 0 0\nleft 0\n",
+    "explanation": "Row 0 consumes the budget as costs 2 and 5 are accepted. Every later cost is greater than zero and is skipped."
+  },
+  {
+    "id": "trace-2-10",
+    "level": 2,
+    "difficulty": "easy-medium",
+    "topic": "nested-loops-and-indices",
+    "title": "Outer State from Inner Position",
+    "instructions": "Trace the nested loops, break/continue branches, and list indices. Enter the exact stdout in order.",
+    "code": "rows = [[1, 4, 2], [3, 6, 1], [5, 2, 7]]\ncursor = 0\nfor row in rows:\n    total = 0\n    for index in range(cursor, len(row)):\n        if row[index] % 2 == 0:\n            cursor = index\n            break\n        total += row[index]\n    else:\n        cursor = 0\n    print(total, cursor)\nprint(\"last\", cursor)",
+    "expected_stdout": "1 1\n0 1\n0 1\nlast 1\n",
+    "explanation": "The inner break updates cursor, which determines where the next row starts. The for-else reset only executes when no break occurs."
+  }
+]

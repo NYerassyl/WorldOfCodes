@@ -1,0 +1,45 @@
+name: Python Trace Practice — execute all 50 exercises
+on:
+  push:
+    branches:
+      - feat/python-trace-content-gpt2
+  pull_request:
+    paths:
+      - 'services/fastapi-backend/**'
+      - '.github/workflows/python-trace-practice.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: services/fastapi-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Execute 50 Python snippets against saved answers, then API tests
+        run: python -m pytest -q
+      - name: Confirm exactly five levels, ten exercises each, and API privacy
+        run: |
+          python - <<'PY'
+          from collections import Counter
+          from fastapi.testclient import TestClient
+          from main import app
+          from trace_data import load_catalog
+          data = load_catalog()
+          assert Counter(x["level"] for x in data) == {1: 10, 2: 10, 3: 10, 4: 10, 5: 10}
+          with TestClient(app) as client:
+              assert client.get("/docs").status_code == 200
+              assert client.get("/api/trace/exercises").status_code == 200
+              assert len(client.get("/api/trace/exercises").json()) == 50
+              details = client.get("/api/trace/exercises/trace-5-01").json()
+              assert "expected_stdout" not in details
+              assert "explanation" not in details
+          print("Five levels x ten exercises; Swagger and solution privacy: PASS")
+          PY

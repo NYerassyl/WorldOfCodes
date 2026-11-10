@@ -1,0 +1,112 @@
+[
+  {
+    "id": "trace-3-01",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Shared List, Two Helpers",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def extend(values, number):\n    values.append(number)\n    return len(values)\ndef measure(values, offset):\n    return sum(values[::2]) + offset\nitems = [2, 3, 4]\nfirst = extend(items, 5)\nscore = measure(items, first)\nprint(first, score)\nsecond = extend(items, score % 4)\nprint(items)\nprint(measure(items, second))",
+    "expected_stdout": "4 10\n[2, 3, 4, 5, 2]\n14\n",
+    "explanation": "extend modifies the shared list before measure reads alternating indices. The second append changes the last alternating-index element."
+  },
+  {
+    "id": "trace-3-02",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Dictionary Counts Through Calls",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def record(counts, word):\n    counts[word] = counts.get(word, 0) + 1\n    return counts[word]\ndef boost(counts, word):\n    amount = record(counts, word)\n    counts[\"total\"] += amount\n    return counts[\"total\"]\ndata = {\"total\": 0}\nprint(boost(data, \"red\"))\nprint(boost(data, \"blue\"))\nprint(boost(data, \"red\"))\nprint(sorted(data.items()))",
+    "expected_stdout": "1\n2\n4\n[('blue', 1), ('red', 2), ('total', 4)]\n",
+    "explanation": "Each boost updates the chosen word count and adds that count to total. The second red occurrence contributes two."
+  },
+  {
+    "id": "trace-3-03",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Mutation Versus New List",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def trim(values):\n    removed = values.pop(0)\n    return removed, values[:]\ndef adjust(values, delta):\n    values[0] += delta\n    return sum(values)\nnums = [3, 5, 7]\nremoved, copy = trim(nums)\nprint(removed, nums)\nprint(adjust(copy, removed))\nprint(nums, copy)\nprint(adjust(nums, -2))",
+    "expected_stdout": "3 [5, 7]\n15\n[5, 7] [8, 7]\n10\n",
+    "explanation": "trim mutates the original list, then returns a separate slice. adjust(copy) does not change nums; adjust(nums) changes the original."
+  },
+  {
+    "id": "trace-3-04",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Function as a Fold",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def apply(value, action):\n    if action == \"double\":\n        return value * 2\n    return value - 1\ndef fold(actions, start):\n    result = start\n    for action in actions:\n        result = apply(result, action)\n    return result\nsteps = [\"double\", \"minus\", \"double\"]\nprint(fold(steps, 3))\nsteps[1] = \"double\"\nprint(fold(steps, 3))",
+    "expected_stdout": "10\n24\n",
+    "explanation": "The first sequence computes 3→6→5→10. Replacing the middle action produces three doublings: 3→6→12→24."
+  },
+  {
+    "id": "trace-3-05",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Alias in a Dictionary",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def attach(state, number):\n    state[\"items\"].append(number)\n    state[\"count\"] = len(state[\"items\"])\n    return state[\"count\"]\ndef summarize(state):\n    return state[\"count\"] + sum(state[\"items\"])\nshared = [1, 2]\ndata = {\"items\": shared, \"count\": 2}\nprint(attach(data, 4))\nshared[0] = 3\nprint(summarize(data))\nprint(data[\"items\"])",
+    "expected_stdout": "3\n12\n[3, 2, 4]\n",
+    "explanation": "The dictionary and shared variable refer to the same list. Changing shared[0] changes what summarize sees."
+  },
+  {
+    "id": "trace-3-06",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Default-Free Accumulation",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def add_to(bucket, name, value):\n    bucket.setdefault(name, []).append(value)\n    return len(bucket[name])\ndef evaluate(bucket, name):\n    values = bucket.get(name, [])\n    return sum(values) - len(values)\nstore = {}\nprint(add_to(store, \"a\", 3))\nprint(add_to(store, \"a\", 5))\nprint(add_to(store, \"b\", 4))\nprint(evaluate(store, \"a\"), evaluate(store, \"b\"))",
+    "expected_stdout": "1\n2\n1\n6 3\n",
+    "explanation": "Each named list is created on first use. evaluate subtracts the number of items from their sum."
+  },
+  {
+    "id": "trace-3-07",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Rotating Mutable Arguments",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def rotate(values):\n    front = values.pop(0)\n    values.append(front)\n    return values[0]\ndef transform(values, shifts):\n    seen = []\n    for _ in range(shifts):\n        seen.append(rotate(values))\n    return seen\ndata = [4, 1, 3]\nprint(transform(data, 2))\nprint(data)\nprint(transform(data, 1))",
+    "expected_stdout": "[1, 3]\n[3, 4, 1]\n[4]\n",
+    "explanation": "rotate moves the first element to the back. The return values are the new first elements, while the same list keeps rotating."
+  },
+  {
+    "id": "trace-3-08",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Nested Dictionary Aliases",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def change(box, key, step):\n    box[key][\"value\"] += step\n    return box[key][\"value\"]\ndef score(box):\n    return sum(item[\"value\"] for item in box.values())\nshared = {\"value\": 2}\nparts = {\"left\": shared, \"right\": shared}\nprint(change(parts, \"left\", 3))\nprint(change(parts, \"right\", 1))\nprint(score(parts))\nprint(shared[\"value\"])",
+    "expected_stdout": "5\n6\n12\n6\n",
+    "explanation": "Both dictionary keys point to the same inner object. score adds that object's current value twice."
+  },
+  {
+    "id": "trace-3-09",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Composed Return and Side Effect",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def take(values):\n    item = values.pop()\n    return item * 2\ndef push(values, value):\n    values.insert(0, value)\n    return len(values)\ndef run(values):\n    a = take(values)\n    b = push(values, a - 1)\n    return a + b\nnumbers = [2, 4, 6]\nprint(run(numbers))\nprint(numbers)\nprint(run(numbers))",
+    "expected_stdout": "14\n[11, 2, 4]\n10\n",
+    "explanation": "The first take removes 6 and returns 12, then inserts 11. The second call removes 4 and inserts 7."
+  },
+  {
+    "id": "trace-3-10",
+    "level": 3,
+    "difficulty": "medium",
+    "topic": "functions-and-mutation",
+    "title": "Mapping Then In-Place Filter",
+    "instructions": "Follow function calls, arguments, mutable objects, and return values. Enter the exact stdout.",
+    "code": "def map_values(values, extra):\n    return [item + extra for item in values]\ndef remove_small(values, cutoff):\n    values[:] = [item for item in values if item >= cutoff]\n    return len(values)\noriginal = [1, 2, 4]\nmapped = map_values(original, 2)\nprint(mapped, original)\nsize = remove_small(mapped, 4)\nprint(size, mapped)\nprint(sum(original) + sum(mapped))",
+    "expected_stdout": "[3, 4, 6] [1, 2, 4]\n2 [4, 6]\n17\n",
+    "explanation": "map_values returns a fresh list. Slice assignment filters only mapped in place, leaving original untouched."
+  }
+]
