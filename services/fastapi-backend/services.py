@@ -238,15 +238,15 @@ def update_lesson(
         if "prerequisite_lesson_id" in payload.model_fields_set:
             new_prerequisite_id = payload.prerequisite_lesson_id
             if new_prerequisite_id != lesson.prerequisite_lesson_id:
-                # Never invalidate already recorded lesson progress by
-                # introducing/removing a prerequisite after completion.
+                # A cycle remains a 400 as promised by GPT 4's router contract.
+                _ensure_prerequisite(store, lesson_id, new_prerequisite_id)
+                # A valid change cannot retrospectively invalidate progress.
                 if any(key[1] == lesson_id for key in store.completions):
                     raise DomainError(
                         409,
                         "LESSON_HAS_PROGRESS",
                         "Cannot change prerequisites after a learner completed this lesson.",
                     )
-                _ensure_prerequisite(store, lesson_id, new_prerequisite_id)
                 lesson.prerequisite_lesson_id = new_prerequisite_id
         if payload.title is not None:
             lesson.title = payload.title
