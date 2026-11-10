@@ -11,6 +11,7 @@ import {
   createCopyRouter, resolveAuthSession, judgePython, getJudgableProblem
 } from '../src/index.js';
 import { errorMiddleware } from '../src/lib/errors.js';
+import { submitBattleSolution } from '../src/battle/service.js';
 
 const database = new URL(process.env.DATABASE_URL || 'http://missing');
 if (!['localhost', '127.0.0.1'].includes(database.hostname)
@@ -103,6 +104,54 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal((await request('/users/me',{method:'PATCH',data:{nickname:'again_'+suffix}})).status,402);
       assert.deepEqual(await resolveAuthSession(prisma,token),{userId:user.id,sessionId:session.id});
     });
+    await t.test('concurrent ranked ACCEPTED submissions settle once and update both Elo ratings once', async () => {
+      const rival = await prisma.user.create({ data: {
+        email: 'battle-rival-' + suffix + '@example.test',
+        passwordHash: 'integration-test-hash',
+        nickname: 'rival_' + suffix,
+        normalizedNickname: ('rival_' + suffix).toLowerCase()
+      } });
+      const problem = await prisma.problem.findUnique({ where: { id: 'algo-sort' } });
+      assert.ok(problem, 'seeded battle problem must exist');
+      await prisma.rating.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
+      await prisma.rating.upsert({ where: { userId: rival.id }, create: { userId: rival.id }, update: {} });
+      const match = await prisma.match.create({ data: {
+        type: 'RANKED', status: 'ACTIVE', problemId: problem.id, startedAt: new Date(),
+        players: { create: [{ userId: user.id, seat: 0 }, { userId: rival.id, seat: 1 }] }
+      } });
+      const before = await prisma.rating.findMany({
+        where: { userId: { in: [user.id, rival.id] } },
+        orderBy: { userId: 'asc' }, select: { userId: true, points: true, wins: true, losses: true }
+      });
+      const judge = async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 });
+      const results = await Promise.allSettled([
+        submitBattleSolution(prisma, { matchId: match.id, userId: user.id, sourceCode: 'def solve(): return 1', judge }),
+        submitBattleSolution(prisma, { matchId: match.id, userId: rival.id, sourceCode: 'def solve(): return 1', judge })
+      ]);
+      const completed = await prisma.match.findUnique({
+        where: { id: match.id }, include: { players: true }
+      });
+      assert.equal(completed.status, 'COMPLETED');
+      assert.ok([user.id, rival.id].includes(completed.winnerId));
+      assert.equal(completed.players.filter(player => player.verdict === 'ACCEPTED').length, 1);
+      assert.equal(results.filter(item => item.status === 'fulfilled').length, 2, JSON.stringify(results));
+      assert.equal(results.filter(item => item.status === 'fulfilled' && item.value.settled === true).length, 1);
+      const after = await prisma.rating.findMany({
+        where: { userId: { in: [user.id, rival.id] } },
+        orderBy: { userId: 'asc' }, select: { userId: true, points: true, wins: true, losses: true }
+      });
+      const winnerBefore = before.find(item => item.userId === completed.winnerId);
+      const loserId = completed.players.find(player => player.userId !== completed.winnerId).userId;
+      const loserBefore = before.find(item => item.userId === loserId);
+      const winnerAfter = after.find(item => item.userId === completed.winnerId);
+      const loserAfter = after.find(item => item.userId === loserId);
+      assert.equal(winnerAfter.wins, winnerBefore.wins + 1);
+      assert.equal(loserAfter.losses, loserBefore.losses + 1);
+      assert.notEqual(winnerAfter.points, winnerBefore.points);
+      assert.notEqual(loserAfter.points, loserBefore.points);
+      assert.equal(completed.players.filter(player => player.ratingDelta !== null).length, 2);
+    });
+
     await t.test('public API exposes starters and only sample cases; server can access hidden cases',async()=>{
       const all=await request('/problems',{auth:null});
       assert.equal(all.status,200);assert.equal(all.body.problems.length,16);
