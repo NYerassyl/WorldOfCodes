@@ -142,7 +142,7 @@ export async function attachBattleSocket(server, prisma, {
 
     socket.on('match:submit', guard(async (payload = {}, ack) => {
       const { matchId, code } = payload || {};
-      if (typeof matchId !== 'string' || !matchId || matchId.length > CODE_LIMIT ||
+      if (typeof matchId !== 'string' || !matchId || matchId.length > 128 ||
           typeof code !== 'string' || code.length < 1 || code.length > CODE_LIMIT) {
         safeAck(ack, { ok: false, code: 'INVALID_INPUT', message: 'matchId and code are required; code limit is 20000 characters' });
         return;
