@@ -135,7 +135,12 @@ class LessonUpdate(ApiModel):
 
     @model_validator(mode="after")
     def require_one_field(self) -> LessonUpdate:
-        if all(value is None for value in self.model_dump().values()):
+        # Explicit JSON null clears an existing prerequisite. Other null-only
+        # patches remain invalid to avoid silent no-op updates.
+        if not any(
+            field == "prerequisite_lesson_id" or getattr(self, field) is not None
+            for field in self.model_fields_set
+        ):
             raise ValueError("Provide at least one field to update.")
         return self
 
