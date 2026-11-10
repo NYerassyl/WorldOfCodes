@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from errors import DomainError
 from routers import lessons, problems, users
+from trace_api import router as trace_router
 from storage import store
 
 DESCRIPTION = """
@@ -72,3 +73,4 @@ app.include_router(lessons.router, prefix="/api")
 app.include_router(lessons.progress_router, prefix="/api")
 app.include_router(problems.router, prefix="/api")
 app.include_router(problems.submissions_router, prefix="/api")
+app.include_router(trace_router, prefix="/api")
