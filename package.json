@@ -11,6 +11,7 @@
     "services/learning-backend"
   ],
   "scripts": {
+    "dev:fastapi": "python3 -m uvicorn main:app --app-dir services/fastapi-backend --reload --reload-dir services/fastapi-backend",
     "dev:api": "node --env-file-if-exists=.env server/index.js",
     "dev:web": "npm run dev --workspace=frontend",
     "build": "npm run build --workspace=frontend",

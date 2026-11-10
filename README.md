@@ -4,6 +4,22 @@ An English learning workspace for Python foundations, algorithm practice and typ
 
 ## Run the integrated application
 
+For the Python REST API assignment, run these commands from the repository root:
+
+```sh
+python3 -m venv .venv
+source .venv/bin/activate
+python3 -m pip install -r services/fastapi-backend/requirements.txt
+npm run dev:fastapi
+```
+
+Open [Swagger UI](http://127.0.0.1:8000/docs), expand `GET /api/health`,
+select **Try it out**, then **Execute**. Expect HTTP 200 and
+`{"status":"ok"}`. The assignment uses process memory, so restarting or
+reloading the service clears its data. Use Ctrl+C to stop it.
+
+### Express application on port 4001
+
 Requirements: Node.js 22.12+, PostgreSQL, and a running Docker engine for Python judging.
 
 ```sh
