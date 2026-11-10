@@ -12,6 +12,9 @@ Service: `services/fastapi-backend/`
 - `python -m pytest -q` from `services/fastapi-backend`: **57 passed**.
 - Live `uvicorn` run on `127.0.0.1:8000`: `/docs` 200, `/redoc` 200,
   `/openapi.json` 200, `/api/health` 200.
+- Swagger UI in a browser rendered all 21 operations and every schema. A
+  `POST /api/users` Try-it-out call returned `201` and created
+  `swagger.check@worldofcodes.dev` (id 3), confirming the UI path works.
 - Live HTTP checks for every workflow, not only TestClient:
 
 | Check | Result |
