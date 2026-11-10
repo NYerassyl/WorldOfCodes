@@ -10,26 +10,20 @@ function routeHandler(router, method, path) {
   return layer.route.stack[0].handle;
 }
 
-test('queue state reports queued ticket, position, and not-queued state', async () => {
-  const prisma = {
-    problem: {
-      findMany: async () => [{ id: 'problem-1' }],
-      findFirst: async () => ({ id: 'problem-1', language: 'python', functionName: 'solve', testCases: [{ argsJson: '[]', expectedJson: '0' }] })
-    },
-    $transaction: async callback => callback({
-      rating: { upsert: async ({ where }) => ({ userId: where.userId, points: 1000 }) },
-      match: { create: async ({ data }) => ({ id: 'ranked-state-test', ...data }) }
-    })
-  };
-  const queue = new MatchmakingQueue(prisma);
-  const first = await queue.join('player-1');
-  const second = await queue.join('player-2');
+test('queue state reports queued ticket, position, and not-queued state', () => {
+  const queue = new MatchmakingQueue({});
+  const first = { userId: 'player-1', ticketId: 'ticket-1', joinedAt: Date.now() };
+  const second = { userId: 'player-2', ticketId: 'ticket-2', joinedAt: Date.now() + 1 };
+  queue.waiting.set(first.ticketId, first);
+  queue.waiting.set(second.ticketId, second);
   assert.deepEqual(queue.getStatus('player-1'), {
     status: 'QUEUED', ticketId: first.ticketId, position: 1,
-    joinedAt: new Date([...queue.waiting.values()][0].joinedAt).toISOString()
+    joinedAt: new Date(first.joinedAt).toISOString()
   });
-  assert.equal(queue.getStatus('player-2').ticketId, second.ticketId);
-  assert.equal(queue.getStatus('player-2').position, 2);
+  assert.deepEqual(queue.getStatus('player-2'), {
+    status: 'QUEUED', ticketId: second.ticketId, position: 2,
+    joinedAt: new Date(second.joinedAt).toISOString()
+  });
   assert.deepEqual(queue.getStatus('player-3'), { status: 'NOT_QUEUED' });
   queue.leave('player-1');
   assert.equal(queue.getStatus('player-1').status, 'NOT_QUEUED');
@@ -55,19 +49,13 @@ test('active match recovery is scoped to the authenticated participant', async (
 
 test('GET /battle/state returns active match and queue recovery state', async () => {
   const match = { id: 'match-1', status: 'ACTIVE', players: [{ userId: 'player-1' }] };
-  const prisma = {
-    problem: {
-      findMany: async () => [{ id: 'problem-1' }],
-      findFirst: async () => ({ id: 'problem-1', language: 'python', functionName: 'solve', testCases: [{ argsJson: '[]', expectedJson: '0' }] })
-    },
-    match: { findFirst: async () => match },
-    $transaction: async callback => callback({
-      rating: { upsert: async ({ where }) => ({ userId: where.userId, points: 1000 }) },
-      match: { create: async ({ data }) => ({ id: 'ranked-state-test', ...data }) }
-    })
-  };
-  const queue = new MatchmakingQueue(prisma);
-  const queued = await queue.join('player-1');
+  const queue = new MatchmakingQueue({});
+  const ticket = { userId: 'player-1', ticketId: 'ticket-state', joinedAt: Date.now() };
+  queue.waiting.set(ticket.ticketId, ticket);
+  const prisma = { match: { findFirst: async args => {
+    assert.deepEqual(args.where, { status: 'ACTIVE', players: { some: { userId: 'player-1' } } });
+    return match;
+  } } };
   const router = createBattleRouter(prisma, (_req, _res, next) => next(), { queue });
   const handler = routeHandler(router, 'get', '/battle/state');
   let response;
@@ -75,6 +63,8 @@ test('GET /battle/state returns active match and queue recovery state', async ()
     json(payload) { response = payload; return this; }
   }, error => { throw error; });
   assert.equal(response.match, match);
-  assert.equal(response.queue.status, 'QUEUED');
-  assert.equal(response.queue.ticketId, queued.ticketId);
+  assert.deepEqual(response.queue, {
+    status: 'QUEUED', ticketId: ticket.ticketId, position: 1,
+    joinedAt: new Date(ticket.joinedAt).toISOString()
+  });
 });
