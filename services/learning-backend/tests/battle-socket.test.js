@@ -150,26 +150,16 @@ test('protected socket events revalidate revoked sessions and remove the last ta
 });
 
 
-test('Socket.IO exposes a 32 KiB transport limit for bounded UTF-8 payloads', async () => {
+
+test('Socket.IO transport limit accepts max-code ASCII JSON and rejects multibyte overflow', async () => {
   const prisma = { authSession: { findUnique: async () => session } };
   await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer });
   const limit = FakeSocketServer.instance.options.maxHttpBufferSize;
   assert.equal(limit, 32 * 1024);
-  const withinLimit = JSON.stringify({ matchId: 'm'.repeat(1), code: 'é'.repeat(20_000) });
-  assert.ok(Buffer.byteLength(withinLimit, 'utf8') < limit);
-  const overLimit = JSON.stringify({ matchId: 'm', code: 'é'.repeat(20_000) + 'é'.repeat(4_000) });
-  assert.ok(Buffer.byteLength(overLimit, 'utf8') > limit);
-});
-
-
-test('Socket.IO exposes 32 KiB transport limit and checks UTF-8 payload boundaries', async () => {
-  const prisma = { authSession: { findUnique: async () => session } };
-  await attachBattleSocket({}, prisma, { ServerClass: FakeSocketServer });
-  const limit = FakeSocketServer.instance.options.maxHttpBufferSize;
-  assert.equal(limit, 32 * 1024);
-  const atCodeLimit = 'é'.repeat(20_000);
-  assert.equal(atCodeLimit.length, 20_000);
-  assert.ok(Buffer.byteLength(JSON.stringify({ matchId: 'm', code: atCodeLimit }), 'utf8') < limit);
-  const aboveTransportLimit = 'é'.repeat(32_000);
-  assert.ok(Buffer.byteLength(JSON.stringify({ matchId: 'm', code: aboveTransportLimit }), 'utf8') > limit);
+  const maxCodeAscii = JSON.stringify({ matchId: 'm', code: 'a'.repeat(20_000) });
+  const maxCodeUtf8 = JSON.stringify({ matchId: 'm', code: 'é'.repeat(20_000) });
+  const transportOverflow = JSON.stringify({ matchId: 'm', code: 'é'.repeat(17_000) });
+  assert.ok(Buffer.byteLength(maxCodeAscii, 'utf8') < limit);
+  assert.ok(Buffer.byteLength(maxCodeUtf8, 'utf8') > limit);
+  assert.ok(Buffer.byteLength(transportOverflow, 'utf8') > limit);
 });
