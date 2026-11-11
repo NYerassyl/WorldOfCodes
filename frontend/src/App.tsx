@@ -14,12 +14,14 @@ import {
 } from "./pages/ServerPractice";
 
 import Profile from "./pages/Profile";
+import Trace from "./pages/Trace";
 import Arena from "./pages/Arena";
 const routes = [
   { id: "home", name: "Overview", icon: "home" },
   { id: "learn", name: "Lessons", icon: "learn" },
   { id: "algorithms", name: "Challenges", icon: "code" },
   { id: "copy", name: "Typing Lab", icon: "copy" },
+  { id: "trace", name: "Trace Practice", icon: "code" },
   { id: "duel", name: "Duel Arena", icon: "duel" },
   { id: "friends", name: "Friendly Battle", icon: "friends" },
   { id: "profile", name: "My Profile", icon: "profile" },
@@ -117,11 +119,11 @@ function Shell() {
           <nav aria-label="Main navigation">
             {routes.map((r, i) => (
               <div key={r.id}>
-                {i === 0 || i === 4 || i === 6 ? (
+                {i === 0 || r.id === "duel" || r.id === "profile" ? (
                   <div className="navlabel">
                     {i === 0
                       ? "WORKSPACE"
-                      : i === 4
+                      : r.id === "duel"
                         ? "PLAY & COMPETE"
                         : "PERSONAL"}
                   </div>
@@ -210,6 +212,8 @@ function Shell() {
             )
           ) : page === "algorithms" ? (
             <ServerProblems key={route} id={id} />
+          ) : page === "trace" ? (
+            <Trace key={id} id={id} />
           ) : page === "copy" ? (
             <ServerCopy />
           ) : page === "profile" ? (
