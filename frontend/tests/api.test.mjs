@@ -232,3 +232,77 @@ test("tokens round-trip without browser storage", () => {
   api.setToken(null);
   assert.equal(api.getToken(), null);
 });
+
+test("chat lists conversations, reads a thread, sends and marks it read", async () => {
+  api.setToken("live-token");
+  const peer = { id: "u2", nickname: "grace", displayName: "Grace", avatarUrl: null };
+  handler = (req, res) => {
+    if (req.url === "/chat/conversations")
+      return json(res, 200, {
+        items: [{
+          peer,
+          lastMessage: {
+            id: "m1", senderId: "u2", recipientId: "u1", body: "hi",
+            createdAt: "2026-11-17T10:00:00.000Z", readAt: null,
+          },
+          unread: 1,
+        }],
+      });
+    if (req.url === "/chat/u2/messages" && req.method === "GET")
+      return json(res, 200, { peer, messages: [] });
+    if (req.url === "/chat/u2/messages" && req.method === "POST")
+      return json(res, 201, { peer, message: { id: "m2" } });
+    if (req.url === "/chat/u2/read")
+      return json(res, 200, { peer, read: 1 });
+    return json(res, 404, { error: { code: "NOT_FOUND", message: "missing" } });
+  };
+
+  assert.equal((await api.getConversations()).items[0].unread, 1);
+  assert.equal(requests.at(-1).url, "/chat/conversations");
+  assert.deepEqual((await api.getChatThread("u2")).peer, peer);
+  assert.equal(requests.at(-1).url, "/chat/u2/messages");
+  assert.equal((await api.sendChatMessage("u2", "  hello  ")).message.id, "m2");
+  assert.equal(requests.at(-1).method, "POST");
+  assert.deepEqual(requests.at(-1).body, { body: "  hello  " });
+  assert.equal((await api.markChatRead("u2")).read, 1);
+  assert.equal(requests.at(-1).url, "/chat/u2/read");
+  assert.equal(requests.at(-1).method, "POST");
+});
+
+test("notifications list, unread count, mark read and stable-id follow routes", async () => {
+  api.setToken("live-token");
+  const actor = { id: "u2", nickname: "grace", displayName: "Grace", avatarUrl: null };
+  handler = (req, res) => {
+    if (req.url.startsWith("/notifications/unread-count"))
+      return json(res, 200, { unreadCount: 2 });
+    if (req.url.startsWith("/notifications?limit=20"))
+      return json(res, 200, {
+        items: [{ id: "n1", type: "FOLLOW", entityId: null, readAt: null,
+          createdAt: "2026-11-17T10:00:00.000Z", actor }],
+        unreadCount: 2, nextCursor: null,
+      });
+    if (req.url === "/notifications/read")
+      return json(res, 200, { updated: 1, unreadCount: 1 });
+    if (req.url === "/players/u2/follow")
+      return req.method === "PUT" ? (res.writeHead(204), res.end()) : (res.writeHead(204), res.end());
+    return json(res, 404, { error: { code: "NOT_FOUND", message: "missing" } });
+  };
+
+  const list = await api.getNotifications();
+  assert.equal(list.unreadCount, 2);
+  assert.equal(list.items[0].actor.id, "u2");
+  assert.equal(requests.at(-1).url, "/notifications?limit=20");
+  assert.equal((await api.getNotifications("next==")).nextCursor, null);
+  assert.equal(requests.at(-1).url, "/notifications?limit=20&cursor=next%3D%3D");
+  assert.equal((await api.getUnreadNotificationCount()).unreadCount, 2);
+  assert.equal(requests.at(-1).url, "/notifications/unread-count");
+  assert.deepEqual(await api.markNotificationsRead({ ids: ["n1"] }), { updated: 1, unreadCount: 1 });
+  assert.deepEqual(requests.at(-1).body, { ids: ["n1"] });
+  assert.deepEqual(await api.markNotificationsRead({ all: true }), { updated: 1, unreadCount: 1 });
+  assert.deepEqual(requests.at(-1).body, { all: true });
+  assert.equal(await api.followPlayer("u2"), undefined);
+  assert.equal(requests.at(-1).method, "PUT");
+  assert.equal(requests.at(-1).url, "/players/u2/follow");
+  assert.equal(await api.unfollowPlayer("u2"), undefined);
+  assert.equal(requests.at(-1).method, "DELETE");
+});

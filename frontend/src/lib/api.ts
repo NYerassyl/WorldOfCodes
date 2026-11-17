@@ -175,3 +175,101 @@ export function updateProfile(input: {
 export function getPublicProfile(nickname: string) {
   return request<PublicProfile>(`/users/${encodeURIComponent(nickname)}`);
 }
+
+export type ChatPeer = {
+  id: string;
+  nickname: string;
+  displayName: string | null;
+  avatarUrl: string | null;
+};
+
+export type DirectMessage = {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export type Conversation = {
+  peer: ChatPeer;
+  lastMessage: DirectMessage;
+  unread: number;
+};
+
+export type ConversationList = { items: Conversation[] };
+
+export type ChatThread = {
+  peer: ChatPeer;
+  messages: DirectMessage[];
+};
+
+export function getConversations() {
+  return request<ConversationList>("/chat/conversations");
+}
+
+export function getChatThread(peerId: string) {
+  return request<ChatThread>(`/chat/${encodeURIComponent(peerId)}/messages`);
+}
+
+export function sendChatMessage(peerId: string, body: string) {
+  return request<{ peer: ChatPeer; message: DirectMessage }>(
+    `/chat/${encodeURIComponent(peerId)}/messages`,
+    { method: "POST", body: { body } },
+  );
+}
+
+export function markChatRead(peerId: string) {
+  return request<{ peer: ChatPeer; read: number }>(
+    `/chat/${encodeURIComponent(peerId)}/read`,
+    { method: "POST" },
+  );
+}
+
+export type NotificationType = "FOLLOW" | "MESSAGE";
+
+export type Notification = {
+  id: string;
+  type: NotificationType;
+  entityId: string | null;
+  readAt: string | null;
+  createdAt: string;
+  actor: ChatPeer;
+};
+
+export type NotificationList = {
+  items: Notification[];
+  unreadCount: number;
+  nextCursor: string | null;
+};
+
+export function getNotifications(cursor?: string) {
+  const query = cursor
+    ? `?limit=20&cursor=${encodeURIComponent(cursor)}`
+    : "?limit=20";
+  return request<NotificationList>(`/notifications${query}`);
+}
+
+export function getUnreadNotificationCount() {
+  return request<{ unreadCount: number }>("/notifications/unread-count");
+}
+
+export function markNotificationsRead(input: { ids: string[] } | { all: true }) {
+  return request<{ updated: number; unreadCount: number }>("/notifications/read", {
+    method: "POST",
+    body: input,
+  });
+}
+
+export function followPlayer(peerId: string) {
+  return request<void>(`/players/${encodeURIComponent(peerId)}/follow`, {
+    method: "PUT",
+  });
+}
+
+export function unfollowPlayer(peerId: string) {
+  return request<void>(`/players/${encodeURIComponent(peerId)}/follow`, {
+    method: "DELETE",
+  });
+}
