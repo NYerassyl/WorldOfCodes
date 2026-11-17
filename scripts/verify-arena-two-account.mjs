@@ -272,6 +272,73 @@ try {
   assert.equal(eveRating.json.points, 1000, "third account rating untouched");
   pass("chat: another account cannot read match, chat or notifications data");
 
+  // --- One continuous learning -> judged submission -> analytics -> comment path ----
+  const lessonFixture = learningPack.lessons.find((lesson) => lesson.problems?.length);
+  assert.ok(lessonFixture, "seeded learning pack contains a lesson with a judged problem");
+  const lessonId = lessonFixture.id;
+  const lessonResponse = await request(`/learning/lessons/${lessonId}`);
+  assert.equal(lessonResponse.status, 200, "lesson is readable through the canonical API");
+  const problemFixture = lessonFixture.problems.find((problem) => solutionFor(problem.id));
+  assert.ok(problemFixture, "lesson contains an authored reference solution");
+  const problemId = problemFixture.id;
+  const started = await request(`/learning/lessons/${lessonId}/start`, {
+    token: alice.token, method: "POST",
+  });
+  assert.equal(started.status, 200);
+  assert.equal(started.json.state, "IN_PROGRESS");
+  pass("learning: Alice starts a seeded lesson", lessonId);
+
+  const judged = await request(`/problems/${problemId}/submit`, {
+    token: alice.token, method: "POST", body: { code: solutionFor(problemId) },
+  });
+  assert.equal(judged.status, 200, `judge submission: ${JSON.stringify(judged.json)}`);
+  assert.equal(judged.json.status, "ACCEPTED", "real judge accepts the authored reference solution");
+  pass("learning: real Docker judge accepts a lesson problem", problemId);
+
+  const fastApiBase = process.env.FASTAPI_BASE_URL || "http://127.0.0.1:8000";
+  async function fastApi(path, { token, method = "GET", body } = {}) {
+    const response = await fetch(`${fastApiBase}/api${path}`, {
+      method,
+      headers: {
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let json = null;
+    try { json = await response.json(); } catch {}
+    return { status: response.status, json };
+  }
+
+  const completed = await fastApi(`/users/${alice.user.id}/progress`, {
+    token: alice.token, method: "POST", body: { lesson_id: lessonId },
+  });
+  assert.equal(completed.status, 200, `lesson completion: ${JSON.stringify(completed.json)}`);
+  const progressBeforeRestart = await fastApi(`/users/${alice.user.id}/progress`, { token: alice.token });
+  assert.equal(progressBeforeRestart.status, 200);
+  assert.ok(
+    (progressBeforeRestart.json.lessons ?? []).some((item) => item.lessonId === lessonId && item.completedAt),
+    "lesson completion is persisted in canonical PostgreSQL",
+  );
+  pass("learning: judged completion is recorded in canonical progress", lessonId);
+
+  const analytics = await fastApi(`/players/${alice.user.id}/activity`, { token: alice.token });
+  assert.equal(analytics.status, 200, `activity analytics: ${JSON.stringify(analytics.json)}`);
+  assert.ok(analytics.json.year.submissions >= 1, "accepted submission appears in activity analytics");
+  assert.ok(analytics.json.year.solved >= 1, "accepted problem appears in solved analytics");
+  pass("analytics: accepted lesson submission appears in FastAPI activity view");
+
+  const comment = await fastApi(`/problems/${problemId}/comments`, {
+    token: alice.token, method: "POST", body: { body: "GPT4 QA two-account persistence comment" },
+  });
+  assert.equal(comment.status, 201, `comment create: ${JSON.stringify(comment.json)}`);
+  const commentsBeforeRestart = await fastApi(`/problems/${problemId}/comments`);
+  assert.ok(
+    commentsBeforeRestart.json.comments.some((item) => item.id === comment.json.id),
+    "comment is visible from a fresh FastAPI request",
+  );
+  pass("comments: authenticated comment is stored in shared PostgreSQL", comment.json.id);
+
   if (process.env.GPT4_QA_STATE_FILE) {
     await writeFile(process.env.GPT4_QA_STATE_FILE, JSON.stringify({
       alice: { id: alice.user.id, token: alice.token },
@@ -280,6 +347,9 @@ try {
       rankedMatchId: rankedTwo.id,
       expectedMessages: ["Hello from the arena check", "Second message for history"],
       expectedRatings: { alice: 1271, bob: 1232 },
+      lessonId,
+      problemId,
+      expectedCommentId: comment.json.id,
     }, null, 2));
   }
   console.log(`\nALL ${results.length} CHECKS PASSED`);
