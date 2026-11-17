@@ -37,6 +37,8 @@ test('one result can cross a rank boundary in either direction', () => {
   assert.equal(rankForPoints(1100).loss, -16);
   assert.equal(1100 + rankForPoints(1100).loss, 1084);
   assert.equal(rankForPoints(1100 + rankForPoints(1100).loss).name, 'Novice');
+  assert.equal(rankForPoints(1249).win, 22);
+  assert.equal(1249 + rankForPoints(1249).win, 1271);
   assert.equal(rankForPoints(1249 + rankForPoints(1249).win).name, 'Silver');
 });
 
