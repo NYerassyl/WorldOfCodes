@@ -42,7 +42,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci --ignore-scripts --no-audit --no-fund
-      - run: node scripts/ensure-ci-native.mjs
+      - name: Build from locked Linux optional dependencies without an install workaround
+        run: npm run build
       - name: Canonical Prisma migrations and idempotent seed
         run: |
           npm run db:validate
@@ -58,11 +59,10 @@ jobs:
       - name: Profile Alembic after Prisma
         working-directory: services/fastapi-backend
         run: python -m alembic upgrade head
-      - name: Python, Node and build regression
+      - name: Python and Node regression
         run: |
           python -m pytest -q services/fastapi-backend/tests
           npm test
-          npm run build
       - name: Trusted isolated worker images
         run: |
           docker pull python:3.12-alpine
