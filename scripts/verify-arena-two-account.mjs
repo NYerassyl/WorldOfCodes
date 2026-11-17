@@ -305,12 +305,14 @@ try {
   assert.equal(started.json.state, "IN_PROGRESS");
   pass("learning: Alice starts a seeded lesson", lessonId);
 
-  const judged = await request(`/problems/${problemId}/submit`, {
-    token: alice.token, method: "POST", body: { code: solutionFor(problemId) },
-  });
-  assert.equal(judged.status, 200, `judge submission: ${JSON.stringify(judged.json)}`);
-  assert.equal(judged.json.status, "ACCEPTED", "real judge accepts the authored reference solution");
-  pass("learning: real Docker judge accepts a lesson problem", problemId);
+  for (const lessonProblem of lessonFixture.problems) {
+    const judged = await request(`/problems/${lessonProblem.id}/submit`, {
+      token: alice.token, method: "POST", body: { code: solutionFor(lessonProblem.id) },
+    });
+    assert.equal(judged.status, 200, `judge submission ${lessonProblem.id}: ${JSON.stringify(judged.json)}`);
+    assert.equal(judged.json.status, "ACCEPTED", `real judge accepts ${lessonProblem.id}`);
+  }
+  pass("learning: real Docker judge accepts every required problem in the lesson", lessonId);
 
   const fastApiBase = process.env.FASTAPI_BASE_URL || "http://127.0.0.1:8000";
   async function fastApi(path, { token, method = "GET", body } = {}) {
@@ -341,8 +343,8 @@ try {
 
   const analytics = await fastApi(`/players/${alice.user.id}/activity`, { token: alice.token });
   assert.equal(analytics.status, 200, `activity analytics: ${JSON.stringify(analytics.json)}`);
-  assert.ok(analytics.json.year.submissions >= 1, "accepted submission appears in activity analytics");
-  assert.ok(analytics.json.year.solved >= 1, "accepted problem appears in solved analytics");
+  assert.ok(analytics.json.year.submissions >= lessonFixture.problems.length, "accepted submissions appear in activity analytics");
+  assert.ok(analytics.json.year.solved >= lessonFixture.problems.length, "accepted problems appear in solved analytics");
   pass("analytics: accepted lesson submission appears in FastAPI activity view");
 
   const comment = await fastApi(`/problems/${problemId}/comments`, {
