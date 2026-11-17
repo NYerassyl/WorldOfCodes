@@ -134,5 +134,9 @@ operation, choose **Try it out**, fill `X-User-Id`, then **Execute**.
 7. Restart Uvicorn. Verify saved profile, progress, submissions and comments. Submit another trace attempt; its number increases.
 8. Create, update and delete an unused problem → 201/200/204. Delete problem 2 after submissions → 409 `PROBLEM_HAS_SUBMISSIONS`.
 
-This checklist is a manual acceptance guide. Executed automated checks are
-reported separately from manual browser verification.
+CI also opens Chromium and uses the actual Swagger **Try it out / Execute**
+controls: health 200, registration 201, duplicate 409 and invalid input 422.
+Its screenshot and server log are uploaded as `swagger-verification` artifacts.
+To repeat locally: install Playwright and Chromium, then run
+`python scripts/verify_swagger.py` with the API's port 8000 available.
+The checklist above covers the broader manual acceptance workflow.

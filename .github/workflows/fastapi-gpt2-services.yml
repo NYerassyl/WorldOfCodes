@@ -45,3 +45,17 @@ jobs:
         run: python -m pytest -q
       - name: Check migration drift
         run: python -m alembic check
+      - name: Install Swagger browser verifier
+        run: |
+          python -m pip install 'playwright>=1.50,<2'
+          python -m playwright install --with-deps chromium
+      - name: Exercise successful and unsuccessful operations through Swagger UI
+        run: python scripts/verify_swagger.py
+      - name: Upload Swagger verification screenshot and server log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: swagger-verification
+          path: |
+            services/fastapi-backend/swagger-verification.png
+            services/fastapi-backend/swagger-server.log

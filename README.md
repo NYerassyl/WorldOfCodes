@@ -10,13 +10,19 @@ For the Python REST API assignment, run these commands from the repository root:
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -r services/fastapi-backend/requirements.txt
-npm run dev:fastapi
+cd services/fastapi-backend
+cp .env.example .env
+# Set FASTAPI_DATABASE_URL, then start your PostgreSQL instance.
+python -m alembic upgrade head
+python seed.py  # optional demo data, empty database only
+python -m uvicorn main:app --reload
 ```
 
 Open [Swagger UI](http://127.0.0.1:8000/docs), expand `GET /api/health`,
 select **Try it out**, then **Execute**. Expect HTTP 200 and
-`{"status":"ok"}`. The assignment uses process memory, so restarting or
-reloading the service clears its data. Use Ctrl+C to stop it.
+`{"status":"ok"}`. The FastAPI service now uses SQLAlchemy and PostgreSQL. Restarting retains its
+data. Setup, relationships, migrations and Swagger checks are documented in
+[the FastAPI guide](services/fastapi-backend/README.md). Use Ctrl+C to stop it.
 
 ### Express application on port 4001
 
