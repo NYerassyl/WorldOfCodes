@@ -4446,3 +4446,5 @@ main > *,
   .chat-composer { flex-direction:column; align-items:stretch; }
   .notification-bell span:not(.unread-badge) { display:none; }
 }
+
+.editor-key-help { display: block; padding: 8px 16px; color: #bfb7ad; font-size: 11px; line-height: 1.6; }
