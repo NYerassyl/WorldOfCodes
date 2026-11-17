@@ -3,12 +3,22 @@
 //   npm run dev:api
 //   node --env-file=.env scripts/verify-arena-two-account.mjs
 import assert from "node:assert/strict";
+import { readFile, writeFile } from "node:fs/promises";
 import { PrismaClient } from "../server/prisma.js";
 import { solutions } from "../tests/solutions.mjs";
 import { rankForPoints } from "../services/learning-backend/src/battle/ranks.js";
 
 const BASE = process.env.BASE_URL || "http://127.0.0.1:4001";
 const prisma = new PrismaClient();
+const learningPack = JSON.parse(
+  await readFile("services/learning-backend/prisma/learning-pack.json", "utf8"),
+);
+const referenceSolutions = Object.fromEntries(
+  learningPack.lessons.flatMap((lesson) =>
+    lesson.problems.map((problem) => [problem.id, problem.referenceCode]),
+  ),
+);
+const solutionFor = (problemId) => solutions[problemId] ?? referenceSolutions[problemId];
 const results = [];
 const pass = (name, detail = "") => {
   results.push({ name, ok: true });
@@ -108,7 +118,7 @@ try {
 
   const friendlyProblem = await request(`/problems/${joined.json.problemId}`);
   assert.equal(friendlyProblem.status, 200);
-  const correctFriendly = solutions[joined.json.problemId];
+  const correctFriendly = solutionFor(joined.json.problemId);
   assert.ok(correctFriendly, `solution fixture exists for ${joined.json.problemId}`);
   const wrongFriendly = friendlyProblem.json.problem.starterCode.replace(/\n\s*pass\s*$/, "\n    return None");
 
@@ -166,7 +176,7 @@ try {
   pass("ranked: wrong answers leave both ratings unchanged");
 
   const aliceRankedWin = await request(`/battle/matches/${rankedOne.id}/submit`, {
-    token: alice.token, method: "POST", body: { code: solutions[rankedOne.problemId] },
+    token: alice.token, method: "POST", body: { code: solutionFor(rankedOne.problemId) },
   });
   assert.equal(aliceRankedWin.json.status, "ACCEPTED");
   assert.equal(aliceRankedWin.json.matchCompleted, true);
@@ -185,7 +195,7 @@ try {
   pass("ranked: Novice loss is 0 and 1099+24=1123 crosses to Bronze", `rankedProblem=${rankedProblem.json.problem.functionName}`);
 
   const bobReplay = await request(`/battle/matches/${rankedOne.id}/submit`, {
-    token: bob.token, method: "POST", body: { code: solutions[rankedOne.problemId] },
+    token: bob.token, method: "POST", body: { code: solutionFor(rankedOne.problemId) },
   });
   assert.equal(bobReplay.status, 404, "a settled match rejects the second submission");
   assert.deepEqual([(await rating(alice)).points, (await rating(bob)).points], [1123, 1090]);
@@ -197,7 +207,7 @@ try {
   await setPoints(bob.user.id, 1248);
   const rankedTwo = await playMatch(alice, bob, "ranked 1249/1248");
   const secondWin = await request(`/battle/matches/${rankedTwo.id}/submit`, {
-    token: alice.token, method: "POST", body: { code: solutions[rankedTwo.problemId] },
+    token: alice.token, method: "POST", body: { code: solutionFor(rankedTwo.problemId) },
   });
   assert.equal(secondWin.json.status, "ACCEPTED");
   const aliceCrossed = await rating(alice);
@@ -262,6 +272,16 @@ try {
   assert.equal(eveRating.json.points, 1000, "third account rating untouched");
   pass("chat: another account cannot read match, chat or notifications data");
 
+  if (process.env.GPT4_QA_STATE_FILE) {
+    await writeFile(process.env.GPT4_QA_STATE_FILE, JSON.stringify({
+      alice: { id: alice.user.id, token: alice.token },
+      bob: { id: bob.user.id, token: bob.token },
+      eve: { id: eve.user.id, token: eve.token },
+      rankedMatchId: rankedTwo.id,
+      expectedMessages: ["Hello from the arena check", "Second message for history"],
+      expectedRatings: { alice: 1271, bob: 1232 },
+    }, null, 2));
+  }
   console.log(`\nALL ${results.length} CHECKS PASSED`);
 } catch (error) {
   console.error("FAIL", error.message);

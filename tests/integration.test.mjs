@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { PrismaClient } from "@prisma/client";
 import { createHash } from "node:crypto";
-import { readFile } from "node:fs/promises";
+import { readFile, readdir } from "node:fs/promises";
 import { execFileSync } from "node:child_process";
 import { createApp } from "../server/app.js";
 import { readConfig } from "../server/config.js";
@@ -18,6 +18,14 @@ if (
     "Integration tests require an isolated localhost database ending in _test",
   );
 const prisma = new PrismaClient();
+const learningPack = JSON.parse(
+  await readFile("services/learning-backend/prisma/learning-pack.json", "utf8"),
+);
+const referenceSolutions = Object.fromEntries(
+  learningPack.lessons.flatMap((lesson) =>
+    lesson.problems.map((problem) => [problem.id, problem.referenceCode]),
+  ),
+);
 const serve = async (app) =>
   new Promise((resolve) => {
     const s = app.listen(0, "127.0.0.1", () =>
@@ -44,7 +52,7 @@ async function request(
     body: res.status === 204 ? null : await res.json(),
   };
 }
-const submit = (id, code = solutions[id]) =>
+const submit = (id, code = solutions[id] ?? referenceSolutions[id]) =>
   request(`/problems/${id}/submit`, { method: "POST", body: { code } });
 test(
   "PostgreSQL + HTTP + Docker integration",
@@ -64,7 +72,10 @@ test(
       await t.test("migration history and seed counts", async () => {
         const migrations =
           await prisma.$queryRaw`SELECT migration_name, checksum, finished_at FROM _prisma_migrations ORDER BY migration_name`;
-        assert.equal(migrations.length, 4);
+        const migrationDirectories = (await readdir("services/learning-backend/prisma/migrations"))
+          .filter((name) => /^\d{14}_/.test(name))
+          .sort();
+        assert.equal(migrations.length, migrationDirectories.length);
         for (const m of migrations) {
           assert.ok(m.finished_at);
           const source = await readFile(
@@ -75,8 +86,8 @@ test(
             m.checksum,
           );
         }
-        assert.equal(await prisma.problem.count(), 16);
-        assert.equal(await prisma.lesson.count(), 6);
+        assert.equal(await prisma.problem.count(), 31);
+        assert.equal(await prisma.lesson.count(), 12);
         assert.equal(await prisma.copyExercise.count(), 3);
       });
       await t.test(
@@ -146,6 +157,8 @@ test(
             [
               "id",
               "nickname",
+              "displayName",
+              "bio",
               "avatarUrl",
               "xp",
               "level",
@@ -171,13 +184,16 @@ test(
         },
       );
       const bank = (await request("/problems", { auth: null })).body.problems;
+      const pythonBank = bank.filter((p) => p.language === "python");
       await t.test(
-        "all 16 starter functions are public; hidden tests stay private",
+        "published Python functions are public; SQL catalog and hidden tests stay private",
         async () => {
-          assert.equal(bank.length, 16);
+          assert.ok(pythonBank.length > 0);
           for (const p of bank) {
-            assert.ok(p.starterCode.startsWith("def "));
-            assert.equal(p.examples.length, 1);
+            assert.ok(p.starterCode);
+            if (p.language === "python") assert.ok(p.starterCode.startsWith("def "));
+            if (p.language === "sql") assert.match(p.starterCode, /select|with/i);
+            assert.ok(p.examples.length >= 1);
             assert.ok(!("testCases" in p));
             assert.equal(
               (await request(`/problems/${p.id}`)).body.problem.starterCode,
@@ -241,40 +257,43 @@ test(
         },
       );
       await t.test(
-        "six topics complete only after successful practices; all algorithm functions execute",
+        "all 11 topics complete only after successful practices; all algorithm functions execute",
         async () => {
           const courses = (await request("/learning/courses")).body.courses;
-          assert.equal(courses[0].topics.length, 6);
+          assert.equal(courses[0].topics.length, 11);
+          const pythonLessonIds = [];
           for (const topic of courses[0].topics) {
             for (const l of topic.lessons) {
               const lesson = (await request(`/learning/lessons/${l.id}`)).body
                 .lesson;
               assert.ok(lesson.theoryMd);
-              assert.equal(lesson.problems.length, 2);
-              for (const p of lesson.problems) {
-                assert.ok(p.starterCode);
+              const pythonProblems = lesson.problems.filter((item) => item.language === "python");
+              if (pythonProblems.length === 0) continue;
+              pythonLessonIds.push(l.id);
+              for (const p of pythonProblems) {
+                assert.ok(p.starterCode.startsWith("def "));
                 const r = await submit(p.id);
                 assert.equal(r.status, 200, JSON.stringify(r.body));
                 assert.equal(r.body.status, "ACCEPTED", p.id);
               }
             }
           }
-          for (const p of bank.filter((p) => !p.lessonId))
+          for (const p of pythonBank.filter((p) => !p.lessonId))
             assert.equal((await submit(p.id)).body.status, "ACCEPTED", p.id);
           const progress = (await request("/learning/progress")).body;
           assert.equal(
-            progress.lessons.filter((l) => l.state === "COMPLETED").length,
-            6,
+            progress.lessons.filter((l) => l.state === "COMPLETED" && pythonLessonIds.includes(l.lessonId)).length,
+            pythonLessonIds.length,
           );
-          assert.equal(progress.completedProblems.length, 16);
+          assert.equal(progress.completedProblems.length, pythonBank.length);
           const me = (await request("/users/me")).body;
           assert.equal(
             me.xp,
-            bank.reduce((n, p) => n + p.rewardXp, 0),
+            pythonBank.reduce((n, p) => n + p.rewardXp, 0),
           );
           assert.equal(
             me.coins,
-            bank.reduce((n, p) => n + p.rewardCoins, 0),
+            pythonBank.reduce((n, p) => n + p.rewardCoins, 0),
           );
           assert.equal(me.level, Math.floor(me.xp / 100) + 1);
         },
@@ -394,10 +413,19 @@ test(
         "logout revocation, relogin and persistent PostgreSQL progress",
         async () => {
           const before = (await request("/users/me")).body;
-          assert.equal(
-            await prisma.rewardLedger.count({ where: { userId: user.id } }),
-            19,
-          );
+          const [ledgerCount, problemCompletionCount, copyCompletionCount, copyLedgerCount] = await Promise.all([
+            prisma.rewardLedger.count({ where: { userId: user.id } }),
+            prisma.problemCompletion.count({ where: { userId: user.id } }),
+            prisma.copyCompletion.count({ where: { userId: user.id } }),
+            prisma.rewardLedger.count({ where: { userId: user.id, kind: "COPY" } }),
+          ]);
+          assert.equal(ledgerCount, pythonBank.length + 3, JSON.stringify({
+            pythonProblems: pythonBank.length,
+            problemCompletionCount,
+            copyCompletionCount,
+            copyLedgerCount,
+            ledgerCount,
+          }));
           assert.equal(
             (await request("/auth/logout", { method: "POST" })).status,
             204,
@@ -414,10 +442,10 @@ test(
           const restored = (await request("/users/me")).body;
           assert.equal(restored.xp, before.xp);
           assert.equal(restored.coins, before.coins);
-          assert.equal(restored.completedLessons, 6);
+          assert.equal(restored.completedLessons, 11);
           assert.equal(
             (await request("/learning/progress")).body.completedProblems.length,
-            16,
+            pythonBank.length,
           );
         },
       );
