@@ -37,4 +37,35 @@ const match = await get(`/battle/matches/${state.rankedMatchId}`, state.bob.toke
 assert.equal(match.status, "COMPLETED", "ranked match settlement survives restart");
 assert.equal(match.players.length, 2, "both ranked players remain associated after restart");
 
-console.log("PASS restart persistence: profiles, chat messages, ranked ratings and settled match");
+const fastApiBase = process.env.FASTAPI_BASE_URL || "http://127.0.0.1:8000";
+async function fastGet(path, token) {
+  const response = await fetch(`${fastApiBase}/api${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  let body = null;
+  try { body = await response.json(); } catch {}
+  assert.equal(response.status, 200, `FastAPI ${path}: expected 200 after coordinated restart, got ${response.status}`);
+  return body;
+}
+
+const fastProfile = await fastGet(`/users/me`, state.alice.token);
+assert.equal(fastProfile.displayName, state.expectedProfile.displayName, "profile edit survives both service restarts");
+assert.equal(fastProfile.bio, state.expectedProfile.bio, "profile bio survives both service restarts");
+
+const progress = await fastGet(`/users/${state.alice.id}/progress`, state.alice.token);
+assert.ok(
+  (progress.lessons ?? []).some((item) => item.lessonId === state.lessonId && item.completedAt),
+  "completed lesson progress survives Express and FastAPI restarts",
+);
+
+const comments = await fastGet(`/problems/${state.problemId}/comments`);
+assert.ok(
+  comments.comments.some((item) => item.id === state.expectedCommentId && item.body === "GPT4 QA two-account persistence comment"),
+  "problem comment survives Express and FastAPI restarts",
+);
+
+const activity = await fastGet(`/players/${state.alice.id}/activity`, state.alice.token);
+assert.ok(activity.year.submissions >= 1 && activity.year.solved >= 1,
+  "analytics view still reads the accepted submission after restart");
+
+console.log("PASS restart persistence: profiles, learning progress, comments, analytics, chat, ratings and settled match");
