@@ -341,6 +341,8 @@ function BattleView({
                   value={state.code}
                   onChange={session.setCode}
                   placeholder="Loading the server starter function…"
+                  smartEditing
+                  language="python"
                 />
                 <div className="inline-actions">
                   <button
