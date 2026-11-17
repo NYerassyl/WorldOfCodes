@@ -64,6 +64,8 @@ model User {
   createdFriendBattles FriendBattle[]  @relation("FriendBattleCreator")
   following          Follow[]          @relation("FollowFollower")
   followers          Follow[]          @relation("FollowFollowing")
+  sentMessages       DirectMessage[]   @relation("MessageSender")
+  receivedMessages   DirectMessage[]   @relation("MessageRecipient")
 }
 
 model Follow {
@@ -75,6 +77,19 @@ model Follow {
   @@id([followerId, followingId])
   @@index([followingId, createdAt])
   @@index([followerId, createdAt])
+}
+
+model DirectMessage {
+  id          String    @id @default(uuid())
+  senderId    String
+  recipientId String
+  body        String
+  createdAt   DateTime  @default(now())
+  readAt      DateTime?
+  sender      User      @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient   User      @relation("MessageRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  @@index([senderId, recipientId, createdAt])
+  @@index([recipientId, readAt])
 }
 
 model AuthSession {

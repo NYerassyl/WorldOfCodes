@@ -4655,6 +4655,177 @@ main > *,
   }
 }
 
+.chat-panel {
+  display: flex;
+  flex-direction: column;
+}
+.chat-panel .section-head {
+  margin-bottom: 14px;
+}
+.chat-empty {
+  margin: 0;
+  padding: 18px 0;
+  color: var(--muted);
+  font-size: 14px;
+}
+.chat-back {
+  margin: 0 0 12px;
+}
+.chat-back a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  text-decoration: none;
+}
+.chat-back a svg {
+  transform: rotate(180deg);
+}
+.chat-back a:hover {
+  color: var(--ink);
+}
+.conversation-list {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+.conversation-row {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  grid-template-areas:
+    "avatar copy meta"
+    "preview preview preview";
+  gap: 3px 12px;
+  align-items: center;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  color: inherit;
+  text-decoration: none;
+  transition:
+    border-color 0.15s ease,
+    transform 0.15s ease;
+}
+.conversation-row:hover {
+  border-color: #d6d1c8;
+  transform: translateY(-1px);
+}
+.conversation-row > .avatar {
+  grid-area: avatar;
+}
+.conversation-row > .chat-peer-copy {
+  grid-area: copy;
+}
+.conversation-row > .conversation-meta {
+  grid-area: meta;
+}
+.conversation-preview {
+  grid-area: preview;
+  padding-left: 52px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--muted);
+  font-size: 13px;
+}
+.conversation-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.conversation-meta small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.unread-badge {
+  min-width: 19px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  text-align: center;
+}
+.chat-peer-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.chat-peer-copy small {
+  color: var(--muted);
+  font-size: 12px;
+}
+.chat-thread-head .chat-peer {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: inherit;
+  text-decoration: none;
+}
+.chat-bubbles {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  min-height: 180px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 4px 2px 16px;
+}
+.bubble {
+  max-width: min(78%, 520px);
+  padding: 9px 13px;
+  border: 1px solid var(--line);
+  border-radius: 14px 14px 14px 4px;
+  background: var(--bg);
+}
+.bubble p {
+  margin: 0 0 3px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bubble small {
+  color: var(--muted);
+  font-size: 11px;
+}
+.bubble.mine {
+  align-self: flex-end;
+  border-color: #f3d4c2;
+  border-radius: 14px 14px 4px 14px;
+  background: var(--accent-soft);
+}
+.chat-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.chat-composer-label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+@media (max-width: 760px) {
+  .conversation-preview {
+    padding-left: 0;
+  }
+  .bubble {
+    max-width: 90%;
+  }
+  .chat-composer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *:before,

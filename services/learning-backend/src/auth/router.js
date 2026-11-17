@@ -4,6 +4,7 @@ import { createSessionToken, hashSessionToken, hashPassword, verifyPassword, nor
 import { resolveAuthSession } from './session.js';
 import { editOwnProfile } from './service.js';
 import { followUser, unfollowUser, getProfile, getActivity, listFollowers, listFollowing } from '../profile/service.js';
+import { createChatRouter } from '../chat/router.js';
 const SESSION_DAYS = 30;
 const BEARER = /^Bearer ([A-Za-z0-9_-]{32,128})$/;
 
@@ -43,6 +44,7 @@ async function startSession(prisma, userId) {
 }
 export function createAuthRouter(prisma) {
   const router=Router(); const auth=makeRequireAuth(prisma); const maybeAuth=makeOptionalAuth(prisma);
+  router.use(createChatRouter(prisma, auth));
   router.post('/auth/register',asyncRoute(async (req,res)=>{
     ensureKeys(req.body,['email','password','nickname','username']);
     const email=normalizeEmail(req.body.email), nickname=requireString(req.body.nickname,'nickname',24), normalizedNickname=normalizeNickname(nickname);

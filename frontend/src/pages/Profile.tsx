@@ -512,19 +512,24 @@ export default function Profile({ handle }: { handle?: string }) {
             {profile && !profile.isMe && (
               <>
                 {status === "authenticated" ? (
-                  <button
-                    type="button"
-                    className={`btn ${profile.isFollowing ? "secondary" : ""}`}
-                    disabled={followBusy}
-                    aria-pressed={profile.isFollowing}
-                    onClick={() => void toggleFollow()}
-                  >
-                    {followBusy
-                      ? "Saving…"
-                      : profile.isFollowing
-                        ? "Following"
-                        : "Follow"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      className={`btn ${profile.isFollowing ? "secondary" : ""}`}
+                      disabled={followBusy}
+                      aria-pressed={profile.isFollowing}
+                      onClick={() => void toggleFollow()}
+                    >
+                      {followBusy
+                        ? "Saving…"
+                        : profile.isFollowing
+                          ? "Following"
+                          : "Follow"}
+                    </button>
+                    <a className="btn secondary" href={`#chat/${profile.id}`}>
+                      Message
+                    </a>
+                  </>
                 ) : (
                   <a className="btn" href="#profile">
                     Sign in to follow

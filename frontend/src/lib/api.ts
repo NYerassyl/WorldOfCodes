@@ -278,3 +278,58 @@ export function getFollowing(handle: string, offset = 0, limit = 20) {
     `/users/${encodeURIComponent(handle)}/following?limit=${limit}&offset=${offset}`,
   );
 }
+
+export type ChatPeer = {
+  id: string;
+  username: string;
+  nickname: string;
+  avatarUrl: string | null;
+};
+
+export type DirectMessage = {
+  id: string;
+  senderId: string;
+  recipientId: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+};
+
+export type Conversation = {
+  peer: ChatPeer;
+  lastMessage: DirectMessage;
+  unread: number;
+};
+
+export type ConversationList = {
+  items: Conversation[];
+};
+
+export type ChatThread = {
+  peer: ChatPeer;
+  messages: DirectMessage[];
+};
+
+export function getConversations() {
+  return request<ConversationList>("/chat/conversations");
+}
+
+export function getChatThread(peerId: string) {
+  return request<ChatThread>(
+    `/chat/${encodeURIComponent(peerId)}/messages`,
+  );
+}
+
+export function sendChatMessage(peerId: string, body: string) {
+  return request<{ peer: ChatPeer; message: DirectMessage }>(
+    `/chat/${encodeURIComponent(peerId)}/messages`,
+    { method: "POST", body: { body } },
+  );
+}
+
+export function markChatRead(peerId: string) {
+  return request<{ peer: ChatPeer; read: number }>(
+    `/chat/${encodeURIComponent(peerId)}/read`,
+    { method: "POST" },
+  );
+}

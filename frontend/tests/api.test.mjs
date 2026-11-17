@@ -255,6 +255,52 @@ test("follow, unfollow, activity and community lists use the handle routes", asy
   assert.equal(requests.at(-1).url, "/users/ada%20l/activity?days=90");
 });
 
+test("chat lists conversations, reads a thread, sends and marks it read", async () => {
+  api.setToken("live-token");
+  const peer = {
+    id: "u2",
+    username: "rival",
+    nickname: "Rival",
+    avatarUrl: null,
+  };
+  const message = {
+    id: "m1",
+    senderId: "u1",
+    recipientId: "u2",
+    body: "hello",
+    createdAt: "2026-11-17T10:00:00.000Z",
+    readAt: null,
+  };
+  handler = (req, res) => {
+    if (req.url === "/chat/conversations")
+      return json(res, 200, {
+        items: [{ peer, lastMessage: message, unread: 2 }],
+      });
+    if (req.url === "/chat/u2/messages" && req.method === "GET")
+      return json(res, 200, { peer, messages: [message] });
+    if (req.url === "/chat/u2/messages" && req.method === "POST")
+      return json(res, 201, {
+        peer,
+        message: { ...message, id: "m2", body: req.body.body },
+      });
+    if (req.url === "/chat/u2/read") return json(res, 200, { peer, read: 2 });
+    return json(res, 404, { error: { code: "NOT_FOUND", message: "no" } });
+  };
+  const list = await api.getConversations();
+  assert.equal(list.items[0].peer.username, "rival");
+  assert.equal(list.items[0].unread, 2);
+  assert.equal(requests.at(-1).url, "/chat/conversations");
+  const thread = await api.getChatThread("u2");
+  assert.equal(thread.messages[0].body, "hello");
+  assert.equal(requests.at(-1).url, "/chat/u2/messages");
+  const sent = await api.sendChatMessage("u2", "on my way");
+  assert.equal(sent.message.body, "on my way");
+  assert.equal(requests.at(-1).method, "POST");
+  assert.deepEqual(requests.at(-1).body, { body: "on my way" });
+  assert.equal((await api.markChatRead("u2")).read, 2);
+  assert.equal(requests.at(-1).url, "/chat/u2/read");
+});
+
 test("non-json failures fall back to the http status", async () => {
   handler = (_req, res) => {
     res.writeHead(502, { "content-type": "text/html" });

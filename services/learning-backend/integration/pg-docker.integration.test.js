@@ -58,7 +58,8 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const names=[
         '20261103000000_init','20261103170000_add_battle_models',
         '20261103220000_match_status_type_index','20261103230000_problem_starter_code',
-        '20261111190000_add_username_and_follows'
+        '20261111190000_add_username_and_follows',
+        '20261117120000_add_direct_messages'
       ];
       const entries=await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" ORDER BY migration_name');
       assert.deepEqual(entries.map(x=>x.migration_name),names);
@@ -72,7 +73,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal(await prisma.problem.count(),16);
       assert.equal(await prisma.testCase.count(),50);
       assert.equal(await prisma.copyExercise.count(),3);
-      for(const delegate of ['user','authSession','follow','problem','testCase','submission','match','matchPlayer','rating','friendBattle'])
+      for(const delegate of ['user','authSession','follow','directMessage','problem','testCase','submission','match','matchPlayer','rating','friendBattle'])
         assert.equal(typeof prisma[delegate].findMany,'function',delegate);
     });
     await t.test('register/login, private profile and authorization',async()=>{
@@ -123,6 +124,44 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal(renamed.body.nextNicknameChange,'PAYMENT_REQUIRED');
       assert.equal((await request('/users/me',{method:'PATCH',data:{nickname:'again_'+suffix}})).status,402);
       assert.deepEqual(await resolveAuthSession(prisma,token),{userId:user.id,sessionId:session.id});
+    });
+    await t.test('chat history persists per pair and a third account cannot read it',async()=>{
+      const secondLogin=await request('/auth/login',{method:'POST',auth:null,data:{email:'second-'+suffix+'@example.test',password:'StrongTestPassword_123'}});
+      const secondToken=secondLogin.body.token,secondId=secondLogin.body.user.id,firstId=user.id;
+      const sent=await request('/chat/'+secondId+'/messages',{method:'POST',data:{body:'hello from first'}});
+      assert.equal(sent.status,201);assert.equal(sent.body.message.body,'hello from first');
+      assert.equal((await request('/chat/'+firstId+'/messages',{method:'POST',auth:secondToken,data:{body:'hello back'}})).status,201);
+      assert.equal((await request('/chat/'+firstId+'/messages',{method:'POST',data:{body:'to myself'}})).status,400);
+
+      const firstList=await request('/chat/conversations');
+      assert.equal(firstList.body.items.length,1);
+      assert.equal(firstList.body.items[0].peer.id,secondId);
+      assert.equal(firstList.body.items[0].lastMessage.body,'hello back');
+      assert.equal(firstList.body.items[0].unread,1);
+      assert.equal((await request('/chat/conversations',{auth:secondToken})).body.items[0].unread,1);
+
+      const thread=await request('/chat/'+secondId+'/messages');
+      assert.deepEqual(thread.body.messages.map(m=>m.body),['hello from first','hello back']);
+      assert.equal((await request('/chat/'+secondId+'/read',{method:'POST'})).status,200);
+      assert.equal((await request('/chat/conversations')).body.items[0].unread,0);
+
+      const third=await request('/auth/register',{method:'POST',auth:null,data:{
+        email:'third-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'third_'+suffix,username:'third_'+suffix
+      }});
+      assert.equal(third.status,201);
+      const thirdId=third.body.user.id,thirdToken=third.body.token;
+      assert.deepEqual((await request('/chat/conversations',{auth:thirdToken})).body.items,[]);
+      assert.deepEqual((await request('/chat/'+firstId+'/messages',{auth:thirdToken})).body.messages,[]);
+      assert.equal((await request('/chat/'+secondId+'/messages',{method:'POST',auth:thirdToken,data:{body:'spoof'}})).status,201);
+      const firstThread=await request('/chat/'+secondId+'/messages');
+      assert.deepEqual(firstThread.body.messages.map(m=>m.body),['hello from first','hello back']);
+
+      const relogin=await request('/auth/login',{method:'POST',auth:null,data:{email:user.email,password:'StrongTestPassword_123'}});
+      const persisted=await request('/chat/'+secondId+'/messages',{auth:relogin.body.token});
+      assert.deepEqual(persisted.body.messages.map(m=>m.body),['hello from first','hello back']);
+      const thirdThread=await request('/chat/'+secondId+'/messages',{auth:thirdToken});
+      assert.deepEqual(thirdThread.body.messages.map(m=>m.body),['spoof']);
+      assert.equal(thirdThread.body.messages[0].senderId,thirdId);
     });
     await t.test('concurrent ranked ACCEPTED submissions settle once and update both Elo ratings once', async () => {
       const rival = await prisma.user.create({ data: {
