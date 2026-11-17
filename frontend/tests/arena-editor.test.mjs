@@ -28,5 +28,5 @@ test("the code editor keeps a monospace font and exposes key help", () => {
   const editorRule = /\.editor textarea\s*\{[^}]*\}/.exec(style)?.[0] ?? "";
   assert.match(editorRule, /font:[^;]*var\(--mono\)/);
   assert.match(style, /\.editor-key-help\s*\{/);
-  assert.match(style, /textarea:not\(\.editor textarea\)/, "generic textarea reset still excludes the code editor");
+  assert.match(style, /textarea:not\(\.editor textarea[,)]/, "generic textarea reset still excludes the code editor");
 });
