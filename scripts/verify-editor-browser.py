@@ -26,13 +26,13 @@ def ready(url,child):
 
 def keyboard_check(editor,language):
     expect(editor).to_be_visible()
-    editor.fill('');editor.press('Shift+9')
+    editor.fill('');editor.press('(')
     expect(editor).to_have_value('()')
     assert editor.evaluate('(el)=>el.selectionStart')==1
     editor.press('Tab')
     assert editor.evaluate('(el)=>el.selectionStart')==2
     editor.press('x');expect(editor).to_have_value('()x')
-    editor.fill('');editor.press('Shift+Quote')
+    editor.fill('');editor.press('"')
     expect(editor).to_have_value('""')
     editor.press('Tab');editor.press('x');expect(editor).to_have_value('""x')
     before='if ready:' if language=='python' else 'SELECT(' if language=='sql' else 'if (ready) {'
@@ -89,8 +89,8 @@ def verify():
                     page.get_by_role('button',name=exercise['title'],exact=True).click()
                     copy=page.locator('.server-workspace .editor textarea')
                     expect(copy).to_be_visible()
-                    copy.fill('');copy.press('Shift+9');expect(copy).to_have_value('(')
-                    copy.press('Shift+Quote');expect(copy).to_have_value('("')
+                    copy.fill('');copy.press('(');expect(copy).to_have_value('(')
+                    copy.press('"');expect(copy).to_have_value('("')
                     copy.fill('if ready:');copy.press('Enter');expect(copy).to_have_value('if ready:\n')
                     copy.fill('(')
                     page.get_by_role('button',name='Check exact match',exact=True).click()
