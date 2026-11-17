@@ -280,13 +280,23 @@ try {
   pass("chat: another account cannot read match, chat or notifications data");
 
   // --- One continuous learning -> judged submission -> analytics -> comment path ----
-  const lessonFixture = learningPack.lessons.find((lesson) => lesson.problems?.length);
-  assert.ok(lessonFixture, "seeded learning pack contains a lesson with a judged problem");
+  const lessonCandidates = await prisma.lesson.findMany({
+    where: {
+      prerequisiteId: null,
+      topic: { course: { isPublished: true } },
+      problems: { some: { isPublished: true } },
+    },
+    include: { problems: { where: { isPublished: true }, select: { id: true } } },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+  });
+  const lessonFixture = lessonCandidates.find((lesson) =>
+    lesson.problems.some((problem) => solutionFor(problem.id)),
+  );
+  assert.ok(lessonFixture, "seeded catalog has a prerequisite-free lesson with a reference solution");
   const lessonId = lessonFixture.id;
   const lessonResponse = await request(`/learning/lessons/${lessonId}`);
   assert.equal(lessonResponse.status, 200, "lesson is readable through the canonical API");
   const problemFixture = lessonFixture.problems.find((problem) => solutionFor(problem.id));
-  assert.ok(problemFixture, "lesson contains an authored reference solution");
   const problemId = problemFixture.id;
   const started = await request(`/learning/lessons/${lessonId}/start`, {
     token: alice.token, method: "POST",
