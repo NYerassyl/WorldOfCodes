@@ -78,11 +78,11 @@ def verify():
                 def authorize(token):
                     page.locator('.auth-wrapper button.authorize').click()
                     modal=page.locator('.dialog-ux')
-                    logout=modal.get_by_role('button',name='Logout',exact=True)
+                    logout=modal.locator('button').filter(has_text=re.compile(r'^\s*Logout\s*$'))
                     if logout.count():logout.click()
                     modal.locator('input').fill(token)
-                    modal.get_by_role('button',name='Authorize',exact=True).click()
-                    modal.get_by_role('button',name='Close',exact=True).click()
+                    modal.locator('button.authorize').click()
+                    modal.locator('button.btn-done').click()
                 suffix=uuid4().hex.translate(str.maketrans('0123456789','abcdefghij'))[:14]
                 registration={'email':suffix+'@example.com','nickname':'owner'+suffix,'password':'shared-password-123'}
                 a=docs('POST','/api/auth/register',201,registration)
