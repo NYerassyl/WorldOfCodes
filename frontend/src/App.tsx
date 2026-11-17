@@ -16,9 +16,11 @@ import {
 import Players from "./components/Players";
 import PlayerProfile from "./components/PlayerProfile";
 import Profile from "./pages/Profile";
+import Chat from "./pages/Chat";
+import Notifications, { NotificationsBell } from "./pages/Notifications";
 import Trace from "./pages/Trace";
 import Arena from "./pages/Arena";
-const routes = [
+const routes: { id: string; name: string; icon: string; hidden?: boolean }[] = [
   { id: "home", name: "Overview", icon: "home" },
   { id: "learn", name: "Lessons", icon: "learn" },
   { id: "algorithms", name: "Challenges", icon: "code" },
@@ -26,8 +28,10 @@ const routes = [
   { id: "trace", name: "Trace Practice", icon: "code" },
   { id: "duel", name: "Duel Arena", icon: "duel" },
   { id: "friends", name: "Friendly Battle", icon: "friends" },
-  { id: "chat", name: "Chat", icon: "friends" },
+  { id: "chat", name: "Messages", icon: "friends" },
   { id: "profile", name: "My Profile", icon: "profile" },
+  { id: "notifications", name: "Notifications", icon: "profile", hidden: true },
+  { id: "players", name: "Find Players", icon: "profile", hidden: true },
 ];
 function Shell() {
   const { state, storageError, update } = useStore();
@@ -120,7 +124,7 @@ function Shell() {
             <span className="workspace-chapter">01</span>
           </div>
           <nav aria-label="Main navigation">
-            {routes.map((r, i) => (
+            {routes.filter((r) => !r.hidden).map((r, i) => (
               <div key={r.id}>
                 {i === 0 || r.id === "duel" || r.id === "profile" ? (
                   <div className="navlabel">
@@ -184,6 +188,7 @@ function Shell() {
             <span className="demo">
               <i /> {user ? "Account connected" : "Sign in to save progress"}
             </span>
+            <NotificationsBell />
             <span className="balance">
               <Icon name="coin" />
               <b>{coins}</b>
@@ -220,7 +225,11 @@ function Shell() {
           ) : page === "copy" ? (
             <ServerCopy />
           ) : page === "chat" ? (
-            account ? <Players key={id || account.id} me={account.id} peerId={id} chat/> : <a href="#profile">Sign in to open chat</a>
+            <Chat key={route} peerId={id} />
+          ) : page === "notifications" ? (
+            <Notifications />
+          ) : page === "players" ? (
+            account ? <Players me={account.id} /> : <a href="#profile">Sign in to find players</a>
           ) : page === "profile" ? (
             id && account && id!==account.id ? <PlayerProfile key={id} id={id} me={account.id}/> : <Profile />
           ) : page === "duel" || page === "friends" ? (

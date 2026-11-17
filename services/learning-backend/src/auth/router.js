@@ -1,4 +1,6 @@
 import { socialRouter } from './social.js';
+import { createChatRouter } from '../chat/router.js';
+import { createNotificationRouter } from '../notifications/router.js';
 import { Router } from 'express';
 import { asyncRoute, ensureKeys, notFound, requireString, badRequest, AppError } from '../lib/errors.js';
 import { createSessionToken, hashSessionToken, hashPassword, verifyPassword, normalizeEmail, newUsername, normalizeNickname, publicUser, privateUser } from '../lib/security.js';
@@ -24,6 +26,8 @@ async function startSession(prisma, userId) {
 export function createAuthRouter(prisma) {
   const router=Router(); const auth=makeRequireAuth(prisma);
   router.use(socialRouter(prisma,auth));
+  router.use(createChatRouter(prisma,auth));
+  router.use(createNotificationRouter(prisma,auth));
   router.post('/auth/register',asyncRoute(async (req,res)=>{
     ensureKeys(req.body,['email','password','nickname']);
     const email=normalizeEmail(req.body.email), nickname=requireString(req.body.nickname,'nickname',24), normalizedNickname=newUsername(nickname);

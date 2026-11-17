@@ -38,7 +38,7 @@ async function startApp() {
 }
 
 test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docker Judge', {timeout:240000}, async t=>{
-  let server, url, token, user;
+  let server, url, token, user, alice, bob, carol, replyMessageId;
   async function request(path,{method='GET',data,auth=token}={}){
     const res=await fetch(url+path,{
       method,
@@ -54,11 +54,12 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
   try {
     await prisma.$connect();
     ({server,url}=await startApp());
-    await t.test('five additive migration checksums match source and seed remains idempotent',async()=>{
+    await t.test('eight additive migration checksums match source and seed remains idempotent',async()=>{
       const names=[
         '20261103000000_init','20261103170000_add_battle_models',
         '20261103220000_match_status_type_index','20261103230000_problem_starter_code',
-        '20261110200000_trace_attempts'
+        '20261110200000_trace_attempts','20261111010000_player_social',
+        '20261117010000_username_policy','20261117130000_chat_notifications'
       ];
       const entries=await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" ORDER BY migration_name');
       assert.deepEqual(entries.map(x=>x.migration_name),names);
@@ -72,7 +73,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal(await prisma.problem.count(),16);
       assert.equal(await prisma.testCase.count(),50);
       assert.equal(await prisma.copyExercise.count(),3);
-      for(const delegate of ['user','authSession','problem','testCase','submission','match','matchPlayer','rating','friendBattle'])
+      for(const delegate of ['user','authSession','problem','testCase','submission','match','matchPlayer','rating','friendBattle','follow','directMessage','notification'])
         assert.equal(typeof prisma[delegate].findMany,'function',delegate);
     });
     await t.test('register/login, private profile and authorization',async()=>{
@@ -96,7 +97,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal((await request('/users/me',{method:'PATCH',data:{coins:9999,xp:9999}})).status,400);
       const pub=await request('/users/'+second.body.user.nickname,{auth:null});
       assert.equal(pub.status,200);
-      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','avatarUrl','xp','level','completedLessons'].sort());
+      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','displayName','bio','avatarUrl','xp','level','completedLessons'].sort());
       assert.equal((await request('/users/me',{auth:null})).status,401);
       assert.equal((await request('/auth/login',{method:'POST',auth:null,data:{email:user.email,password:'wrong'}})).status,401);
       const renamed=await request('/users/me',{method:'PATCH',data:{nickname:'new'+suffix}});
@@ -104,6 +105,129 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal(renamed.body.nextNicknameChange,'PAYMENT_REQUIRED');
       assert.equal((await request('/users/me',{method:'PATCH',data:{nickname:'again'+suffix}})).status,402);
       assert.deepEqual(await resolveAuthSession(prisma,token),{userId:user.id,sessionId:session.id});
+    });
+    await t.test('chat migration keeps pre-existing DirectMessage history',async()=>{
+      await prisma.$executeRawUnsafe('DROP SCHEMA IF EXISTS chat_legacy_sim CASCADE');
+      try{
+        await prisma.$executeRawUnsafe('CREATE SCHEMA chat_legacy_sim');
+        await prisma.$executeRawUnsafe('CREATE TABLE chat_legacy_sim."User" ("id" TEXT PRIMARY KEY)');
+        await prisma.$executeRawUnsafe(`CREATE TABLE chat_legacy_sim."DirectMessage" (
+          "id" TEXT PRIMARY KEY,
+          "senderId" TEXT NOT NULL REFERENCES chat_legacy_sim."User"("id") ON DELETE CASCADE,
+          "recipientId" TEXT NOT NULL REFERENCES chat_legacy_sim."User"("id") ON DELETE CASCADE,
+          "body" TEXT NOT NULL,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+        )`);
+        await prisma.$executeRawUnsafe(`INSERT INTO chat_legacy_sim."User" ("id") VALUES ('legacy-a'),('legacy-b')`);
+        await prisma.$executeRawUnsafe(`INSERT INTO chat_legacy_sim."DirectMessage"
+          ("id","senderId","recipientId","body","createdAt")
+          VALUES ('legacy-msg','legacy-a','legacy-b','hello before the chat migration',CURRENT_TIMESTAMP - INTERVAL '1 hour')`);
+        const source=readFileSync(new URL('../prisma/migrations/20261117130000_chat_notifications/migration.sql',import.meta.url),'utf8');
+        const scoped=source
+          .replace(/"DirectMessage"/g,'chat_legacy_sim."DirectMessage"')
+          .replace(/"NotificationType"/g,'chat_legacy_sim."NotificationType"')
+          .replace(/"Notification"/g,'chat_legacy_sim."Notification"')
+          .replace(/"User"/g,'chat_legacy_sim."User"');
+        const statements=scoped.split('\n').filter(line=>!line.trim().startsWith('--')).join('\n')
+          .split(';').map(part=>part.trim()).filter(Boolean);
+        assert.ok(statements.length>=7,JSON.stringify(statements));
+        for(const statement of statements) await prisma.$executeRawUnsafe(statement);
+        const rows=await prisma.$queryRawUnsafe(
+          'SELECT "id","senderId","recipientId","body","readAt" FROM chat_legacy_sim."DirectMessage"'
+        );
+        assert.equal(rows.length,1);
+        assert.equal(rows[0].body,'hello before the chat migration');
+        assert.equal(rows[0].readAt,null);
+        const tables=await prisma.$queryRawUnsafe(
+          `SELECT table_name FROM information_schema.tables WHERE table_schema='chat_legacy_sim' ORDER BY table_name`
+        );
+        assert.deepEqual(tables.map(row=>row.table_name),['DirectMessage','Notification','User']);
+      }finally{
+        await prisma.$executeRawUnsafe('DROP SCHEMA IF EXISTS chat_legacy_sim CASCADE');
+      }
+    });
+    await t.test('chat inbox keeps legacy history, continues one conversation and isolates third accounts',async()=>{
+      const register=async(name)=>{
+        const response=await request('/auth/register',{method:'POST',auth:null,data:{
+          email:name+'-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:name+suffix
+        }});
+        assert.equal(response.status,201,JSON.stringify(response.body));
+        return response.body;
+      };
+      alice=await register('alice');bob=await register('bob');carol=await register('carol');
+      const legacyId=randomBytes(16).toString('hex');
+      await prisma.$executeRaw`INSERT INTO "DirectMessage" ("id","senderId","recipientId","body","createdAt")
+        VALUES (${legacyId},${alice.user.id},${bob.user.id},${'hello from before the migration'},${new Date(Date.now()-3600000)})`;
+      const bobInbox=await request('/chat/conversations',{auth:bob.token});
+      assert.equal(bobInbox.status,200);
+      const legacyConversation=bobInbox.body.items.find(item=>item.peer.id===alice.user.id);
+      assert.ok(legacyConversation,'legacy message must appear in the new inbox');
+      assert.equal(legacyConversation.lastMessage.body,'hello from before the migration');
+      assert.equal(legacyConversation.lastMessage.readAt,null);
+      assert.equal(legacyConversation.unread,1);
+      const legacyThread=await request('/chat/'+alice.user.id+'/messages',{auth:bob.token});
+      assert.deepEqual(legacyThread.body.messages.map(item=>item.body),['hello from before the migration']);
+      const reply=await request('/chat/'+bob.user.id+'/messages',{method:'POST',auth:alice.token,data:{body:'reply after the migration'}});
+      assert.equal(reply.status,201);
+      replyMessageId=reply.body.message.id;
+      const continued=await request('/chat/'+alice.user.id+'/messages',{auth:bob.token});
+      assert.deepEqual(continued.body.messages.map(item=>item.body),['hello from before the migration','reply after the migration']);
+      for(const [account,peer] of [[alice,bob],[bob,alice]]){
+        const list=await request('/chat/conversations',{auth:account.token});
+        assert.equal(list.body.items.filter(item=>item.peer.id===peer.user.id).length,1,'one conversation per person');
+      }
+      const foreign=await request('/chat/'+alice.user.id+'/messages',{auth:carol.token});
+      assert.equal(foreign.status,200);
+      assert.equal(foreign.body.messages.length,0,'a third account cannot read someone else\'s thread');
+      assert.equal((await request('/chat/conversations',{auth:carol.token})).body.items.length,0);
+    });
+    await t.test('follow and message notifications are deduplicated, refundable and recipient-scoped',async()=>{
+      const followRoute='/players/'+alice.user.id+'/follow';
+      assert.equal((await request(followRoute,{method:'PUT',auth:bob.token})).status,204);
+      assert.equal((await request(followRoute,{method:'PUT',auth:bob.token})).status,204);
+      assert.equal(await prisma.follow.count({where:{followerId:bob.user.id,followedId:alice.user.id}}),1);
+      const followNotes=()=>prisma.notification.count({where:{recipientId:alice.user.id,actorId:bob.user.id,type:'FOLLOW'}});
+      assert.equal(await followNotes(),1,'a repeated follow must create exactly one notification');
+      assert.equal(await prisma.notification.count({where:{dedupeKey:'message:'+replyMessageId}}),1);
+      assert.equal(await prisma.notification.count({where:{entityId:replyMessageId,recipientId:bob.user.id,actorId:alice.user.id,type:'MESSAGE'}}),1);
+      const aliceList=await request('/notifications',{auth:alice.token});
+      assert.equal(aliceList.status,200);
+      const followNote=aliceList.body.items.find(item=>item.type==='FOLLOW');
+      assert.ok(followNote);
+      assert.equal(followNote.actor.id,bob.user.id);
+      assert.equal(followNote.readAt,null);
+      const legacySend=await request('/players/'+alice.user.id+'/messages',{method:'POST',auth:bob.token,data:{body:'sent through the legacy endpoint'}});
+      assert.equal(legacySend.status,201);
+      assert.equal(await prisma.notification.count({where:{dedupeKey:'message:'+legacySend.body.id}}),1);
+      assert.equal(await prisma.notification.count({where:{entityId:legacySend.body.id,recipientId:alice.user.id,actorId:bob.user.id,type:'MESSAGE'}}),1);
+      const bobUnread=await request('/notifications/unread-count',{auth:bob.token});
+      assert.deepEqual(bobUnread.body,{unreadCount:1});
+      const foreignRead=await request('/notifications/read',{method:'POST',auth:carol.token,data:{ids:[followNote.id]}});
+      assert.equal(foreignRead.status,200);
+      assert.equal(foreignRead.body.updated,0,'another account cannot mark a notification read');
+      assert.equal((await prisma.notification.findUnique({where:{id:followNote.id}})).readAt,null);
+      const ownRead=await request('/notifications/read',{method:'POST',auth:alice.token,data:{ids:[followNote.id]}});
+      assert.equal(ownRead.status,200);
+      assert.equal(ownRead.body.updated,1);
+      assert.equal(ownRead.body.unreadCount,1);
+      assert.ok((await prisma.notification.findUnique({where:{id:followNote.id}})).readAt instanceof Date);
+      assert.equal((await request(followRoute,{method:'PUT',auth:bob.token})).status,204);
+      assert.ok((await prisma.notification.findUnique({where:{id:followNote.id}})).readAt instanceof Date,'repeat follow must not revive a read notification');
+      assert.equal(await followNotes(),1);
+      const markAll=await request('/notifications/read',{method:'POST',auth:alice.token,data:{all:true}});
+      assert.equal(markAll.status,200);
+      assert.equal(markAll.body.updated,1);
+      assert.equal(markAll.body.unreadCount,0);
+      assert.equal((await request(followRoute,{method:'DELETE',auth:bob.token})).status,204);
+      assert.equal((await request(followRoute,{method:'PUT',auth:bob.token})).status,204);
+      assert.equal(await followNotes(),1,'refollow updates the previous notification instead of adding one');
+      const refreshed=await prisma.notification.findUnique({where:{id:followNote.id}});
+      assert.equal(refreshed.readAt,null,'refollow sets the existing notification to unread');
+      assert.ok(refreshed.createdAt.getTime()>=new Date(followNote.createdAt).getTime());
+      assert.equal((await request('/notifications/unread-count',{auth:alice.token})).body.unreadCount,1);
+      for(const body of [{},{ids:['missing'],all:true},{all:false},{ids:[]}]){
+        assert.equal((await request('/notifications/read',{method:'POST',auth:alice.token,data:body})).status,400,JSON.stringify(body));
+      }
     });
     await t.test('concurrent ranked ACCEPTED submissions settle once and update both Elo ratings once', async () => {
       const rival = await prisma.user.create({ data: {
