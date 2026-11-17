@@ -4,7 +4,7 @@ Reuses the existing `feat/editor-auto-pairs-gpt4` helper (audited commit
 `fe065d947ae8655ceb972524475236450c7b93f2`) and its 14 regression cases.
 Six additional regressions cover language indentation, comment/string punctuation,
 selection boundaries, a leading newline and IME composition. Existing JetBrains
-Mono styling is retained.
+Mono styling is retained; the generic form reset excludes local lab editors so it cannot override their monospace font.
 
 Smart editing is explicitly enabled for Challenges, server lesson practice,
 editable Python/SQL lesson examples, local language Code labs and the legacy
