@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import express from 'express';
@@ -54,12 +54,9 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
   try {
     await prisma.$connect();
     ({server,url}=await startApp());
-    await t.test('five additive migration checksums match source and seed remains idempotent',async()=>{
-      const names=[
-        '20261103000000_init','20261103170000_add_battle_models',
-        '20261103220000_match_status_type_index','20261103230000_problem_starter_code',
-        '20261110200000_trace_attempts'
-      ];
+    await t.test('all additive migration checksums match source and seed remains idempotent',async()=>{
+      const names = readdirSync(new URL('../prisma/migrations/', import.meta.url))
+        .filter(name => /^\d{14}_/.test(name)).sort();
       const entries=await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" ORDER BY migration_name');
       assert.deepEqual(entries.map(x=>x.migration_name),names);
       for(const item of entries){
@@ -96,7 +93,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal((await request('/users/me',{method:'PATCH',data:{coins:9999,xp:9999}})).status,400);
       const pub=await request('/users/'+second.body.user.nickname,{auth:null});
       assert.equal(pub.status,200);
-      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','avatarUrl','xp','level','completedLessons'].sort());
+      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','avatarUrl','xp','level','completedLessons','displayName','bio'].sort());
       assert.equal((await request('/users/me',{auth:null})).status,401);
       assert.equal((await request('/auth/login',{method:'POST',auth:null,data:{email:user.email,password:'wrong'}})).status,401);
       const renamed=await request('/users/me',{method:'PATCH',data:{nickname:'new'+suffix}});

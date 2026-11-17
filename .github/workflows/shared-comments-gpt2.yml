@@ -44,6 +44,8 @@ jobs:
         with:
           python-version: '3.12'
       - run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install matching Linux optional binaries from inherited workspace versions
+        run: node scripts/ensure-ci-native.mjs
       - name: Validate Prisma, apply migrations twice and seed
         run: |
           npm run db:validate
