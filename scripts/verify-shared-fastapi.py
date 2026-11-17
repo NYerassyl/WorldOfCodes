@@ -62,8 +62,8 @@ def verify():
                     assert block.count()==1,(method,path,block.count())
                     if 'is-open' not in block.get_attribute('class'):block.locator('.opblock-summary').click()
                     attempt=block.get_by_role('button',name='Try it out',exact=True)
-                    if attempt.count():attempt.click()
-                    if data is not None:block.locator('textarea.body-param__text').fill(json.dumps(data))
+                    if not block.get_by_role('button',name='Execute',exact=True).count():attempt.click()
+                    if data is not None:block.locator('textarea').fill(json.dumps(data))
                     expected_path=path
                     for name,value in (params or {}).items():
                         block.locator('tr[data-param-name="'+name+'"] input').fill(value)

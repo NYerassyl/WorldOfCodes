@@ -30,14 +30,16 @@
 | `POST /api/problems/{problem_id}/submissions` | Жоқ (docs/demo) | X-User-Id integer | submissions + users / MemoryStore | Жоқ / Иә |
 | `GET /api/problems/{problem_id}/submissions` | Жоқ (docs/demo) | Жоқ | — / — | Жоқ / Иә |
 | `GET /api/submissions/{submission_id}` | Жоқ (docs/demo) | Жоқ | — / — | Жоқ / Иә |
-| `GET /api/problems/{problem_id}/comments` | Иә, Express bridge | X-User-Id / Bearer | — / — | Жоқ / Жоқ |
-| `POST /api/problems/{problem_id}/comments` | Иә, Express bridge | X-User-Id / Bearer | comments / ProblemComment | Жоқ / Жоқ |
-| `PATCH /api/problems/{problem_id}/comments/{comment_id}` | Иә, Express bridge | X-User-Id / Bearer | comments / ProblemComment | Жоқ / Жоқ |
-| `DELETE /api/problems/{problem_id}/comments/{comment_id}` | Иә, Express bridge | X-User-Id / Bearer | comments / ProblemComment | Жоқ / Жоқ |
-| `GET /api/trace/exercises` | Жоқ (docs/demo) | Жоқ | — / — | Жоқ / Иә |
-| `GET /api/trace/exercises/{exercise_id}` | Жоқ (docs/demo) | Жоқ | — / — | Жоқ / Иә |
+| `GET /api/problems/{problem_id}/comments` | Иә, #18 Express bridge | Жоқ / Жоқ | — / — | Жоқ / Жоқ |
+| `POST /api/problems/{problem_id}/comments` | Иә, #18 Express bridge | X-User-Id / Bearer | comments / ProblemComment | Жоқ / Жоқ |
+| `PATCH /api/problems/{problem_id}/comments/{comment_id}` | Иә, #18 Express bridge | X-User-Id / Bearer | comments / ProblemComment | Жоқ / Жоқ |
+| `DELETE /api/problems/{problem_id}/comments/{comment_id}` | Иә, #18 Express bridge | X-User-Id / Bearer | comments / ProblemComment | Жоқ / Жоқ |
+| `GET /api/trace/exercises` | Жоқ (docs/demo) | Жоқ | — / — | Жоқ / Жоқ |
+| `GET /api/trace/exercises/{exercise_id}` | Жоқ (docs/demo) | Жоқ | — / — | Жоқ / Жоқ |
 | `POST /api/trace/exercises/{exercise_id}/submit` | Жоқ (docs/demo) | X-User-Id integer | trace_attempts / MemoryStore | Жоқ / Иә |
-| `GET /api/players/{player_id}/activity` | Иә, Express bridge | Bearer | — / — | Жоқ / Жоқ |
+| `GET /api/players/{player_id}/activity` | Иә, #18 Express bridge | — / Bearer | — / — | — / Жоқ |
+
+Жад бағаны пайдаланушы деректерінің mutable сақтауын көрсетеді. Trace каталогы екі нұсқада да trusted статикалық JSON, пайдаланушы тарихы емес. `/api/players/{player_id}/activity` тек #18-де бар.
 
 ## Қалған нақты көшіру жұмысы
 
