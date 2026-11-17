@@ -1,0 +1,18 @@
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: woc
+      POSTGRES_PASSWORD: ${FASTAPI_POSTGRES_PASSWORD:-woc}
+      POSTGRES_DB: worldofcodes_fastapi
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - fastapi_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U woc -d worldofcodes_fastapi"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+volumes:
+  fastapi_postgres:

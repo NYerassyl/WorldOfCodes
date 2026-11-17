@@ -1,0 +1,6 @@
+.env
+.venv/
+__pycache__/
+.pytest_cache/
+swagger-verification.png
+swagger-server.log

@@ -1,0 +1,87 @@
+.server-card-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 20px;
+  margin: 24px 0;
+}
+.server-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  color: inherit;
+  text-decoration: none;
+}
+.server-card h2 {
+  font-size: 20px;
+}
+.server-card p {
+  line-height: 1.65;
+}
+.server-card .text-link {
+  margin-top: auto;
+}
+.server-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.2fr);
+  gap: 24px;
+  margin: 24px 0;
+}
+.server-workspace > div {
+  min-width: 0;
+}
+.server-workspace h2,
+.server-workspace h3 {
+  margin: 16px 0;
+}
+.server-workspace p {
+  line-height: 1.7;
+}
+.server-workspace pre,
+.server-theory pre {
+  padding: 20px;
+  background: var(--bg, #15171c);
+  color: var(--ink, #24252a);
+  border-radius: 12px;
+  overflow: auto;
+  white-space: pre;
+  max-width: 100%;
+}
+.server-theory p {
+  line-height: 1.85;
+  white-space: pre-line;
+  margin: 16px 0;
+  max-width: 75ch;
+}
+.server-problem-tabs,
+.server-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin: 24px 0;
+}
+.server-filters label {
+  display: grid;
+  gap: 8px;
+}
+.server-filters select {
+  padding: 10px;
+  border-radius: 8px;
+  background: var(--bg, #f8f7f4);
+  color: var(--ink, #24252a);
+  border: 1px solid #555;
+}
+.server-workspace .editor {
+  margin-bottom: 16px;
+}
+.server-workspace .editor textarea {
+  min-height: 280px;
+}
+.server-workspace .notice {
+  margin: 18px 0;
+}
+@media (max-width: 800px) {
+  .server-workspace {
+    grid-template-columns: 1fr;
+  }
+}
