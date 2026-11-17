@@ -1,0 +1,258 @@
+name: GPT4 integrated local-stack QA
+
+on:
+  push:
+    branches:
+      - qa/gpt4-integration-testing
+  pull_request:
+    branches:
+      - integration/nov17-combined
+    paths:
+      - 'frontend/**'
+      - 'server/**'
+      - 'services/**'
+      - 'tests/**'
+      - 'scripts/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - '.github/workflows/gpt4-integration-qa.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  integrated-stack:
+    name: Clean PostgreSQL, Prisma, Express, Docker Judge and frontend
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: woc_qa
+          POSTGRES_PASSWORD: woc_qa_only
+          POSTGRES_DB: worldofcodes_integration_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U woc_qa -d worldofcodes_integration_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://woc_qa:woc_qa_only@127.0.0.1:5432/worldofcodes_integration_test?schema=public
+      JUDGE_IMAGE: python:3.12-alpine
+      CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173
+      HOST: 127.0.0.1
+      PORT: 4001
+      GPT4_QA_STATE_FILE: /tmp/gpt4-qa-state.json
+      FASTAPI_DATABASE_URL: postgresql://woc_qa:woc_qa_only@127.0.0.1:5432/worldofcodes_integration_test?schema=public
+      EXPRESS_INTERNAL_URL: http://127.0.0.1:4001
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
+      FASTAPI_BASE_URL: http://127.0.0.1:8000
+      AUTH_RATE_LIMIT: 100
+      SUBMISSION_RATE_LIMIT: 200
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install clean locked workspaces
+        run: npm ci
+      - name: Validate and generate Prisma Client
+        run: |
+          npm run db:validate
+          npm run db:generate
+      - name: Apply Prisma migrations twice to the isolated database
+        run: |
+          npm run db:migrate
+          npm run db:migrate
+      - name: Seed twice and verify idempotent catalog counts
+        run: |
+          npm run db:seed
+          npm run db:seed
+          node --input-type=module <<'JS'
+          import { PrismaClient } from '@prisma/client';
+          const db = new PrismaClient();
+          const counts = {
+            users: await db.user.count(),
+            lessons: await db.lesson.count(),
+            problems: await db.problem.count(),
+            copyExercises: await db.copyExercise.count(),
+          };
+          console.log(counts);
+          if (counts.lessons !== 12 || counts.problems !== 31 || counts.copyExercises !== 3) {
+            throw new Error('Unexpected seeded learning catalog counts');
+          }
+          await db.$disconnect();
+          JS
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/fastapi-backend/requirements.txt
+      - name: Install FastAPI against the same isolated PostgreSQL database
+        working-directory: services/fastapi-backend
+        run: |
+          python -m pip install -r requirements.txt
+          alembic -c alembic.ini upgrade head
+      - name: Run frontend, backend and server unit/contract tests
+        run: npm test
+      - name: Build production frontend
+        run: npm run build
+      - name: Run real PostgreSQL and Docker Judge integration suite
+        run: |
+          docker pull python:3.12-alpine
+          npm run test:integration
+      - name: Start Express and verify REST plus Socket.IO transport
+        run: |
+          python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 > /tmp/woc-fastapi-integrated.log 2>&1 &
+          echo $! > /tmp/woc-fastapi-integrated.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-fastapi-integrated-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-fastapi-integrated-health.json
+          node --env-file-if-exists=.env server/index.js > /tmp/woc-express.log 2>&1 &
+          echo $! > /tmp/woc-express.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4001/api/health -o /tmp/woc-auth.json; then break; fi
+            sleep 1
+          done
+          # An unauthenticated request must reach Express and be rejected by auth, not by a missing route.
+          code=$(curl -sS -o /tmp/woc-auth.json -w '%{http_code}' http://127.0.0.1:4001/api/users/me)
+          test "$code" = "401"
+          # Socket.IO Engine.IO polling handshake must return an open packet.
+          socket=$(curl -fsS -H 'Origin: http://127.0.0.1:5173' 'http://127.0.0.1:4001/socket.io/?EIO=4&transport=polling')
+          echo "$socket" | grep -q '"sid"'
+          # Real two-account friendly/ranked lifecycle, chat, follow and notifications.
+          node scripts/verify-arena-two-account.mjs
+          # Restart both services against the same disposable PostgreSQL database.
+          kill "$(cat /tmp/woc-express.pid)"
+          kill "$(cat /tmp/woc-fastapi-integrated.pid)"
+          sleep 2
+          python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 >> /tmp/woc-fastapi-integrated.log 2>&1 &
+          echo $! > /tmp/woc-fastapi-integrated.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-fastapi-restart-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-fastapi-restart-health.json
+          node --env-file-if-exists=.env server/index.js >> /tmp/woc-express.log 2>&1 &
+          sleep 2
+          node --env-file-if-exists=.env server/index.js >> /tmp/woc-express.log 2>&1 &
+          echo $! > /tmp/woc-express.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4001/api/health -o /tmp/woc-restart-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-restart-health.json
+          node scripts/verify-restart-persistence.mjs
+      - name: Start Vite and verify the frontend is served
+        run: |
+          npm run dev --workspace=frontend -- --host 127.0.0.1 > /tmp/woc-vite.log 2>&1 &
+          echo $! > /tmp/woc-vite.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:5173/ -o /tmp/woc-index.html; then break; fi
+            sleep 1
+          done
+          grep -qi '<html' /tmp/woc-index.html
+      - name: Show frontend server log on smoke failure
+        if: failure()
+        run: cat /tmp/woc-vite.log || true
+      - name: Upload service logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gpt4-integrated-stack-logs
+          path: |
+            /tmp/woc-express.log
+            /tmp/woc-fastapi-integrated.log
+            /tmp/woc-vite.log
+            /tmp/woc-auth.json
+          if-no-files-found: ignore
+
+  fastapi-contract:
+    name: FastAPI contract suite and shared PostgreSQL Alembic view
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: woc_qa
+          POSTGRES_PASSWORD: woc_qa_only
+          POSTGRES_DB: worldofcodes_fastapi_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U woc_qa -d worldofcodes_fastapi_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    env:
+      DATABASE_URL: postgresql://woc_qa:woc_qa_only@127.0.0.1:5432/worldofcodes_fastapi_test?schema=public
+      FASTAPI_DATABASE_URL: postgresql://woc_qa:woc_qa_only@127.0.0.1:5432/worldofcodes_fastapi_test?schema=public
+      SHARED_DATABASE_TEST_URL: postgresql://woc_qa:woc_qa_only@127.0.0.1:5432/worldofcodes_fastapi_test?schema=public
+      EXPRESS_INTERNAL_URL: http://127.0.0.1:4001
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
+    defaults:
+      run:
+        working-directory: services/fastapi-backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install Prisma workspace dependencies
+        run: npm ci
+        working-directory: .
+      - name: Create shared Prisma tables for the analytics view
+        run: npx prisma migrate deploy --schema services/learning-backend/prisma/schema.prisma
+        working-directory: .
+      - name: Seed canonical Prisma catalog after migrations
+        run: npm run db:seed
+        working-directory: .
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+          cache: pip
+          cache-dependency-path: services/fastapi-backend/requirements.txt
+      - name: Install FastAPI and Alembic dependencies
+        run: python -m pip install -r requirements.txt
+      - name: Apply the additive Alembic analytics migration
+        run: alembic -c alembic.ini upgrade head
+      - name: Run FastAPI regression suite including real shared PostgreSQL cases
+        run: python -m pytest -q
+      - name: Verify Swagger and health endpoint
+        run: |
+          python - <<'PY'
+          from fastapi.testclient import TestClient
+          from main import app
+          with TestClient(app) as client:
+              assert client.get('/docs').status_code == 200
+              assert client.get('/openapi.json').status_code == 200
+              assert client.get('/api/health').json()['status'] == 'ok'
+          print('FastAPI Swagger/OpenAPI/health PASS')
+          PY
+      - name: Start FastAPI and verify live HTTP endpoints
+        run: |
+          python -m uvicorn main:app --host 127.0.0.1 --port 8000 > /tmp/woc-fastapi.log 2>&1 &
+          echo $! > /tmp/woc-fastapi.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-fastapi-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-fastapi-health.json
+          curl -fsS http://127.0.0.1:8000/docs | grep -qi swagger
+          kill "$(cat /tmp/woc-fastapi.pid)"
+          sleep 2
+          python -m uvicorn main:app --host 127.0.0.1 --port 8000 >> /tmp/woc-fastapi.log 2>&1 &
+          echo $! > /tmp/woc-fastapi.pid
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-fastapi-restart-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-fastapi-restart-health.json

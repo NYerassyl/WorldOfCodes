@@ -3,12 +3,22 @@
 //   npm run dev:api
 //   node --env-file=.env scripts/verify-arena-two-account.mjs
 import assert from "node:assert/strict";
+import { readFile, writeFile } from "node:fs/promises";
 import { PrismaClient } from "../server/prisma.js";
 import { solutions } from "../tests/solutions.mjs";
 import { rankForPoints } from "../services/learning-backend/src/battle/ranks.js";
 
 const BASE = process.env.BASE_URL || "http://127.0.0.1:4001";
 const prisma = new PrismaClient();
+const learningPack = JSON.parse(
+  await readFile("services/learning-backend/prisma/learning-pack.json", "utf8"),
+);
+const referenceSolutions = Object.fromEntries(
+  learningPack.lessons.flatMap((lesson) =>
+    lesson.problems.map((problem) => [problem.id, problem.referenceCode]),
+  ),
+);
+const solutionFor = (problemId) => solutions[problemId] ?? referenceSolutions[problemId];
 const results = [];
 const pass = (name, detail = "") => {
   results.push({ name, ok: true });
@@ -90,6 +100,13 @@ try {
   const alice = await register("alice");
   const bob = await register("bob");
   const eve = await register("eve");
+  const aliceProfileEdit = await request("/users/me", {
+    token: alice.token, method: "PATCH",
+    body: { displayName: "GPT4 QA Alice", bio: "Two-account integration acceptance" },
+  });
+  assert.equal(aliceProfileEdit.status, 200, "Alice can edit her canonical profile");
+  assert.equal(aliceProfileEdit.json.displayName, "GPT4 QA Alice");
+  pass("profile: Alice updates display name and bio");
 
   // --- Friendly match: wrong verdict, accepted verdict, reload restore -----
   const invite = await request("/battle/friendly", { token: alice.token, method: "POST", body: {} });
@@ -108,7 +125,7 @@ try {
 
   const friendlyProblem = await request(`/problems/${joined.json.problemId}`);
   assert.equal(friendlyProblem.status, 200);
-  const correctFriendly = solutions[joined.json.problemId];
+  const correctFriendly = solutionFor(joined.json.problemId);
   assert.ok(correctFriendly, `solution fixture exists for ${joined.json.problemId}`);
   const wrongFriendly = friendlyProblem.json.problem.starterCode.replace(/\n\s*pass\s*$/, "\n    return None");
 
@@ -166,7 +183,7 @@ try {
   pass("ranked: wrong answers leave both ratings unchanged");
 
   const aliceRankedWin = await request(`/battle/matches/${rankedOne.id}/submit`, {
-    token: alice.token, method: "POST", body: { code: solutions[rankedOne.problemId] },
+    token: alice.token, method: "POST", body: { code: solutionFor(rankedOne.problemId) },
   });
   assert.equal(aliceRankedWin.json.status, "ACCEPTED");
   assert.equal(aliceRankedWin.json.matchCompleted, true);
@@ -185,7 +202,7 @@ try {
   pass("ranked: Novice loss is 0 and 1099+24=1123 crosses to Bronze", `rankedProblem=${rankedProblem.json.problem.functionName}`);
 
   const bobReplay = await request(`/battle/matches/${rankedOne.id}/submit`, {
-    token: bob.token, method: "POST", body: { code: solutions[rankedOne.problemId] },
+    token: bob.token, method: "POST", body: { code: solutionFor(rankedOne.problemId) },
   });
   assert.equal(bobReplay.status, 404, "a settled match rejects the second submission");
   assert.deepEqual([(await rating(alice)).points, (await rating(bob)).points], [1123, 1090]);
@@ -197,7 +214,7 @@ try {
   await setPoints(bob.user.id, 1248);
   const rankedTwo = await playMatch(alice, bob, "ranked 1249/1248");
   const secondWin = await request(`/battle/matches/${rankedTwo.id}/submit`, {
-    token: alice.token, method: "POST", body: { code: solutions[rankedTwo.problemId] },
+    token: alice.token, method: "POST", body: { code: solutionFor(rankedTwo.problemId) },
   });
   assert.equal(secondWin.json.status, "ACCEPTED");
   const aliceCrossed = await rating(alice);
@@ -262,6 +279,114 @@ try {
   assert.equal(eveRating.json.points, 1000, "third account rating untouched");
   pass("chat: another account cannot read match, chat or notifications data");
 
+  // --- One continuous learning -> judged submission -> analytics -> comment path ----
+  const lessonCandidates = await prisma.lesson.findMany({
+    where: {
+      prerequisiteId: null,
+      topic: { course: { isPublished: true } },
+      problems: { some: { isPublished: true } },
+    },
+    include: { problems: { where: { isPublished: true }, select: { id: true } } },
+    orderBy: [{ position: "asc" }, { id: "asc" }],
+  });
+  const lessonFixture = lessonCandidates.find((lesson) =>
+    lesson.problems.some((problem) => solutionFor(problem.id)),
+  );
+  assert.ok(lessonFixture, "seeded catalog has a prerequisite-free lesson with a reference solution");
+  const lessonId = lessonFixture.id;
+  const lessonResponse = await request(`/learning/lessons/${lessonId}`);
+  assert.equal(lessonResponse.status, 200, "lesson is readable through the canonical API");
+  const problemFixture = lessonFixture.problems.find((problem) => solutionFor(problem.id));
+  const problemId = problemFixture.id;
+  const started = await request(`/learning/lessons/${lessonId}/start`, {
+    token: alice.token, method: "POST",
+  });
+  assert.equal(started.status, 200);
+  assert.equal(started.json.state, "IN_PROGRESS");
+  pass("learning: Alice starts a seeded lesson", lessonId);
+
+  for (const lessonProblem of lessonFixture.problems) {
+    const judged = await request(`/problems/${lessonProblem.id}/submit`, {
+      token: alice.token, method: "POST", body: { code: solutionFor(lessonProblem.id) },
+    });
+    assert.equal(judged.status, 200, `judge submission ${lessonProblem.id}: ${JSON.stringify(judged.json)}`);
+    assert.equal(judged.json.status, "ACCEPTED", `real judge accepts ${lessonProblem.id}`);
+  }
+  pass("learning: real Docker judge accepts every required problem in the lesson", lessonId);
+
+  const fastApiBase = process.env.FASTAPI_BASE_URL || "http://127.0.0.1:8000";
+  async function fastApi(path, { token, method = "GET", body } = {}) {
+    const response = await fetch(`${fastApiBase}/api${path}`, {
+      method,
+      headers: {
+        ...(body ? { "Content-Type": "application/json" } : {}),
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    let json = null;
+    try { json = await response.json(); } catch {}
+    return { status: response.status, json };
+  }
+
+  const completed = await fastApi(`/users/${alice.user.id}/progress`, {
+    token: alice.token, method: "POST", body: { lesson_id: lessonId },
+  });
+  assert.equal(completed.status, 200, `lesson completion: ${JSON.stringify(completed.json)}`);
+  const progressBeforeRestart = await fastApi(`/users/${alice.user.id}/progress`, { token: alice.token });
+  assert.equal(progressBeforeRestart.status, 200);
+  assert.ok(
+    (progressBeforeRestart.json.lessons ?? []).some((item) => item.lessonId === lessonId && item.completedAt),
+    "lesson completion is persisted in canonical PostgreSQL",
+  );
+  pass("learning: judged completion is recorded in canonical progress", lessonId);
+
+  const analytics = await fastApi(`/players/${alice.user.id}/activity`, { token: alice.token });
+  assert.equal(analytics.status, 200, `activity analytics: ${JSON.stringify(analytics.json)}`);
+  assert.ok(analytics.json.year.submissions >= lessonFixture.problems.length, "accepted submissions appear in activity analytics");
+  assert.ok(analytics.json.year.solved >= lessonFixture.problems.length, "accepted problems appear in solved analytics");
+  pass("analytics: accepted lesson submission appears in FastAPI activity view");
+
+  const comment = await fastApi(`/problems/${problemId}/comments`, {
+    token: alice.token, method: "POST", body: { body: "GPT4 QA two-account persistence comment" },
+  });
+  assert.equal(comment.status, 201, `comment create: ${JSON.stringify(comment.json)}`);
+  const commentsBeforeRestart = await fastApi(`/problems/${problemId}/comments`);
+  assert.ok(
+    commentsBeforeRestart.json.comments.some((item) => item.id === comment.json.id),
+    "comment is visible from a fresh FastAPI request",
+  );
+  pass("comments: authenticated comment is stored in shared PostgreSQL", comment.json.id);
+
+  // Final ranked duel comes after profile, follow, chat, lesson, analytics and comment.
+  await setPoints(alice.user.id, 1300);
+  await setPoints(bob.user.id, 1290);
+  const finalRanked = await playMatch(alice, bob, "post-learning/comment ranked duel");
+  const finalRankedProblem = await request(`/problems/${finalRanked.problemId}`);
+  assert.equal(finalRankedProblem.status, 200);
+  const finalRankedWin = await request(`/battle/matches/${finalRanked.id}/submit`, {
+    token: alice.token, method: "POST",
+    body: { code: solutionFor(finalRanked.problemId) },
+  });
+  assert.equal(finalRankedWin.json.status, "ACCEPTED");
+  assert.equal(finalRankedWin.json.matchCompleted, true);
+  const finalRatings = { alice: (await rating(alice)).points, bob: (await rating(bob)).points };
+  pass("ranked: duel completes after learning, analytics and comments", finalRanked.id);
+
+  if (process.env.GPT4_QA_STATE_FILE) {
+    await writeFile(process.env.GPT4_QA_STATE_FILE, JSON.stringify({
+      alice: { id: alice.user.id, token: alice.token },
+      bob: { id: bob.user.id, token: bob.token },
+      eve: { id: eve.user.id, token: eve.token },
+      rankedMatchId: finalRanked.id,
+      expectedMessages: ["Hello from the arena check", "Second message for history"],
+      expectedRatings: finalRatings,
+      lessonId,
+      problemId,
+      expectedCommentId: comment.json.id,
+      expectedProfile: { displayName: "GPT4 QA Alice", bio: "Two-account integration acceptance" },
+    }, null, 2));
+  }
   console.log(`\nALL ${results.length} CHECKS PASSED`);
 } catch (error) {
   console.error("FAIL", error.message);
