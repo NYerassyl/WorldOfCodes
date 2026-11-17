@@ -9,7 +9,6 @@ import pytest
 
 from main import app
 from trace_data import load_catalog
-from storage import store
 
 CATALOG = load_catalog()
 
@@ -93,7 +92,8 @@ def test_detail_hides_solution_until_player_submits(client):
     assert correct.status_code == 200
     assert correct.json()["correct"] is True
     assert correct.json()["attempt_number"] == 2
-    assert store.users[2].xp == 0 and store.users[2].coins == 0
+    profile = client.get("/api/users/2").json()
+    assert profile["xp"] == 0 and profile["coins"] == 0
 
 
 def test_exact_whitespace_and_user_validation(client):

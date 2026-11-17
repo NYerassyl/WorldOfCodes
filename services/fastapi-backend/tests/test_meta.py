@@ -20,7 +20,7 @@ def test_health(client):
     assert response.status_code == 200
     body = response.json()
     assert body["status"] == "ok"
-    assert body["storage"] == "in-memory"
+    assert body["storage"] == "postgresql"
     assert body["users"] == 2
 
 
@@ -46,4 +46,4 @@ def test_openapi_exposes_every_workflow(client):
 def test_service_index(client):
     body = client.get("/").json()
     assert body["docs"] == "/docs"
-    assert body["storage"] == "in-memory"
+    assert body["storage"] == "postgresql"

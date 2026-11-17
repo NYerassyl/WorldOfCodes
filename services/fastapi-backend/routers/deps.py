@@ -16,3 +16,10 @@ def require_user_id(
 
 
 ActorId = Annotated[int, Depends(require_user_id)]
+
+
+from sqlalchemy.orm import Session
+from database import get_session
+
+# Commit/rollback before sending the HTTP response (including commit-time errors).
+DbSession = Annotated[Session, Depends(get_session, scope="function")]

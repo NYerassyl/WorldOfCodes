@@ -3,3 +3,7 @@ pydantic[email]==2.14.2
 uvicorn[standard]==0.54.0
 pytest==8.4.2
 httpx==0.28.1
+SQLAlchemy==2.0.58
+alembic==1.20.1
+psycopg[binary]==3.3.9
+python-dotenv==1.2.4

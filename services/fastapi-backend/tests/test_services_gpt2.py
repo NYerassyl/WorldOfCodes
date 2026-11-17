@@ -1,7 +1,12 @@
 """GPT 2 service-layer contract checks; routers and GPT 4 tests are unchanged."""
 
 from concurrent.futures import ThreadPoolExecutor
-from dataclasses import asdict
+from sqlalchemy import select, func
+from models import User, Lesson, Problem, Submission
+from database import SessionLocal
+
+def asdict(user):
+    return UserResponse.model_validate(user).model_dump()
 
 import pytest
 from pydantic import ValidationError
@@ -19,11 +24,10 @@ from services import (
     update_lesson,
     update_user,
 )
-from storage import Storage
 
 
-def test_only_profile_owner_can_edit_or_delete_without_partial_mutation():
-    store = Storage()
+def test_only_profile_owner_can_edit_or_delete_without_partial_mutation(db):
+    store = db
     initial = asdict(get_user(store, 1))
     with pytest.raises(DomainError) as denied:
         update_user(
@@ -44,8 +48,8 @@ def test_only_profile_owner_can_edit_or_delete_without_partial_mutation():
     assert updated.bio == "Updated by owner"
 
 
-def test_progress_owner_guard_supports_router_authorization():
-    store = Storage()
+def test_progress_owner_guard_supports_router_authorization(db):
+    store = db
     ensure_progress_owner(store, user_id=1, actor_id=1)
     with pytest.raises(DomainError) as denied:
         ensure_progress_owner(store, user_id=1, actor_id=2)
@@ -55,20 +59,20 @@ def test_progress_owner_guard_supports_router_authorization():
     assert unknown.value.code == "USER_NOT_FOUND"
 
 
-def test_lesson_prerequisite_can_be_cleared_before_any_completion():
-    store = Storage()
-    assert store.lessons[2].prerequisite_lesson_id == 1
+def test_lesson_prerequisite_can_be_cleared_before_any_completion(db):
+    store = db
+    assert store.get(Lesson, 2).prerequisite_lesson_id == 1
     updated = update_lesson(
         store, lesson_id=2, payload=LessonUpdate(prerequisite_lesson_id=None), actor_id=1
     )
     assert updated.prerequisite_lesson_id is None
-    assert store.lessons[2].prerequisite_lesson_id is None
+    assert store.get(Lesson, 2).prerequisite_lesson_id is None
     with pytest.raises(ValidationError):
         LessonUpdate(title=None)
 
 
-def test_completed_lesson_prerequisites_cannot_change_or_invalidate_progress():
-    store = Storage()
+def test_completed_lesson_prerequisites_cannot_change_or_invalidate_progress(db):
+    store = db
     completed, user = complete_lesson(store, user_id=1, lesson_id=2)
     assert completed.xp_awarded == 30
     assert user.xp == 60  # Seed gives Ada 30 XP, completion grants 30.
@@ -79,7 +83,7 @@ def test_completed_lesson_prerequisites_cannot_change_or_invalidate_progress():
     assert (conflict.value.status_code, conflict.value.code) == (
         409, "LESSON_HAS_PROGRESS"
     )
-    assert store.lessons[2].prerequisite_lesson_id == 1
+    assert store.get(Lesson, 2).prerequisite_lesson_id == 1
     assert [row["lesson"].id for row in get_progress(store, 1)["rows"]] == [1, 2]
     with pytest.raises(DomainError) as duplicate:
         complete_lesson(store, user_id=1, lesson_id=2)
@@ -87,8 +91,8 @@ def test_completed_lesson_prerequisites_cannot_change_or_invalidate_progress():
     assert get_user(store, 1).xp == 60
 
 
-def test_resetting_prerequisite_is_blocked_and_xp_refunds_exactly_once():
-    store = Storage()
+def test_resetting_prerequisite_is_blocked_and_xp_refunds_exactly_once(db):
+    store = db
     complete_lesson(store, user_id=1, lesson_id=2)
     with pytest.raises(DomainError) as dependent:
         reset_lesson(store, user_id=1, lesson_id=1)
@@ -103,8 +107,8 @@ def test_resetting_prerequisite_is_blocked_and_xp_refunds_exactly_once():
     assert get_user(store, 1).xp == 30
 
 
-def test_wrong_correct_and_repeated_answers_reward_once_per_user_problem():
-    store = Storage()
+def test_wrong_correct_and_repeated_answers_reward_once_per_user_problem(db):
+    store = db
     grace_id = 2
     wrong = submit_solution(store, problem_id=1, user_id=grace_id, answer="42")
     assert not wrong["accepted"]
@@ -120,28 +124,32 @@ def test_wrong_correct_and_repeated_answers_reward_once_per_user_problem():
     assert not repeated["submission"].rewarded
     assert (repeated["submission"].xp_awarded, repeated["submission"].coins_awarded) == (0, 0)
     assert (get_user(store, grace_id).xp, get_user(store, grace_id).coins) == (10, 2)
-    assert len(store.submissions) == 4  # 1 seeded + 3 new submissions.
+    assert store.scalar(select(func.count()).select_from(Submission)) == 4  # 1 seeded + 3 new submissions.
 
 
-def test_concurrent_correct_submissions_are_atomic_and_do_not_multiply_rewards():
-    store = Storage()
+def test_concurrent_correct_submissions_are_atomic_and_do_not_multiply_rewards(db):
+    store = db
+    def submit(_):
+        with SessionLocal.begin() as session:
+            return submit_solution(session, 2, 2, " [::-1] ")
+
     with ThreadPoolExecutor(max_workers=8) as executor:
         responses = list(
             executor.map(
-                lambda _: submit_solution(store, 2, 2, " [::-1] "),
+                submit,
                 range(24),
             )
         )
     assert all(response["submission"].verdict == "ACCEPTED" for response in responses)
     assert sum(bool(response["submission"].rewarded) for response in responses) == 1
     assert len({response["submission"].id for response in responses}) == 24
-    assert (store.users[2].xp, store.users[2].coins) == (15, 3)
+    assert (store.get(User, 2).xp, store.get(User, 2).coins) == (15, 3)
 
 
-def test_public_schemas_do_not_expose_password_hash_or_expected_answer():
-    store = Storage()
-    public_user = UserResponse.model_validate(store.users[1]).model_dump()
-    problem = ProblemResponse.model_validate(store.problems[1]).model_dump()
+def test_public_schemas_do_not_expose_password_hash_or_expected_answer(db):
+    store = db
+    public_user = UserResponse.model_validate(store.get(User, 1)).model_dump()
+    problem = ProblemResponse.model_validate(store.get(Problem, 1)).model_dump()
     assert "password_hash" not in public_user
     assert "password" not in public_user
     assert "expected_answer" not in problem

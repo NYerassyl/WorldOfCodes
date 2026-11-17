@@ -49,7 +49,7 @@ def validate_password(value: str) -> str:
 
 
 class UserCreate(ApiModel):
-    email: str
+    email: Annotated[str, Field(max_length=254)]
     nickname: Annotated[str, Field(min_length=3, max_length=20)]
     password: Annotated[str, Field(min_length=8, max_length=72)]
     bio: Annotated[str, Field(max_length=280)] = ""
@@ -66,7 +66,7 @@ class UserCreate(ApiModel):
 
 
 class UserUpdate(ApiModel):
-    email: str | None = None
+    email: Annotated[str | None, Field(max_length=254)] = None
     nickname: Annotated[str | None, Field(min_length=3, max_length=20)] = None
     password: Annotated[str | None, Field(min_length=8, max_length=72)] = None
     bio: Annotated[str | None, Field(max_length=280)] = None
@@ -239,4 +239,16 @@ class SubmissionResponse(ApiModel):
     xp_awarded: int
     coins_awarded: int
     message: str
+    created_at: datetime
+
+
+class CommentCreate(ApiModel):
+    body: Annotated[str, Field(min_length=1, max_length=2000)]
+
+
+class CommentResponse(ApiModel):
+    id: int
+    problem_id: int
+    author_id: int
+    body: str
     created_at: datetime

@@ -1,519 +1,330 @@
-from __future__ import annotations
+"""Business rules. Callers own the transaction; mutations flush but never commit."""
+from sqlalchemy import func, or_, select, text
+from sqlalchemy.orm import Session
 
 from errors import DomainError
-from schemas import (
-    LessonCreate,
-    LessonUpdate,
-    ProblemCreate,
-    ProblemUpdate,
-    UserCreate,
-    UserUpdate,
-)
-from storage import (
-    CompletionRecord,
-    LessonRecord,
-    ProblemRecord,
-    Storage,
-    SubmissionRecord,
-    UserRecord,
-    hash_password,
-)
+from models import Comment, Completion, Lesson, Problem, Submission, User
+from security import hash_password
 
 
-def _normalize_answer(value: str) -> str:
-    return " ".join(value.split()).casefold()
+def _one(db, model, record_id, code, label, lock=False):
+    stmt = select(model).where(model.id == record_id)
+    if lock:
+        stmt = stmt.with_for_update().execution_options(populate_existing=True)
+    value = db.scalar(stmt)
+    if value is None:
+        raise DomainError(404, code, f"{label} {record_id} does not exist.")
+    return value
 
 
-def list_users(store: Storage, query: str | None = None, limit: int = 50) -> list[UserRecord]:
-    with store.lock:
-        users = sorted(store.users.values(), key=lambda user: user.id)
-        if query:
-            needle = query.casefold()
-            users = [
-                user
-                for user in users
-                if needle in user.email.casefold() or needle in user.nickname.casefold()
-            ]
-        return users[:limit]
+def get_user(db, user_id, *, lock=False):
+    return _one(db, User, user_id, "USER_NOT_FOUND", "User", lock)
 
 
-def get_user(store: Storage, user_id: int) -> UserRecord:
-    with store.lock:
-        user = store.users.get(user_id)
-        if user is None:
-            raise DomainError(404, "USER_NOT_FOUND", f"User {user_id} does not exist.")
-        return user
+def get_lesson(db, lesson_id):
+    return _one(db, Lesson, lesson_id, "LESSON_NOT_FOUND", "Lesson")
 
 
-def ensure_progress_owner(store: Storage, user_id: int, actor_id: int) -> None:
-    """Authorize progress mutations; called by the GPT 4 router with ActorId.
-
-    The X-User-Id header is demo-only identity, not production authentication.
-    Keep actor_id required so a caller cannot accidentally bypass this check.
-    """
-    with store.lock:
-        get_user(store, user_id)
-        if actor_id != user_id:
-            raise DomainError(
-                403, "FORBIDDEN", "Only the learner can change their progress."
-            )
+def get_problem(db, problem_id):
+    return _one(db, Problem, problem_id, "PROBLEM_NOT_FOUND", "Problem")
 
 
-def _ensure_email_available(store: Storage, email: str, exclude_id: int | None = None) -> None:
-    for user in store.users.values():
-        if user.email == email and user.id != exclude_id:
-            raise DomainError(409, "EMAIL_TAKEN", "That email is already registered.")
+def get_submission(db, submission_id):
+    return _one(db, Submission, submission_id, "SUBMISSION_NOT_FOUND", "Submission")
 
 
-def create_user(store: Storage, payload: UserCreate) -> UserRecord:
-    with store.lock:
-        _ensure_email_available(store, payload.email)
-        user = UserRecord(
-            id=store.new_user_id(),
-            email=payload.email,
-            nickname=payload.nickname,
-            password_hash=hash_password(payload.password),
-            bio=payload.bio,
-        )
-        store.users[user.id] = user
-        return user
+def _exists(db, model, *conditions):
+    return db.scalar(select(model).where(*conditions).limit(1)) is not None
 
 
-def update_user(store: Storage, user_id: int, payload: UserUpdate, actor_id: int) -> UserRecord:
-    with store.lock:
-        user = get_user(store, user_id)
-        if actor_id != user_id:
-            raise DomainError(403, "FORBIDDEN", "Only the profile owner can update this user.")
-        if payload.email is not None:
-            _ensure_email_available(store, payload.email, exclude_id=user_id)
-            user.email = payload.email
-        if payload.nickname is not None:
-            user.nickname = payload.nickname
-        if payload.password is not None:
-            user.password_hash = hash_password(payload.password)
-        if payload.bio is not None:
-            user.bio = payload.bio
-        return user
+def _owner(owner_id, actor_id, message="Only the owner can change this resource."):
+    if owner_id != actor_id:
+        raise DomainError(403, "FORBIDDEN", message)
 
 
-def delete_user(store: Storage, user_id: int, actor_id: int) -> None:
-    with store.lock:
-        get_user(store, user_id)
-        if actor_id != user_id:
-            raise DomainError(403, "FORBIDDEN", "Only the profile owner can delete this user.")
-        if any(lesson.author_id == user_id for lesson in store.lessons.values()) or any(
-            problem.author_id == user_id for problem in store.problems.values()
-        ):
-            raise DomainError(
-                409,
-                "USER_HAS_CONTENT",
-                "Delete or reassign authored lessons and problems before deleting this user.",
-            )
-        for key in [key for key in store.completions if key[0] == user_id]:
-            del store.completions[key]
-        for submission_id in [
-            submission.id
-            for submission in store.submissions.values()
-            if submission.user_id == user_id
-        ]:
-            del store.submissions[submission_id]
-        del store.users[user_id]
+def _lesson_lock(db):
+    # Serialize prerequisite graph changes and completion/reset checks across
+    # processes so concurrent edits cannot introduce a cycle or invalid progress.
+    db.execute(text("SELECT pg_advisory_xact_lock(146481235, 1)"))
 
 
-def get_profile(store: Storage, user_id: int) -> dict:
-    with store.lock:
-        user = get_user(store, user_id)
-        completed_lessons = sum(
-            1 for key in store.completions if key[0] == user_id
-        )
-        user_submissions = [
-            submission
-            for submission in store.submissions.values()
-            if submission.user_id == user_id
-        ]
-        accepted = [
-            submission for submission in user_submissions if submission.verdict == "ACCEPTED"
-        ]
-        return {
-            "user": user,
-            "completed_lessons": completed_lessons,
-            "solved_problems": len({submission.problem_id for submission in accepted}),
-            "accepted_submissions": len(accepted),
-            "rank": 1 + sum(1 for other in store.users.values() if other.xp > user.xp),
-        }
+def ensure_progress_owner(db, user_id, actor_id):
+    get_user(db, user_id)
+    _owner(user_id, actor_id, "Only the learner can change their progress.")
 
 
-def get_leaderboard(store: Storage, limit: int = 10) -> list[dict]:
-    with store.lock:
-        accepted_problems: dict[int, set[int]] = {}
-        for submission in store.submissions.values():
-            if submission.verdict == "ACCEPTED":
-                accepted_problems.setdefault(submission.user_id, set()).add(
-                    submission.problem_id
-                )
-        ranked = sorted(store.users.values(), key=lambda user: (-user.xp, user.id))
-        return [
-            {
-                "rank": index,
-                "user_id": user.id,
-                "nickname": user.nickname,
-                "xp": user.xp,
-                "coins": user.coins,
-                "solved_problems": len(accepted_problems.get(user.id, set())),
-            }
-            for index, user in enumerate(ranked[:limit], start=1)
-        ]
+def _ensure_email_available(db, email, exclude_id=None):
+    stmt = select(User.id).where(User.email == email)
+    if exclude_id is not None:
+        stmt = stmt.where(User.id != exclude_id)
+    if db.scalar(stmt) is not None:
+        raise DomainError(409, "EMAIL_TAKEN", "That email is already registered.")
 
 
-def list_lessons(
-    store: Storage,
-    level: str | None = None,
-    topic: str | None = None,
-    include_unpublished: bool = False,
-) -> list[LessonRecord]:
-    with store.lock:
-        lessons = sorted(store.lessons.values(), key=lambda lesson: lesson.id)
-        if not include_unpublished:
-            lessons = [lesson for lesson in lessons if lesson.published]
-        if level:
-            lessons = [lesson for lesson in lessons if lesson.level == level]
-        if topic:
-            lessons = [lesson for lesson in lessons if lesson.topic.casefold() == topic.casefold()]
-        return lessons
+def list_users(db, query=None, limit=50):
+    stmt = select(User).order_by(User.id).limit(limit)
+    if query:
+        stmt = stmt.where(or_(User.email.icontains(query, autoescape=True), User.nickname.icontains(query, autoescape=True)))
+    return list(db.scalars(stmt))
 
 
-def get_lesson(store: Storage, lesson_id: int) -> LessonRecord:
-    with store.lock:
-        lesson = store.lessons.get(lesson_id)
-        if lesson is None:
-            raise DomainError(404, "LESSON_NOT_FOUND", f"Lesson {lesson_id} does not exist.")
-        return lesson
+def create_user(db, payload):
+    _ensure_email_available(db, payload.email)
+    data = payload.model_dump(exclude={"password"})
+    user = User(**data, password_hash=hash_password(payload.password))
+    db.add(user)
+    db.flush()
+    return user
 
 
-def _ensure_prerequisite(store: Storage, lesson_id: int, prerequisite_id: int | None) -> None:
-    if prerequisite_id is None:
-        return
-    if prerequisite_id == lesson_id:
-        raise DomainError(400, "LESSON_CYCLE", "A lesson cannot require itself.")
-    get_lesson(store, prerequisite_id)
-    cursor = prerequisite_id
-    visited: set[int] = set()
-    while cursor is not None:
-        if cursor == lesson_id:
-            raise DomainError(400, "LESSON_CYCLE", "That prerequisite would create a cycle.")
-        if cursor in visited:
-            raise DomainError(400, "LESSON_CYCLE", "Existing prerequisite chain contains a cycle.")
-        visited.add(cursor)
-        parent = store.lessons.get(cursor)
-        cursor = parent.prerequisite_lesson_id if parent else None
-
-
-def create_lesson(store: Storage, payload: LessonCreate, actor_id: int) -> LessonRecord:
-    with store.lock:
-        get_user(store, actor_id)
-        lesson_id = store.new_lesson_id()
-        _ensure_prerequisite(store, lesson_id, payload.prerequisite_lesson_id)
-        lesson = LessonRecord(
-            id=lesson_id,
-            title=payload.title,
-            description=payload.description,
-            level=payload.level.value,
-            topic=payload.topic,
-            xp_reward=payload.xp_reward,
-            author_id=actor_id,
-            prerequisite_lesson_id=payload.prerequisite_lesson_id,
-            published=payload.published,
-        )
-        store.lessons[lesson.id] = lesson
-        return lesson
-
-
-def update_lesson(
-    store: Storage, lesson_id: int, payload: LessonUpdate, actor_id: int
-) -> LessonRecord:
-    with store.lock:
-        lesson = get_lesson(store, lesson_id)
-        if lesson.author_id != actor_id:
-            raise DomainError(403, "FORBIDDEN", "Only the lesson author can update this lesson.")
-        if "prerequisite_lesson_id" in payload.model_fields_set:
-            new_prerequisite_id = payload.prerequisite_lesson_id
-            if new_prerequisite_id != lesson.prerequisite_lesson_id:
-                # A cycle remains a 400 as promised by GPT 4's router contract.
-                _ensure_prerequisite(store, lesson_id, new_prerequisite_id)
-                # A valid change cannot retrospectively invalidate progress.
-                if any(key[1] == lesson_id for key in store.completions):
-                    raise DomainError(
-                        409,
-                        "LESSON_HAS_PROGRESS",
-                        "Cannot change prerequisites after a learner completed this lesson.",
-                    )
-                lesson.prerequisite_lesson_id = new_prerequisite_id
-        if payload.title is not None:
-            lesson.title = payload.title
-        if payload.description is not None:
-            lesson.description = payload.description
-        if payload.level is not None:
-            lesson.level = payload.level.value
-        if payload.topic is not None:
-            lesson.topic = payload.topic
-        if payload.xp_reward is not None:
-            lesson.xp_reward = payload.xp_reward
-        if payload.published is not None:
-            lesson.published = payload.published
-        return lesson
-
-
-def delete_lesson(store: Storage, lesson_id: int, actor_id: int) -> None:
-    with store.lock:
-        lesson = get_lesson(store, lesson_id)
-        if lesson.author_id != actor_id:
-            raise DomainError(403, "FORBIDDEN", "Only the lesson author can delete this lesson.")
-        if any(key[1] == lesson_id for key in store.completions):
-            raise DomainError(
-                409, "LESSON_HAS_PROGRESS", "Learners already completed this lesson."
-            )
-        if any(other.prerequisite_lesson_id == lesson_id for other in store.lessons.values()):
-            raise DomainError(
-                409, "LESSON_HAS_DEPENDENTS", "Another lesson depends on this prerequisite."
-            )
-        del store.lessons[lesson_id]
-
-
-def complete_lesson(store: Storage, user_id: int, lesson_id: int) -> tuple[CompletionRecord, UserRecord]:
-    with store.lock:
-        user = get_user(store, user_id)
-        lesson = get_lesson(store, lesson_id)
-        if not lesson.published:
-            raise DomainError(409, "LESSON_NOT_PUBLISHED", "This lesson is not published yet.")
-        if (user_id, lesson_id) in store.completions:
-            raise DomainError(
-                409,
-                "LESSON_ALREADY_COMPLETED",
-                "This lesson is already completed; XP is never awarded twice.",
-            )
-        if (
-            lesson.prerequisite_lesson_id is not None
-            and (user_id, lesson.prerequisite_lesson_id) not in store.completions
-        ):
-            raise DomainError(
-                409,
-                "PREREQUISITE_INCOMPLETE",
-                "Complete the prerequisite lesson before this one.",
-            )
-        completion = CompletionRecord(
-            user_id=user_id, lesson_id=lesson_id, xp_awarded=lesson.xp_reward
-        )
-        store.completions[(user_id, lesson_id)] = completion
-        user.xp += completion.xp_awarded
-        return completion, user
-
-
-def reset_lesson(store: Storage, user_id: int, lesson_id: int) -> None:
-    with store.lock:
-        get_user(store, user_id)
-        completion = store.completions.get((user_id, lesson_id))
-        if completion is None:
-            raise DomainError(404, "PROGRESS_NOT_FOUND", "This lesson has no saved progress.")
-        for other in store.completions.values():
-            if other.user_id != user_id:
-                continue
-            lesson = store.lessons.get(other.lesson_id)
-            if lesson is not None and lesson.prerequisite_lesson_id == lesson_id:
-                raise DomainError(
-                    409,
-                    "DEPENDENT_LESSONS_COMPLETED",
-                    "Reset the dependent lessons before resetting this prerequisite.",
-                )
-        del store.completions[(user_id, lesson_id)]
-        user = store.users[user_id]
-        user.xp = max(0, user.xp - completion.xp_awarded)
-
-
-def get_progress(store: Storage, user_id: int) -> dict:
-    with store.lock:
-        user = get_user(store, user_id)
-        completed = sorted(
-            (record for key, record in store.completions.items() if key[0] == user_id),
-            key=lambda record: record.completed_at,
-        )
-        rows = [
-            {"completion": record, "lesson": store.lessons.get(record.lesson_id)}
-            for record in completed
-        ]
-        next_lesson = None
-        for lesson in sorted(store.lessons.values(), key=lambda item: item.id):
-            if not lesson.published or (user_id, lesson.id) in store.completions:
-                continue
-            if (
-                lesson.prerequisite_lesson_id is None
-                or (user_id, lesson.prerequisite_lesson_id) in store.completions
-            ):
-                next_lesson = lesson
-                break
-        return {"user": user, "rows": rows, "next_lesson": next_lesson}
-
-
-def list_problems(
-    store: Storage, difficulty: str | None = None, topic: str | None = None
-) -> list[ProblemRecord]:
-    with store.lock:
-        problems = sorted(store.problems.values(), key=lambda problem: problem.id)
-        if difficulty:
-            problems = [
-                problem for problem in problems if problem.difficulty == difficulty
-            ]
-        if topic:
-            problems = [
-                problem for problem in problems if problem.topic.casefold() == topic.casefold()
-            ]
-        return problems
-
-
-def get_problem(store: Storage, problem_id: int) -> ProblemRecord:
-    with store.lock:
-        problem = store.problems.get(problem_id)
-        if problem is None:
-            raise DomainError(
-                404, "PROBLEM_NOT_FOUND", f"Problem {problem_id} does not exist."
-            )
-        return problem
-
-
-def create_problem(store: Storage, payload: ProblemCreate, actor_id: int) -> ProblemRecord:
-    with store.lock:
-        get_user(store, actor_id)
-        problem = ProblemRecord(
-            id=store.new_problem_id(),
-            title=payload.title,
-            prompt=payload.prompt,
-            difficulty=payload.difficulty.value,
-            topic=payload.topic,
-            expected_answer=payload.expected_answer,
-            xp_reward=payload.xp_reward,
-            coin_reward=payload.coin_reward,
-            author_id=actor_id,
-        )
-        store.problems[problem.id] = problem
-        return problem
-
-
-def update_problem(
-    store: Storage, problem_id: int, payload: ProblemUpdate, actor_id: int
-) -> ProblemRecord:
-    with store.lock:
-        problem = get_problem(store, problem_id)
-        if problem.author_id != actor_id:
-            raise DomainError(
-                403, "FORBIDDEN", "Only the problem author can update this problem."
-            )
-        if payload.title is not None:
-            problem.title = payload.title
-        if payload.prompt is not None:
-            problem.prompt = payload.prompt
-        if payload.difficulty is not None:
-            problem.difficulty = payload.difficulty.value
-        if payload.topic is not None:
-            problem.topic = payload.topic
-        if payload.expected_answer is not None:
-            problem.expected_answer = payload.expected_answer
-        if payload.xp_reward is not None:
-            problem.xp_reward = payload.xp_reward
-        if payload.coin_reward is not None:
-            problem.coin_reward = payload.coin_reward
-        return problem
-
-
-def delete_problem(store: Storage, problem_id: int, actor_id: int) -> None:
-    with store.lock:
-        problem = get_problem(store, problem_id)
-        if problem.author_id != actor_id:
-            raise DomainError(
-                403, "FORBIDDEN", "Only the problem author can delete this problem."
-            )
-        if any(submission.problem_id == problem_id for submission in store.submissions.values()):
-            raise DomainError(
-                409,
-                "PROBLEM_HAS_SUBMISSIONS",
-                "Delete submissions before deleting this problem.",
-            )
-        del store.problems[problem_id]
-
-
-def submit_solution(
-    store: Storage, problem_id: int, user_id: int, answer: str
-) -> dict:
-    with store.lock:
-        user = get_user(store, user_id)
-        problem = get_problem(store, problem_id)
-        correct = _normalize_answer(answer) == _normalize_answer(problem.expected_answer)
-        already_accepted = any(
-            submission.problem_id == problem_id
-            and submission.user_id == user_id
-            and submission.verdict == "ACCEPTED"
-            for submission in store.submissions.values()
-        )
-        rewarded = correct and not already_accepted
-        xp_awarded = problem.xp_reward if rewarded else 0
-        coins_awarded = problem.coin_reward if rewarded else 0
-        verdict = "ACCEPTED" if correct else "WRONG_ANSWER"
-        if rewarded:
-            message = f"Accepted! +{xp_awarded} XP and +{coins_awarded} coins."
-        elif correct:
-            message = "Accepted, but this problem was already solved; no additional reward."
+def update_user(db, user_id, payload, actor_id):
+    user = get_user(db, user_id, lock=True)
+    _owner(user_id, actor_id)
+    if payload.email is not None:
+        _ensure_email_available(db, payload.email, user_id)
+    for key, value in payload.model_dump(exclude_none=True).items():
+        if key == "password":
+            user.password_hash = hash_password(value)
         else:
-            message = "Wrong answer. Review the material and try again."
-        submission = SubmissionRecord(
-            id=store.new_submission_id(),
-            problem_id=problem_id,
-            user_id=user_id,
-            answer=answer,
-            verdict=verdict,
-            rewarded=rewarded,
-            xp_awarded=xp_awarded,
-            coins_awarded=coins_awarded,
-            message=message,
-        )
-        store.submissions[submission.id] = submission
-        if rewarded:
-            user.xp += xp_awarded
-            user.coins += coins_awarded
-        return {
-            "submission": submission,
-            "user": user,
-            "message": message,
-            "accepted": correct,
-        }
+            setattr(user, key, value)
+    db.flush()
+    return user
 
 
-def list_submissions(
-    store: Storage, problem_id: int | None = None, user_id: int | None = None
-) -> list[SubmissionRecord]:
-    with store.lock:
-        if problem_id is not None:
-            get_problem(store, problem_id)
-        if user_id is not None:
-            get_user(store, user_id)
-        submissions = sorted(
-            store.submissions.values(), key=lambda submission: submission.id
-        )
-        if problem_id is not None:
-            submissions = [
-                submission
-                for submission in submissions
-                if submission.problem_id == problem_id
-            ]
-        if user_id is not None:
-            submissions = [
-                submission for submission in submissions if submission.user_id == user_id
-            ]
-        return submissions
+def delete_user(db, user_id, actor_id):
+    user = get_user(db, user_id, lock=True)
+    _owner(user_id, actor_id)
+    if _exists(db, Lesson, Lesson.author_id == user_id) or _exists(db, Problem, Problem.author_id == user_id):
+        raise DomainError(409, "USER_HAS_CONTENT", "Delete or reassign authored content first.")
+    db.delete(user)
+    db.flush()
 
 
-def get_submission(store: Storage, submission_id: int) -> SubmissionRecord:
-    with store.lock:
-        submission = store.submissions.get(submission_id)
-        if submission is None:
-            raise DomainError(
-                404, "SUBMISSION_NOT_FOUND", f"Submission {submission_id} does not exist."
-            )
-        return submission
+def get_profile(db, user_id):
+    user = get_user(db, user_id)
+    accepted = (Submission.user_id == user_id, Submission.verdict == "ACCEPTED")
+    return {
+        "user": user,
+        "completed_lessons": db.scalar(select(func.count()).select_from(Completion).where(Completion.user_id == user_id)),
+        "solved_problems": db.scalar(select(func.count(func.distinct(Submission.problem_id))).where(*accepted)),
+        "accepted_submissions": db.scalar(select(func.count()).select_from(Submission).where(*accepted)),
+        "rank": 1 + db.scalar(select(func.count()).select_from(User).where(User.xp > user.xp)),
+    }
+
+
+def get_leaderboard(db, limit=10):
+    users = db.scalars(select(User).order_by(User.xp.desc(), User.id).limit(limit))
+    return [dict(rank=i, user_id=u.id, nickname=u.nickname, xp=u.xp, coins=u.coins,
+                 solved_problems=db.scalar(select(func.count(func.distinct(Submission.problem_id))).where(Submission.user_id == u.id, Submission.verdict == "ACCEPTED")))
+            for i, u in enumerate(users, 1)]
+
+
+def list_lessons(db, level=None, topic=None, include_unpublished=False):
+    stmt = select(Lesson).order_by(Lesson.id)
+    if not include_unpublished:
+        stmt = stmt.where(Lesson.published.is_(True))
+    if level:
+        stmt = stmt.where(Lesson.level == level)
+    if topic:
+        stmt = stmt.where(func.lower(Lesson.topic) == topic.lower())
+    return list(db.scalars(stmt))
+
+
+def _ensure_prerequisite(db, lesson_id, prerequisite_id):
+    visited = {lesson_id} if lesson_id is not None else set()
+    cursor = prerequisite_id
+    while cursor is not None:
+        if cursor in visited:
+            raise DomainError(400, "LESSON_CYCLE", "That prerequisite would create a cycle.")
+        visited.add(cursor)
+        cursor = get_lesson(db, cursor).prerequisite_lesson_id
+
+
+def _payload_data(payload):
+    return payload.model_dump(mode="json")
+
+
+def create_lesson(db, payload, actor_id):
+    _lesson_lock(db)
+    get_user(db, actor_id)
+    _ensure_prerequisite(db, None, payload.prerequisite_lesson_id)
+    lesson = Lesson(**_payload_data(payload), author_id=actor_id)
+    db.add(lesson)
+    db.flush()
+    return lesson
+
+
+def update_lesson(db, lesson_id, payload, actor_id):
+    _lesson_lock(db)
+    lesson = get_lesson(db, lesson_id)
+    _owner(lesson.author_id, actor_id)
+    if "prerequisite_lesson_id" in payload.model_fields_set:
+        new_id = payload.prerequisite_lesson_id
+        if new_id != lesson.prerequisite_lesson_id:
+            _ensure_prerequisite(db, lesson_id, new_id)
+            if _exists(db, Completion, Completion.lesson_id == lesson_id):
+                raise DomainError(409, "LESSON_HAS_PROGRESS", "Cannot change prerequisites after completion.")
+            lesson.prerequisite_lesson_id = new_id
+    for key, value in payload.model_dump(mode="json", exclude_none=True).items():
+        setattr(lesson, key, value)
+    db.flush()
+    return lesson
+
+
+def delete_lesson(db, lesson_id, actor_id):
+    _lesson_lock(db)
+    lesson = get_lesson(db, lesson_id)
+    _owner(lesson.author_id, actor_id)
+    if _exists(db, Completion, Completion.lesson_id == lesson_id):
+        raise DomainError(409, "LESSON_HAS_PROGRESS", "Learners already completed this lesson.")
+    if _exists(db, Lesson, Lesson.prerequisite_lesson_id == lesson_id):
+        raise DomainError(409, "LESSON_HAS_DEPENDENTS", "Another lesson depends on this prerequisite.")
+    db.delete(lesson)
+    db.flush()
+
+
+def complete_lesson(db, user_id, lesson_id):
+    _lesson_lock(db)
+    user = get_user(db, user_id, lock=True)
+    lesson = get_lesson(db, lesson_id)
+    if not lesson.published:
+        raise DomainError(409, "LESSON_NOT_PUBLISHED", "This lesson is not published yet.")
+    if db.get(Completion, (user_id, lesson_id)) is not None:
+        raise DomainError(409, "LESSON_ALREADY_COMPLETED", "This lesson is already completed; XP is never awarded twice.")
+    if lesson.prerequisite_lesson_id is not None and db.get(Completion, (user_id, lesson.prerequisite_lesson_id)) is None:
+        raise DomainError(409, "PREREQUISITE_INCOMPLETE", "Complete the prerequisite lesson first.")
+    completion = Completion(user_id=user_id, lesson_id=lesson_id, xp_awarded=lesson.xp_reward)
+    db.add(completion)
+    user.xp += lesson.xp_reward
+    db.flush()
+    return completion, user
+
+
+def reset_lesson(db, user_id, lesson_id):
+    _lesson_lock(db)
+    user = get_user(db, user_id, lock=True)
+    completion = db.get(Completion, (user_id, lesson_id))
+    if completion is None:
+        raise DomainError(404, "PROGRESS_NOT_FOUND", "This lesson has no saved progress.")
+    dependent = db.scalar(select(Completion).join(Lesson).where(Completion.user_id == user_id, Lesson.prerequisite_lesson_id == lesson_id).limit(1))
+    if dependent is not None:
+        raise DomainError(409, "DEPENDENT_LESSONS_COMPLETED", "Reset dependent lessons first.")
+    user.xp = max(0, user.xp - completion.xp_awarded)
+    db.delete(completion)
+    db.flush()
+
+
+def get_progress(db, user_id):
+    user = get_user(db, user_id)
+    completed = list(db.scalars(select(Completion).where(Completion.user_id == user_id).order_by(Completion.completed_at, Completion.lesson_id)))
+    ids = {c.lesson_id for c in completed}
+    next_lesson = next((l for l in list_lessons(db) if l.id not in ids and (l.prerequisite_lesson_id is None or l.prerequisite_lesson_id in ids)), None)
+    return {"user": user, "rows": [{"completion": c, "lesson": c.lesson} for c in completed], "next_lesson": next_lesson}
+
+
+def list_problems(db, difficulty=None, topic=None):
+    stmt = select(Problem).order_by(Problem.id)
+    if difficulty:
+        stmt = stmt.where(Problem.difficulty == difficulty)
+    if topic:
+        stmt = stmt.where(func.lower(Problem.topic) == topic.lower())
+    return list(db.scalars(stmt))
+
+
+def create_problem(db, payload, actor_id):
+    get_user(db, actor_id)
+    problem = Problem(**_payload_data(payload), author_id=actor_id)
+    db.add(problem)
+    db.flush()
+    return problem
+
+
+def update_problem(db, problem_id, payload, actor_id):
+    problem = _one(db, Problem, problem_id, "PROBLEM_NOT_FOUND", "Problem", lock=True)
+    _owner(problem.author_id, actor_id)
+    for key, value in payload.model_dump(mode="json", exclude_none=True).items():
+        setattr(problem, key, value)
+    db.flush()
+    return problem
+
+
+def delete_problem(db, problem_id, actor_id):
+    problem = _one(db, Problem, problem_id, "PROBLEM_NOT_FOUND", "Problem", lock=True)
+    _owner(problem.author_id, actor_id)
+    if _exists(db, Submission, Submission.problem_id == problem_id):
+        raise DomainError(409, "PROBLEM_HAS_SUBMISSIONS", "This problem has saved submissions.")
+    db.delete(problem)
+    db.flush()
+
+
+def submit_solution(db, problem_id, user_id, answer):
+    # Same lock order as problem deletion: problem then user. Shared problem
+    # lock freezes the expected answer/reward while allowing different learners.
+    problem = db.scalar(select(Problem).where(Problem.id == problem_id).with_for_update(read=True))
+    user = get_user(db, user_id, lock=True)
+    if problem is None:
+        raise DomainError(404, "PROBLEM_NOT_FOUND", f"Problem {problem_id} does not exist.")
+    correct = " ".join(answer.split()).casefold() == " ".join(problem.expected_answer.split()).casefold()
+    already = _exists(db, Submission, Submission.problem_id == problem_id, Submission.user_id == user_id, Submission.verdict == "ACCEPTED")
+    rewarded = correct and not already
+    xp, coins = (problem.xp_reward, problem.coin_reward) if rewarded else (0, 0)
+    if rewarded:
+        message = f"Accepted! +{xp} XP and +{coins} coins."
+    elif correct:
+        message = "Accepted, but this problem was already solved; no additional reward."
+    else:
+        message = "Wrong answer. Review the material and try again."
+    submission = Submission(problem_id=problem_id, user_id=user_id, answer=answer,
+                            verdict="ACCEPTED" if correct else "WRONG_ANSWER", rewarded=rewarded,
+                            xp_awarded=xp, coins_awarded=coins, message=message)
+    db.add(submission)
+    user.xp += xp
+    user.coins += coins
+    db.flush()
+    return {"submission": submission, "user": user, "message": message, "accepted": correct}
+
+
+def list_submissions(db, problem_id=None, user_id=None):
+    stmt = select(Submission).order_by(Submission.id)
+    if problem_id is not None:
+        get_problem(db, problem_id)
+        stmt = stmt.where(Submission.problem_id == problem_id)
+    if user_id is not None:
+        get_user(db, user_id)
+        stmt = stmt.where(Submission.user_id == user_id)
+    return list(db.scalars(stmt))
+
+
+def list_comments(db, problem_id):
+    get_problem(db, problem_id)
+    return list(db.scalars(select(Comment).where(Comment.problem_id == problem_id).order_by(Comment.id)))
+
+
+def create_comment(db, problem_id, payload, actor_id):
+    get_problem(db, problem_id)
+    get_user(db, actor_id)
+    comment = Comment(problem_id=problem_id, author_id=actor_id, body=payload.body)
+    db.add(comment)
+    db.flush()
+    return comment
+
+
+def _comment(db, problem_id, comment_id, actor_id):
+    get_problem(db, problem_id)
+    comment = db.scalar(select(Comment).where(Comment.id == comment_id, Comment.problem_id == problem_id).with_for_update())
+    if comment is None:
+        raise DomainError(404, "COMMENT_NOT_FOUND", "This comment does not exist on this problem.")
+    _owner(comment.author_id, actor_id)
+    return comment
+
+
+def update_comment(db, problem_id, comment_id, payload, actor_id):
+    comment = _comment(db, problem_id, comment_id, actor_id)
+    comment.body = payload.body
+    db.flush()
+    return comment
+
+
+def delete_comment(db, problem_id, comment_id, actor_id):
+    db.delete(_comment(db, problem_id, comment_id, actor_id))
+    db.flush()

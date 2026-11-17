@@ -4,9 +4,10 @@ from typing import Annotated
 from fastapi import APIRouter, Query
 
 from errors import DomainError
-from routers.deps import ActorId
+from routers.deps import ActorId, DbSession
 from services import get_user
-from storage import store
+from models import TraceAttempt
+from sqlalchemy import select, func
 from trace_data import by_id, match_catalog, public_detail
 from trace_models import (
     ExerciseDetail,
@@ -49,30 +50,28 @@ def get_trace_exercise(exercise_id: str) -> dict:
 
 @router.post("/{exercise_id}/submit", response_model=TraceSubmissionResult)
 def submit_trace_answer(
+    store: DbSession,
     exercise_id: str,
     payload: TraceSubmissionInput,
     actor_id: ActorId,
 ) -> dict:
-    with store.lock:
-        get_user(store, actor_id)
-        item = _get_exercise(exercise_id)
-        guess = _answer_lines(payload.answer)
-        expected = _answer_lines(item["expected_stdout"])
-        correct = guess == expected
-        # In-memory demo history is attached to the same store to share its
-        # reset and lock lifecycle with all other educational workflows.
-        if not hasattr(store, "trace_attempts"):
-            store.trace_attempts = {}
-        key = (actor_id, exercise_id)
-        attempt_number = store.trace_attempts.get(key, 0) + 1
-        store.trace_attempts[key] = attempt_number
-        return {
-            "exercise_id": exercise_id,
-            "user_id": actor_id,
-            "correct": correct,
-            "verdict": "CORRECT" if correct else "INCORRECT",
-            "submitted_output": guess,
-            "expected_output": expected,
-            "explanation": item["explanation"],
-            "attempt_number": attempt_number,
-        }
+    get_user(store, actor_id, lock=True)
+    item = _get_exercise(exercise_id)
+    guess = _answer_lines(payload.answer)
+    expected = _answer_lines(item["expected_stdout"])
+    correct = guess == expected
+    attempt_number = 1 + (store.scalar(select(func.max(TraceAttempt.attempt_number)).where(
+        TraceAttempt.user_id == actor_id, TraceAttempt.exercise_id == exercise_id)) or 0)
+    store.add(TraceAttempt(user_id=actor_id, exercise_id=exercise_id,
+                           submitted_output=guess, correct=correct, attempt_number=attempt_number))
+    store.flush()
+    return {
+        "exercise_id": exercise_id,
+        "user_id": actor_id,
+        "correct": correct,
+        "verdict": "CORRECT" if correct else "INCORRECT",
+        "submitted_output": guess,
+        "expected_output": expected,
+        "explanation": item["explanation"],
+        "attempt_number": attempt_number,
+    }

@@ -1,6 +1,6 @@
 from fastapi import APIRouter, Query
 
-from routers.deps import ActorId
+from routers.deps import ActorId, DbSession
 from schemas import (
     LeaderboardEntry,
     UserCreate,
@@ -17,13 +17,12 @@ from services import (
     list_users,
     update_user,
 )
-from storage import store
 
 router = APIRouter(prefix="/users", tags=["users"])
 
 
 @router.get("", response_model=list[UserResponse])
-def list_users_route(
+def list_users_route(store: DbSession,
     q: str | None = None,
     limit: int = Query(default=50, ge=1, le=100),
 ) -> list:
@@ -31,22 +30,22 @@ def list_users_route(
 
 
 @router.get("/leaderboard", response_model=list[LeaderboardEntry])
-def leaderboard_route(limit: int = Query(default=10, ge=1, le=100)) -> list[dict]:
+def leaderboard_route(store: DbSession, limit: int = Query(default=10, ge=1, le=100)) -> list[dict]:
     return get_leaderboard(store, limit)
 
 
 @router.post("", response_model=UserResponse, status_code=201)
-def create_user_route(payload: UserCreate):
+def create_user_route(store: DbSession, payload: UserCreate):
     return create_user(store, payload)
 
 
 @router.get("/{user_id}", response_model=UserResponse)
-def get_user_route(user_id: int):
+def get_user_route(store: DbSession, user_id: int):
     return get_user(store, user_id)
 
 
 @router.get("/{user_id}/profile", response_model=UserProfileResponse)
-def profile_route(user_id: int):
+def profile_route(store: DbSession, user_id: int):
     data = get_profile(store, user_id)
     return UserProfileResponse(
         **UserResponse.model_validate(data["user"]).model_dump(),
@@ -58,10 +57,10 @@ def profile_route(user_id: int):
 
 
 @router.patch("/{user_id}", response_model=UserResponse)
-def update_user_route(user_id: int, payload: UserUpdate, actor_id: ActorId):
+def update_user_route(store: DbSession, user_id: int, payload: UserUpdate, actor_id: ActorId):
     return update_user(store, user_id, payload, actor_id)
 
 
 @router.delete("/{user_id}", status_code=204)
-def delete_user_route(user_id: int, actor_id: ActorId) -> None:
+def delete_user_route(store: DbSession, user_id: int, actor_id: ActorId) -> None:
     delete_user(store, user_id, actor_id)
