@@ -31,7 +31,7 @@ def verify():
                 health.get_by_role("button", name="Execute", exact=True).click()
             assert response.value.status == 200
             assert response.value.json()["storage"] == "postgresql"
-            expect(health.locator(".live-responses-table .response-col_status")).to_contain_text("200")
+            expect(health.locator(".live-responses-table .response-col_status:not(.col_header)")).to_contain_text("200")
 
             operation = page.locator("#operations-users-create_user_route_api_users_post")
             operation.locator(".opblock-summary").click()
@@ -43,7 +43,7 @@ def verify():
                 with page.expect_response(lambda r: r.url == BASE + "/api/users" and r.request.method == "POST") as response:
                     operation.get_by_role("button", name="Execute", exact=True).click()
                 assert response.value.status == expected_status, response.value.text()
-                expect(operation.locator(".live-responses-table .response-col_status")).to_contain_text(str(expected_status))
+                expect(operation.locator(".live-responses-table .response-col_status:not(.col_header)")).to_contain_text(str(expected_status))
                 print(f"Swagger POST /api/users -> {expected_status}", flush=True)
 
             submit(payload, 201)
@@ -74,3 +74,4 @@ if __name__ == "__main__":
         finally:
             process.terminate()
             process.wait(timeout=10)
+
