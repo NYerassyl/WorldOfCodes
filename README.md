@@ -15,8 +15,9 @@ npm run dev:fastapi
 
 Open [Swagger UI](http://127.0.0.1:8000/docs), expand `GET /api/health`,
 select **Try it out**, then **Execute**. Expect HTTP 200 and
-`{"status":"ok"}`. The assignment uses process memory, so restarting or
-reloading the service clears its data. Use Ctrl+C to stop it.
+`{"status":"ok"}`. The API uses the shared Prisma PostgreSQL database and Express account/judge
+service. Apply Prisma → profile Alembic migrations and run Express first; see
+[FastAPI setup](services/fastapi-backend/README.md). Records survive restarts.
 
 ### Express application on port 4001
 
