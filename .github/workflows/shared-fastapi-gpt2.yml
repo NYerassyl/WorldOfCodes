@@ -8,6 +8,9 @@ on:
       - 'services/learning-backend/prisma/**'
       - 'scripts/verify-shared-fastapi.py'
       - '.github/workflows/shared-fastapi-gpt2.yml'
+      - 'scripts/verify_schema_recreation.sh'
+      - 'scripts/verify_schema_recreation.py'
+      - 'docs/schema-recreation-evidence.md'
 permissions:
   contents: read
 jobs:
@@ -81,3 +84,45 @@ jobs:
         with:
           name: canonical-fastapi-evidence
           path: artifacts/
+
+  schema-recreation:
+    name: Recreate Prisma tables and Alembic view on clean PostgreSQL
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: schema_ci
+          POSTGRES_PASSWORD: schema_ci_only
+          POSTGRES_DB: worldofcodes_schema_recreation_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U schema_ci -d worldofcodes_schema_recreation_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://schema_ci:schema_ci_only@127.0.0.1:5432/worldofcodes_schema_recreation_test?schema=public
+      FASTAPI_DATABASE_URL: postgresql+psycopg://schema_ci:schema_ci_only@127.0.0.1:5432/worldofcodes_schema_recreation_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install reproducible dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          python -m pip install -r services/fastapi-backend/requirements.txt
+      - name: Verify actual Prisma → seed → Alembic → uvicorn recreation
+        run: bash scripts/verify_schema_recreation.sh
+      - name: Upload redacted recreation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: schema-recreation-evidence
+          path: |
+            artifacts/schema-recreation-transcript.md
+            artifacts/schema-recreation-uvicorn.log
+          if-no-files-found: warn
