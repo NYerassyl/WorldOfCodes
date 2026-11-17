@@ -185,7 +185,8 @@ def fixture_account(conn):
     uid = str(uuid4())
     sid = str(uuid4())
     token = secrets.token_urlsafe(48)
-    nickname = "schema" + secrets.token_hex(7)
+    # Canonical username policy: lower-case a-z only, length 3..24.
+    nickname = "schema" + "".join(chr(ord("a") + value % 26) for value in secrets.token_bytes(12))
     conn.execute(text("""
         INSERT INTO "User" (id,email,"passwordHash",nickname,"normalizedNickname","updatedAt")
         VALUES (:id,:email,:password,:nickname,:nickname,timezone('UTC',CURRENT_TIMESTAMP))
