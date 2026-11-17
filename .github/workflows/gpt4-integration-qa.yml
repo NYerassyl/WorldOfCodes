@@ -6,6 +6,7 @@ on:
       - qa/gpt4-integration-testing
   pull_request:
     branches:
+      - feat/profile-insights
       - integration/nov17-combined
     paths:
       - 'frontend/**'
@@ -140,9 +141,8 @@ jobs:
           done
           grep -q '"status":"ok"' /tmp/woc-fastapi-restart-health.json
           node --env-file-if-exists=.env server/index.js >> /tmp/woc-express.log 2>&1 &
-          sleep 2
-          node --env-file-if-exists=.env server/index.js >> /tmp/woc-express.log 2>&1 &
           echo $! > /tmp/woc-express.pid
+          sleep 2
           for i in $(seq 1 40); do
             if curl -fsS http://127.0.0.1:4001/api/health -o /tmp/woc-restart-health.json; then break; fi
             sleep 1
