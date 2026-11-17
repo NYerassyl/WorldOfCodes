@@ -34,7 +34,7 @@ export type PublicBattleProblem = {
   rewardCoins: number;
   examples: { args: unknown[]; expected: unknown }[];
 };
-export type Rating = { points: number; wins: number; losses: number; draws: number };
+export type Rating = { points: number; rank?: string; wins: number; losses: number; draws: number };
 export type Invite = { matchId: string; inviteCode: string; expiresInSeconds: number };
 export type Verdict = {
   status: VerdictStatus;

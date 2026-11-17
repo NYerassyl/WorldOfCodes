@@ -13,3 +13,5 @@ export {
   getMyRating
 } from './service.js';
 export { calculateElo, expectedScore } from './rating.js';
+export { RANKS, rankForPoints, rankedDeltas } from './ranks.js';
+export { SEARCH_WINDOWS, searchWindow, pairWindow, canPair, bestOpponent } from './matchmaking.js';
