@@ -58,6 +58,7 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   sessions           AuthSession[]
+  comments           ProblemComment[]
   submissions        Submission[]
   completions        ProblemCompletion[]
   lessonProgress     LessonProgress[]
@@ -128,6 +129,7 @@ model Problem {
   isPublished  Boolean             @default(true)
   lesson       Lesson?             @relation(fields: [lessonId], references: [id])
   testCases    TestCase[]
+  comments     ProblemComment[]
   submissions  Submission[]
   completions  ProblemCompletion[]
   matches      Match[]
@@ -323,4 +325,17 @@ model DirectMessage {
   recipient User @relation("Recipient", fields: [recipientId], references: [id], onDelete: Cascade)
   @@index([senderId, recipientId, createdAt])
   @@index([recipientId, createdAt])
+}
+
+model ProblemComment {
+  id        String   @id @default(uuid())
+  problemId String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  @@index([problemId, createdAt, id])
+  @@index([authorId])
 }

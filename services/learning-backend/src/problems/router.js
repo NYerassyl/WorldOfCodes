@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createCommentsBridge } from './commentsBridge.js';
 import { asyncRoute,badRequest,ensureKeys,notFound,requireString } from '../lib/errors.js';
 import { getPublicProblemBank,publicProblemSelect,submitProblem } from './service.js';
 export function createProblemsRouter(prisma,requireAuth,{judge}={}){
@@ -26,5 +27,6 @@ export function createProblemsRouter(prisma,requireAuth,{judge}={}){
     const sourceCode=requireString(req.body.code,'code',20000);
     res.json(await submitProblem(prisma,{userId:req.auth.userId,problemId:req.params.id,sourceCode,...(judge?{judge}:{})}));
   }));
+  router.use(createCommentsBridge(requireAuth));
   return router;
 }

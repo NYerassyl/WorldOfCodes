@@ -3,6 +3,7 @@ import { Heading, Editor, Notice } from "../components/UI";
 import { useAuth, authErrorMessage } from "../lib/auth";
 import * as api from "../lib/learning-api";
 import "./server-practice.css";
+import { ProblemComments } from "../components/ProblemComments";
 function useResource<T>(load: () => Promise<T>, key: string) {
   const [data, setData] = useState<T>();
   const [error, setError] = useState("");
@@ -310,6 +311,7 @@ function ProblemWorkspace({
   }
   if (!p) return <Load error={resource.error} retry={resource.reload} />;
   return (
+    <>
     <section className="server-workspace">
       <div className="panel">
         <span className="tag">{p.difficulty} · Python</span>
@@ -364,6 +366,8 @@ function ProblemWorkspace({
         )}
       </div>
     </section>
+    <ProblemComments key={`${id}:${user?.id ?? "guest"}`} problemId={id} />
+    </>
   );
 }
 export function ServerCopy() {

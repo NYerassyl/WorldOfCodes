@@ -83,3 +83,21 @@ export const submitCopy = (id: string, code: string) =>
     method: "POST",
     body: { code },
   });
+
+export type ProblemComment = {
+  id: string;
+  problemId: string;
+  author: { id: string; nickname: string; avatarUrl: string | null };
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type CommentPage = { comments: ProblemComment[]; nextCursor: string | null };
+export const comments = (id: string, before?: string, signal?: AbortSignal) =>
+  request<CommentPage>(`/problems/${encodeURIComponent(id)}/comments${before ? '?before=' + encodeURIComponent(before) : ''}`, { signal });
+export const createComment = (id: string, body: string) =>
+  request<ProblemComment>(`/problems/${encodeURIComponent(id)}/comments`, { method: 'POST', body: { body } });
+export const updateComment = (id: string, commentId: string, body: string) =>
+  request<ProblemComment>(`/problems/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', body: { body } });
+export const deleteComment = (id: string, commentId: string) =>
+  request<void>(`/problems/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
