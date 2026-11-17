@@ -81,3 +81,83 @@ The new workflow also repeats comments, learning and editor browser acceptance
 on this runtime. Evidence includes screenshots, exact Swagger status codes and
 both service logs. Main merging belongs to GPT1; production migration/deployment
 is not part of this change.
+
+## Schema recreation (requirement 3)
+
+This is the **single, shared PostgreSQL schema** used by Express and FastAPI,
+not the old classroom in-memory store. **Prisma is the only owner of tables,
+constraints, FKs and their history.** Alembic is restricted to the read-only
+analytics VIEW `woc_profile_activity` and its own revision tracking table
+`woc_fastapi_revision`; never run Alembic autogenerate to recreate Prisma
+tables. Both services use the same `public` schema.
+
+### Reproduce from an EMPTY test database
+
+**Prerequisites:** Node 22+, npm, Python 3.12, a local PostgreSQL database that
+already exists, and project dependencies. Export `DATABASE_URL` and
+`FASTAPI_DATABASE_URL` securely from your local environment/secrets manager.
+Both must refer to the same localhost `public` schema whose **database name
+ends in `_test`**. Do **not** print either URL, paste real credentials in
+terminal logs, or run this verification on production. The script refuses a
+non-local, non-`_test`, non-empty database.
+
+From the repository root:
+
+```bash
+npm ci --ignore-scripts --no-audit --no-fund
+python -m pip install -r services/fastapi-backend/requirements.txt
+bash scripts/verify_schema_recreation.sh
+```
+
+The shell script executes this **exact creation order** (validate/generate
+Prisma Client first, then migrate):
+
+1. `npx prisma migrate deploy --schema services/learning-backend/prisma/schema.prisma`
+   — applies **11 original Prisma migrations**, ending in
+   `20261117160000_content_authors`. No historical migration files are edited.
+2. `node services/learning-backend/prisma/seed.js` — seeds courses, topics,
+   lessons and problems using the canonical Prisma model.
+3. `(cd services/fastapi-backend && python -m alembic upgrade head)`
+   — adds **only** the read-only `woc_profile_activity` VIEW and the
+   `woc_fastapi_revision` tracking table. It does **not** create site tables.
+4. `(cd services/fastapi-backend && python -m uvicorn main:app --host 127.0.0.1 --port 8000)`
+   — standalone manual example; the verification script starts and restarts
+   `uvicorn` automatically on an available localhost port, checks `/docs`
+   (HTTP 200) and `/openapi.json` (**50 HTTP operations**).
+
+**Alembic naming note:** The migration *filename* is `001_activity.py`,
+but its actual `revision` field, and therefore the value printed by
+`python -m alembic current`, is **`001_profile_activity`**.
+Renaming that revision to `001_activity` would rewrite migration history;
+we intentionally leave it unchanged. The script validates the real
+`001_profile_activity` revision and the view independently.
+
+### Evidence and negative cases
+
+The verifier compares the set of PostgreSQL tables **before and after**
+Alembic: only `woc_fastapi_revision` may be added by Alembic. It checks
+11 finished Prisma migrations, `alembic current`, the read-only view and
+exactly 50 FastAPI OpenAPI operations. It creates an isolated throwaway
+user/session **only in this dedicated test database**, grants author permission
+to that process through `FASTAPI_CONTENT_ADMIN_IDS`, and performs real HTTP:
+
+- `POST /api/lessons` → **201**, then `GET /api/lessons` → **200**;
+- invalid title `PATCH /api/lessons/{id}` → **422** (Pydantic);
+- missing lesson `PATCH /api/lessons/{missing_id}` → **404**;
+- circular prerequisite `PATCH /api/lessons/{id}` → **409**;
+- valid `PATCH /api/lessons/{id}` → **200**;
+- **stop and restart uvicorn**, then `GET /api/lessons` → **200** with the
+  same updated title, proving state is persisted in PostgreSQL;
+- `DELETE /api/lessons/{id}` → **204** and final GET confirms deletion.
+
+Transcript: `artifacts/schema-recreation-transcript.md`; the CI job
+`Canonical FastAPI persistence, Swagger and cross-runtime rewards /
+schema-recreation` uploads it as an Actions artifact. See
+`docs/schema-recreation-evidence.md` for verification scope and links.
+
+The historical `verify` job in that workflow already runs **Prisma
+migrations → seed → Alembic** (each Prisma migrate/seed command repeats only
+to check idempotency). The new `schema-recreation` job independently
+exercises the same order **once on an empty PostgreSQL instance**.
+The content/session business logic is unchanged: this check does not
+duplicate logout or session-revocation testing.
