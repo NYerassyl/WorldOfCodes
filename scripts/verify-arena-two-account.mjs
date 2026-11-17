@@ -100,6 +100,13 @@ try {
   const alice = await register("alice");
   const bob = await register("bob");
   const eve = await register("eve");
+  const aliceProfileEdit = await request("/users/me", {
+    token: alice.token, method: "PATCH",
+    body: { displayName: "GPT4 QA Alice", bio: "Two-account integration acceptance" },
+  });
+  assert.equal(aliceProfileEdit.status, 200, "Alice can edit her canonical profile");
+  assert.equal(aliceProfileEdit.json.displayName, "GPT4 QA Alice");
+  pass("profile: Alice updates display name and bio");
 
   // --- Friendly match: wrong verdict, accepted verdict, reload restore -----
   const invite = await request("/battle/friendly", { token: alice.token, method: "POST", body: {} });
@@ -350,6 +357,7 @@ try {
       lessonId,
       problemId,
       expectedCommentId: comment.json.id,
+      expectedProfile: { displayName: "GPT4 QA Alice", bio: "Two-account integration acceptance" },
     }, null, 2));
   }
   console.log(`\nALL ${results.length} CHECKS PASSED`);
