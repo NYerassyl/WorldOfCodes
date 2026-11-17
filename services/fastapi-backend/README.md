@@ -30,20 +30,6 @@ python -m alembic upgrade head
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-### Recreating the schema from scratch
-
-Prisma owns the shared `public` tables; Alembic adds only the profile view.
-From an empty database:
-
-```sh
-export DATABASE_URL='postgresql://USER:PASSWORD@127.0.0.1:5432/EMPTY_DB?schema=public'
-bash scripts/verify-schema-recreation.sh
-```
-
-The script applies 11 Prisma migrations, seeds, runs `alembic upgrade head`
-(`001_activity`) and asserts the FastAPI contract (50 operations on 36 paths).
-See `docs/schema-recreation-25db51a.md` for the decision and evidence.
-
 Express remains the canonical password/session/profile/judge/reward service.
 FastAPI exposes those typed operations through a bounded HTTP adapter and uses
 SQLAlchemy for canonical profile/history reads, authorized content/progress CRUD,
