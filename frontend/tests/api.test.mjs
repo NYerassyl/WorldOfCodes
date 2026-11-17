@@ -59,6 +59,7 @@ function json(res, status, payload) {
 const user = {
   id: "u1",
   email: "ada@example.com",
+  username: "ada_l",
   nickname: "Ada",
   avatarUrl: null,
   xp: 120,
@@ -86,15 +87,18 @@ test("register posts credentials and returns the session", async () => {
     email: "ada@example.com",
     password: "correct horse",
     nickname: "Ada",
+    username: "ada_l",
   });
   assert.equal(result.token, "token-one");
   assert.equal(result.user.nickname, "Ada");
+  assert.equal(result.user.username, "ada_l");
   assert.equal(requests[0].method, "POST");
   assert.equal(requests[0].url, "/auth/register");
   assert.deepEqual(requests[0].body, {
     email: "ada@example.com",
     password: "correct horse",
     nickname: "Ada",
+    username: "ada_l",
   });
   assert.match(requests[0].headers["content-type"], /application\/json/);
 });
@@ -169,30 +173,86 @@ test("logout accepts an empty 204 response", async () => {
 test("profile updates patch the server and return the merged user", async () => {
   api.setToken("live-token");
   handler = (_req, res) =>
-    json(res, 200, { ...user, nickname: "Ada_L", nicknameChanges: 1 });
+    json(res, 200, {
+      ...user,
+      nickname: "Ada_L",
+      username: "ada_lit",
+      nicknameChanges: 1,
+    });
   const result = await api.updateProfile({
     nickname: "Ada_L",
+    username: "ada_lit",
     avatarUrl: null,
   });
   assert.equal(result.nickname, "Ada_L");
+  assert.equal(result.username, "ada_lit");
   assert.equal(requests[0].method, "PATCH");
   assert.equal(requests[0].url, "/users/me");
-  assert.deepEqual(requests[0].body, { nickname: "Ada_L", avatarUrl: null });
+  assert.deepEqual(requests[0].body, {
+    nickname: "Ada_L",
+    username: "ada_lit",
+    avatarUrl: null,
+  });
 });
 
-test("public profiles encode the nickname in the path", async () => {
+test("public profiles encode the handle in the path", async () => {
   handler = (_req, res) =>
     json(res, 200, {
       id: "u1",
-      nickname: "ada l",
+      username: "ada_l",
+      nickname: "Ada",
       avatarUrl: null,
       xp: 120,
       level: 2,
+      joinedAt: "2026-01-02T03:04:05.000Z",
       completedLessons: 3,
+      solvedProblems: 4,
+      submissions: 9,
+      followers: 2,
+      following: 5,
+      isFollowing: true,
+      isMe: false,
+      rating: null,
     });
-  const result = await api.getPublicProfile("ada l");
+  const result = await api.getPublicProfile("ada_l");
   assert.equal(result.completedLessons, 3);
-  assert.equal(requests[0].url, "/users/ada%20l");
+  assert.equal(result.isFollowing, true);
+  assert.equal(requests[0].url, "/users/ada_l");
+});
+
+test("follow, unfollow, activity and community lists use the handle routes", async () => {
+  api.setToken("live-token");
+  handler = (req, res) => {
+    if (req.url.endsWith("/activity?days=90"))
+      return json(res, 200, { from: "2026-08-20", to: "2026-11-17", days: [] });
+    if (req.url.endsWith("/followers?limit=20&offset=0"))
+      return json(res, 200, { total: 1, items: [], hasMore: false });
+    if (req.url.endsWith("/following?limit=20&offset=0"))
+      return json(res, 200, { total: 0, items: [], hasMore: false });
+    if (req.url.endsWith("/follow"))
+      return json(res, 200, {
+        following: req.method === "POST",
+        followersCount: req.method === "POST" ? 3 : 2,
+      });
+    return json(res, 404, { error: { code: "NOT_FOUND", message: "no" } });
+  };
+  assert.deepEqual(await api.followUser("ada l"), {
+    following: true,
+    followersCount: 3,
+  });
+  assert.equal(requests.at(-1).method, "POST");
+  assert.equal(requests.at(-1).url, "/users/ada%20l/follow");
+  assert.deepEqual(await api.unfollowUser("ada l"), {
+    following: false,
+    followersCount: 2,
+  });
+  assert.equal(requests.at(-1).method, "DELETE");
+  assert.equal((await api.getFollowers("ada l")).total, 1);
+  assert.equal(requests.at(-1).url, "/users/ada%20l/followers?limit=20&offset=0");
+  assert.equal((await api.getFollowing("ada l")).total, 0);
+  assert.equal(requests.at(-1).url, "/users/ada%20l/following?limit=20&offset=0");
+  assert.equal((await api.getProfileActivity("ada l", 90)).to, "2026-11-17");
+  assert.equal(requests.at(-1).url, "/users/ada%20l/activity?days=90");
 });
 
 test("non-json failures fall back to the http status", async () => {

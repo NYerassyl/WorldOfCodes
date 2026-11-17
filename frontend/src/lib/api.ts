@@ -17,6 +17,7 @@ export class ApiError extends Error {
 export type ServerUser = {
   id: string;
   email: string;
+  username: string;
   nickname: string;
   avatarUrl: string | null;
   xp: number;
@@ -34,11 +35,82 @@ export type AuthResponse = {
 
 export type PublicProfile = {
   id: string;
+  username: string;
   nickname: string;
   avatarUrl: string | null;
   xp: number;
   level: number;
+  joinedAt: string;
   completedLessons: number;
+  solvedProblems: number;
+  submissions: number;
+  followers: number;
+  following: number;
+  isFollowing: boolean;
+  isMe: boolean;
+  rating: {
+    points: number;
+    wins: number;
+    losses: number;
+    draws: number;
+  } | null;
+};
+
+export type ActivityDay = {
+  date: string;
+  weekday: number;
+  submissions: number;
+  accepted: number;
+  solved: number;
+};
+
+export type ActivityBreakdown = {
+  submissions: number;
+  solved: number;
+  accepted: number;
+};
+
+export type ActivityResponse = {
+  from: string;
+  to: string;
+  days: ActivityDay[];
+  months: { month: string; submissions: number; solved: number }[];
+  totals: {
+    submissions: number;
+    solved: number;
+    accepted: number;
+    activeDays: number;
+    maxStreak: number;
+    currentStreak: number;
+  };
+  windows: {
+    last30: { submissions: number; solved: number };
+    previous30: { submissions: number; solved: number };
+  };
+  topics: ({ topic: string } & ActivityBreakdown)[];
+  difficulties: ({ difficulty: "EASY" | "MEDIUM" | "HARD" } & ActivityBreakdown)[];
+  allTime: { submissions: number; solved: number };
+};
+
+export type FollowResult = {
+  following: boolean;
+  followersCount: number;
+};
+
+export type CommunityEntry = {
+  id: string;
+  username: string;
+  nickname: string;
+  avatarUrl: string | null;
+  xp: number;
+  level: number;
+  followedAt: string;
+};
+
+export type CommunityList = {
+  total: number;
+  items: CommunityEntry[];
+  hasMore: boolean;
 };
 
 function storage() {
@@ -139,6 +211,7 @@ export function register(input: {
   email: string;
   password: string;
   nickname: string;
+  username: string;
 }) {
   return request<AuthResponse>("/auth/register", {
     method: "POST",
@@ -163,6 +236,7 @@ export function me() {
 
 export function updateProfile(input: {
   nickname?: string;
+  username?: string;
   avatarUrl?: string | null;
 }) {
   return request<ServerUser>("/users/me", {
@@ -171,6 +245,36 @@ export function updateProfile(input: {
   });
 }
 
-export function getPublicProfile(nickname: string) {
-  return request<PublicProfile>(`/users/${encodeURIComponent(nickname)}`);
+export function getPublicProfile(handle: string) {
+  return request<PublicProfile>(`/users/${encodeURIComponent(handle)}`);
+}
+
+export function getProfileActivity(handle: string, days = 365) {
+  return request<ActivityResponse>(
+    `/users/${encodeURIComponent(handle)}/activity?days=${days}`,
+  );
+}
+
+export function followUser(handle: string) {
+  return request<FollowResult>(`/users/${encodeURIComponent(handle)}/follow`, {
+    method: "POST",
+  });
+}
+
+export function unfollowUser(handle: string) {
+  return request<FollowResult>(`/users/${encodeURIComponent(handle)}/follow`, {
+    method: "DELETE",
+  });
+}
+
+export function getFollowers(handle: string, offset = 0, limit = 20) {
+  return request<CommunityList>(
+    `/users/${encodeURIComponent(handle)}/followers?limit=${limit}&offset=${offset}`,
+  );
+}
+
+export function getFollowing(handle: string, offset = 0, limit = 20) {
+  return request<CommunityList>(
+    `/users/${encodeURIComponent(handle)}/following?limit=${limit}&offset=${offset}`,
+  );
 }

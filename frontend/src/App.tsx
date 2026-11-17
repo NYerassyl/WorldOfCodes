@@ -213,7 +213,7 @@ function Shell() {
           ) : page === "copy" ? (
             <ServerCopy />
           ) : page === "profile" ? (
-            <Profile />
+            <Profile key={route} handle={id} />
           ) : page === "duel" || page === "friends" ? (
             <Arena key={page} friendly={page === "friends"} />
           ) : (

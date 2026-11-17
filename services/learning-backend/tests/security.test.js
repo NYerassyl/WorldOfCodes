@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
- hashPassword,verifyPassword,normalizeNickname,normalizeEmail,
+ hashPassword,verifyPassword,normalizeNickname,normalizeEmail,normalizeUsername,
  publicUser,privateUser,hashSessionToken,createSessionToken,levelFromXp
 } from '../src/lib/security.js';
 import { codeMatchesExactly } from '../src/lib/rewards.js';
@@ -19,15 +19,19 @@ test('sessions are random and stored as digest',()=>{
  assert.notEqual(a,b);assert.notEqual(a,hashSessionToken(a));
  assert.equal(hashSessionToken(a).length,64);
 });
-test('nickname and email validation',()=>{
+test('nickname, username and email validation',()=>{
  assert.equal(normalizeNickname('User_123'),'user_123');
+ assert.equal(normalizeUsername(' Hero_1 '),'hero_1');
  assert.equal(normalizeEmail(' Example@Mail.COM '),'example@mail.com');
  assert.throws(()=>normalizeNickname('ab'));
+ assert.throws(()=>normalizeUsername('ab'));
+ assert.throws(()=>normalizeUsername('hero!'));
+ assert.throws(()=>normalizeUsername('with space'));
  assert.throws(()=>normalizeEmail('invalid'));
 });
 test('public user excludes private account data',()=>{
- const u={id:'u1',nickname:'Hero',avatarUrl:null,xp:101,coins:900,email:'private@example.com',passwordHash:'secret',nicknameChanges:1};
- assert.deepEqual(publicUser(u),{id:'u1',nickname:'Hero',avatarUrl:null,xp:101,level:2});
+ const u={id:'u1',username:'hero_1',nickname:'Hero',avatarUrl:null,xp:101,coins:900,email:'private@example.com',passwordHash:'secret',nicknameChanges:1};
+ assert.deepEqual(publicUser(u),{id:'u1',username:'hero_1',nickname:'Hero',avatarUrl:null,xp:101,level:2});
  assert.equal(privateUser(u).nextNicknameChange,'PAYMENT_REQUIRED');
  assert.equal(levelFromXp(199),2);
 });

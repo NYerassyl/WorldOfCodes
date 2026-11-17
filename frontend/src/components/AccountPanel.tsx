@@ -34,6 +34,7 @@ function SignedOut() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [nickname, setNickname] = useState("");
+  const [username, setUsername] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
 
@@ -79,6 +80,7 @@ function SignedOut() {
           email: email.trim(),
           password,
           nickname: nickname.trim(),
+          username: username.trim(),
         });
       }
       setPassword("");
@@ -148,21 +150,39 @@ function SignedOut() {
           />
         </label>
         {mode === "register" && (
-          <label>
-            Nickname
-            <input
-              required
-              minLength={3}
-              maxLength={24}
-              pattern="[A-Za-z0-9_]+"
-              autoComplete="username"
-              value={nickname}
-              onChange={(event) => setNickname(event.target.value)}
-            />
-            <small className="account-hint">
-              3–24 Latin letters, digits or underscores.
-            </small>
-          </label>
+          <>
+            <label>
+              Display name
+              <input
+                required
+                minLength={3}
+                maxLength={24}
+                pattern="[A-Za-z0-9_]+"
+                autoComplete="nickname"
+                value={nickname}
+                onChange={(event) => setNickname(event.target.value)}
+              />
+              <small className="account-hint">
+                Shown across the app. 3–24 Latin letters, digits or underscores.
+              </small>
+            </label>
+            <label>
+              Username
+              <input
+                required
+                minLength={3}
+                maxLength={24}
+                pattern="[A-Za-z0-9_]+"
+                autoComplete="username"
+                value={username}
+                onChange={(event) => setUsername(event.target.value)}
+              />
+              <small className="account-hint">
+                Your unique @handle for profile links, set once at signup and
+                changeable later.
+              </small>
+            </label>
+          </>
         )}
         <div className="account-actions">
           <button className="btn" type="submit" disabled={busy}>
@@ -185,6 +205,7 @@ function SignedOut() {
 function SignedIn() {
   const { user, logout, updateProfile } = useAuth();
   const [nickname, setNickname] = useState(user?.nickname ?? "");
+  const [username, setUsername] = useState(user?.username ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<Notice | null>(null);
@@ -197,9 +218,11 @@ function SignedIn() {
     try {
       const next = await updateProfile({
         nickname: nickname.trim(),
+        username: username.trim(),
         avatarUrl: avatarUrl.trim() ? avatarUrl.trim() : null,
       });
       setNickname(next.nickname);
+      setUsername(next.username);
       setAvatarUrl(next.avatarUrl ?? "");
       setNotice({ tone: "ok", text: "Your server profile has been updated." });
     } catch (caught) {
@@ -228,7 +251,9 @@ function SignedIn() {
         </span>
         <div>
           <strong>{user.nickname}</strong>
-          <span>{user.email}</span>
+          <span>
+            @{user.username} · {user.email}
+          </span>
         </div>
       </div>
       <dl className="account-facts">
@@ -271,6 +296,20 @@ function SignedIn() {
             {user.nextNicknameChange === "FREE"
               ? "Your first nickname change is free."
               : "Your free nickname change has been used."}
+          </small>
+        </label>
+        <label>
+          Username
+          <input
+            required
+            minLength={3}
+            maxLength={24}
+            pattern="[A-Za-z0-9_]+"
+            value={username}
+            onChange={(event) => setUsername(event.target.value)}
+          />
+          <small className="account-hint">
+            Your unique @handle. Changing it changes your profile link.
           </small>
         </label>
         <label>

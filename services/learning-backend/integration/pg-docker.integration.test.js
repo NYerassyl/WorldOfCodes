@@ -57,7 +57,8 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     await t.test('four migration checksums match source and seed remains idempotent',async()=>{
       const names=[
         '20261103000000_init','20261103170000_add_battle_models',
-        '20261103220000_match_status_type_index','20261103230000_problem_starter_code'
+        '20261103220000_match_status_type_index','20261103230000_problem_starter_code',
+        '20261111190000_add_username_and_follows'
       ];
       const entries=await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" ORDER BY migration_name');
       assert.deepEqual(entries.map(x=>x.migration_name),names);
@@ -71,15 +72,16 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal(await prisma.problem.count(),16);
       assert.equal(await prisma.testCase.count(),50);
       assert.equal(await prisma.copyExercise.count(),3);
-      for(const delegate of ['user','authSession','problem','testCase','submission','match','matchPlayer','rating','friendBattle'])
+      for(const delegate of ['user','authSession','follow','problem','testCase','submission','match','matchPlayer','rating','friendBattle'])
         assert.equal(typeof prisma[delegate].findMany,'function',delegate);
     });
     await t.test('register/login, private profile and authorization',async()=>{
       const register=await request('/auth/register',{method:'POST',auth:null,data:{
-        email:'first-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'first_'+suffix
+        email:'first-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'first_'+suffix,username:'first_'+suffix
       }});
       assert.equal(register.status,201);
       token=register.body.token;user=register.body.user;
+      assert.equal(user.username,'first_'+suffix);
       assert.ok(token.length>32);
       assert.equal(await prisma.authSession.count({where:{userId:user.id}}),1);
       const session=await prisma.authSession.findFirst({where:{userId:user.id}});
@@ -88,14 +90,32 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const me=await request('/users/me');
       assert.equal(me.status,200);assert.equal(me.body.id,user.id);assert.equal(me.body.coins,0);
       const second=await request('/auth/register',{method:'POST',auth:null,data:{
-        email:'second-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'second_'+suffix
+        email:'second-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'second_'+suffix,username:'second_'+suffix
       }});
       assert.equal(second.status,201);
       assert.equal((await request('/users/me',{method:'PATCH',data:{userId:second.body.user.id,nickname:'attacker'}})).status,400);
       assert.equal((await request('/users/me',{method:'PATCH',data:{coins:9999,xp:9999}})).status,400);
-      const pub=await request('/users/'+second.body.user.nickname,{auth:null});
+      const pub=await request('/users/'+second.body.user.username,{auth:null});
       assert.equal(pub.status,200);
-      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','avatarUrl','xp','level','completedLessons'].sort());
+      assert.deepEqual(Object.keys(pub.body).sort(),['id','username','nickname','avatarUrl','xp','level','joinedAt','completedLessons','solvedProblems','submissions','followers','following','isFollowing','isMe','rating'].sort());
+      assert.equal(pub.body.username,'second_'+suffix);assert.equal(pub.body.isMe,false);assert.equal(pub.body.isFollowing,false);
+      const duplicate=await request('/auth/register',{method:'POST',auth:null,data:{
+        email:'duplicate-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'duplicate_'+suffix,username:'second_'+suffix
+      }});
+      assert.equal(duplicate.status,409);assert.equal(duplicate.body.error.code,'USERNAME_TAKEN');
+      const followed=await request('/users/'+second.body.user.username+'/follow',{method:'POST'});
+      assert.deepEqual(followed.body,{following:true,followersCount:1});
+      assert.equal((await request('/users/'+second.body.user.username)).body.isFollowing,true);
+      const followerList=await request('/users/'+second.body.user.username+'/followers');
+      assert.equal(followerList.body.total,1);assert.equal(followerList.body.items[0].username,'first_'+suffix);
+      const followingList=await request('/users/'+user.username+'/following');
+      assert.equal(followingList.body.items[0].username,'second_'+suffix);
+      assert.equal((await request('/users/'+second.body.user.username+'/follow',{method:'POST'})).body.followersCount,1);
+      const selfFollow=await request('/users/'+user.username+'/follow',{method:'POST'});
+      assert.equal(selfFollow.status,400);assert.equal(selfFollow.body.error.code,'SELF_FOLLOW');
+      const activity=await request('/users/'+user.username+'/activity');
+      assert.equal(activity.status,200);assert.equal(activity.body.days.length,365);assert.equal(typeof activity.body.totals.currentStreak,'number');
+      assert.deepEqual(await request('/users/'+second.body.user.username+'/follow',{method:'DELETE'}).then(r=>r.body),{following:false,followersCount:0});
       assert.equal((await request('/users/me',{auth:null})).status,401);
       assert.equal((await request('/auth/login',{method:'POST',auth:null,data:{email:user.email,password:'wrong'}})).status,401);
       const renamed=await request('/users/me',{method:'PATCH',data:{nickname:'new_'+suffix}});
@@ -109,7 +129,8 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
         email: 'battle-rival-' + suffix + '@example.test',
         passwordHash: 'integration-test-hash',
         nickname: 'rival_' + suffix,
-        normalizedNickname: ('rival_' + suffix).toLowerCase()
+        normalizedNickname: ('rival_' + suffix).toLowerCase(),
+        username: ('rival_' + suffix).toLowerCase()
       } });
       const problem = await prisma.problem.findUnique({ where: { id: 'algo-sort' } });
       assert.ok(problem, 'seeded battle problem must exist');

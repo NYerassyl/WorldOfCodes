@@ -1,5 +1,5 @@
-import { AppError, badRequest, requireString } from '../lib/errors.js';
-import { normalizeNickname, privateUser } from '../lib/security.js';
+import { AppError, badRequest, isUniqueError, requireString } from '../lib/errors.js';
+import { normalizeNickname, normalizeUsername, privateUser } from '../lib/security.js';
 
 function validateAvatar(value) {
   if (value === null) return null;
@@ -12,9 +12,17 @@ function validateAvatar(value) {
 }
 
 export async function editOwnProfile(prisma, { userId, current, changes: input }) {
-  if (Object.keys(input).length === 0) throw badRequest('Provide nickname or avatarUrl');
+  if (Object.keys(input).length === 0) throw badRequest('Provide nickname, username or avatarUrl');
   const changes = {};
   if (Object.hasOwn(input,'avatarUrl')) changes.avatarUrl = validateAvatar(input.avatarUrl);
+  if (Object.hasOwn(input,'username')) {
+    const username = normalizeUsername(input.username);
+    if (username !== current.username) {
+      const taken = await prisma.user.findUnique({ where: { username }, select: { id: true } });
+      if (taken && taken.id !== userId) throw new AppError(409,'USERNAME_TAKEN','Username is already taken');
+      changes.username = username;
+    }
+  }
   if (Object.hasOwn(input,'nickname')) {
     const nickname = requireString(input.nickname,'nickname',24);
     const normalizedNickname = normalizeNickname(nickname);
@@ -26,9 +34,15 @@ export async function editOwnProfile(prisma, { userId, current, changes: input }
     }
   }
   if (Object.keys(changes).length === 0) return privateUser(current);
-  const result = await prisma.user.updateMany({
-    where: { id: userId, ...(changes.nickname ? { nicknameChanges: 0 } : {}) }, data: changes
-  });
+  let result;
+  try {
+    result = await prisma.user.updateMany({
+      where: { id: userId, ...(changes.nickname ? { nicknameChanges: 0 } : {}) }, data: changes
+    });
+  } catch (error) {
+    if (isUniqueError(error)) throw new AppError(409,'USERNAME_TAKEN','Username is already taken');
+    throw error;
+  }
   if (!result.count) throw new AppError(409,'PROFILE_CHANGED','Profile was changed concurrently; refresh');
   return privateUser(await prisma.user.findUniqueOrThrow({where:{id:userId}}));
 }

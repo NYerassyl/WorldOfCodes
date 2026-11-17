@@ -12,6 +12,12 @@ export function normalizeNickname(nickname) {
   if (typeof nickname !== 'string' || !/^[a-zA-Z0-9_]{3,24}$/.test(nickname)) throw badRequest('Nickname must be 3-24 Latin letters, digits, or underscores');
   return nickname.toLowerCase();
 }
+// Usernames are the public, unique handle; unlike nicknames they are shown as
+// @handle and used in profile links, so they are always stored lowercase.
+export function normalizeUsername(username) {
+  if (typeof username !== 'string' || !/^[a-zA-Z0-9_]{3,24}$/.test(username.trim())) throw badRequest('Username must be 3-24 Latin letters, digits, or underscores');
+  return username.trim().toLowerCase();
+}
 export async function hashPassword(password) {
   if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw badRequest('Password must be 8-128 characters');
   const salt = randomBytes(16).toString('hex');
@@ -28,6 +34,6 @@ export async function verifyPassword(password, stored) {
 export const createSessionToken = () => randomBytes(32).toString('base64url');
 export const hashSessionToken = token => createHash('sha256').update(token).digest('hex');
 export const levelFromXp = xp => Math.floor(Math.max(0,xp)/100)+1;
-export const publicUser = user => ({id:user.id, nickname:user.nickname, avatarUrl:user.avatarUrl, xp:user.xp, level:levelFromXp(user.xp)});
+export const publicUser = user => ({id:user.id, username:user.username, nickname:user.nickname, avatarUrl:user.avatarUrl, xp:user.xp, level:levelFromXp(user.xp)});
 export const privateUser = user => ({...publicUser(user), email:user.email, coins:user.coins, nicknameChanges:user.nicknameChanges, nextNicknameChange:user.nicknameChanges === 0 ? 'FREE' : 'PAYMENT_REQUIRED'});
 export const codeMatchesExactly = (input,sample) => typeof input === 'string' && input === sample;

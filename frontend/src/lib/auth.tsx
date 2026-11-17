@@ -21,11 +21,13 @@ type AuthValue = {
     email: string;
     password: string;
     nickname: string;
+    username: string;
   }) => Promise<ServerUser>;
   logout: () => Promise<void>;
   retry: () => Promise<void>;
   updateProfile: (input: {
     nickname?: string;
+    username?: string;
     avatarUrl?: string | null;
   }) => Promise<ServerUser>;
 };
@@ -89,7 +91,12 @@ export function Provider({ children }: { children: ReactNode }) {
   );
 
   const register = useCallback(
-    async (input: { email: string; password: string; nickname: string }) => {
+    async (input: {
+      email: string;
+      password: string;
+      nickname: string;
+      username: string;
+    }) => {
       const result = await api.register(input);
       setToken(result.token);
       setUser(result.user);
@@ -117,7 +124,11 @@ export function Provider({ children }: { children: ReactNode }) {
   }, []);
 
   const updateProfile = useCallback(
-    async (input: { nickname?: string; avatarUrl?: string | null }) => {
+    async (input: {
+      nickname?: string;
+      username?: string;
+      avatarUrl?: string | null;
+    }) => {
       try {
         const next = await api.updateProfile(input);
         const merged: ServerUser = {
