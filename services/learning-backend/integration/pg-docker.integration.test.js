@@ -11,7 +11,8 @@ import {
   createCopyRouter, resolveAuthSession, judgePython, getJudgableProblem
 } from '../src/index.js';
 import { errorMiddleware } from '../src/lib/errors.js';
-import { submitBattleSolution } from '../src/battle/service.js';
+import { createFriendlyInvite, createMatch, joinFriendlyInvite, submitBattleSolution } from '../src/battle/service.js';
+import { rankForPoints } from '../src/battle/ranks.js';
 
 const database = new URL(process.env.DATABASE_URL || 'http://missing');
 if (!['localhost', '127.0.0.1'].includes(database.hostname)
@@ -229,7 +230,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
         assert.equal((await request('/notifications/read',{method:'POST',auth:alice.token,data:body})).status,400,JSON.stringify(body));
       }
     });
-    await t.test('concurrent ranked ACCEPTED submissions settle once and update both Elo ratings once', async () => {
+    await t.test('concurrent ranked ACCEPTED submissions settle once and update both rank ratings once', async () => {
       const rival = await prisma.user.create({ data: {
         email: 'battle-rival-' + suffix + '@example.test',
         passwordHash: 'integration-test-hash',
@@ -238,8 +239,8 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       } });
       const problem = await prisma.problem.findUnique({ where: { id: 'algo-sort' } });
       assert.ok(problem, 'seeded battle problem must exist');
-      await prisma.rating.upsert({ where: { userId: user.id }, create: { userId: user.id }, update: {} });
-      await prisma.rating.upsert({ where: { userId: rival.id }, create: { userId: rival.id }, update: {} });
+      await prisma.rating.upsert({ where: { userId: user.id }, create: { userId: user.id, points: 1200 }, update: { points: 1200 } });
+      await prisma.rating.upsert({ where: { userId: rival.id }, create: { userId: rival.id, points: 1200 }, update: { points: 1200 } });
       const match = await prisma.match.create({ data: {
         type: 'RANKED', status: 'ACTIVE', problemId: problem.id, startedAt: new Date(),
         players: { create: [{ userId: user.id, seat: 0 }, { userId: rival.id, seat: 1 }] }
@@ -272,9 +273,73 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const loserAfter = after.find(item => item.userId === loserId);
       assert.equal(winnerAfter.wins, winnerBefore.wins + 1);
       assert.equal(loserAfter.losses, loserBefore.losses + 1);
-      assert.notEqual(winnerAfter.points, winnerBefore.points);
-      assert.notEqual(loserAfter.points, loserBefore.points);
+      assert.equal(winnerAfter.points, winnerBefore.points + 22, 'Bronze win is +22');
+      assert.equal(loserAfter.points, loserBefore.points - 16, 'Bronze loss is -16');
       assert.equal(completed.players.filter(player => player.ratingDelta !== null).length, 2);
+    });
+    await t.test('ranked points use the pre-match rank, protect Novice, cross boundaries and skip friendly matches', async () => {
+      const judge = async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 });
+      const makePlayer = async label => {
+        const nickname = 'rank' + label + suffix;
+        return prisma.user.create({ data: {
+          email: 'rank-' + label + '-' + suffix + '@example.test',
+          passwordHash: 'integration-test-hash',
+          nickname, normalizedNickname: nickname
+        } });
+      };
+      const setPoints = (userId, points) => prisma.rating.upsert({
+        where: { userId }, create: { userId, points }, update: { points }
+      });
+
+      const winner = await makePlayer('winner');
+      const novice = await makePlayer('novice');
+      await setPoints(winner.id, 1000);
+      await setPoints(novice.id, 1000);
+      const protectedMatch = await createMatch(prisma, { userIds: [winner.id, novice.id], type: 'RANKED', problemId: 'algo-sort' });
+      const snapshots = await prisma.matchPlayer.findMany({ where: { matchId: protectedMatch.id }, orderBy: { seat: 'asc' }, select: { ratingBefore: true } });
+      assert.deepEqual(snapshots.map(row => row.ratingBefore), [1000, 1000]);
+      await setPoints(winner.id, 1400);
+      await setPoints(novice.id, 1500);
+      const settled = await submitBattleSolution(prisma, {
+        matchId: protectedMatch.id, userId: winner.id, sourceCode: 'def solve(): return 1', judge
+      });
+      assert.equal(settled.settled, true);
+      const winnerAfter = await prisma.rating.findUnique({ where: { userId: winner.id } });
+      const noviceAfter = await prisma.rating.findUnique({ where: { userId: novice.id } });
+      assert.equal(winnerAfter.points, 1424, 'live 1400 plus the +24 Novice snapshot delta');
+      assert.equal(noviceAfter.points, 1500, 'a Novice loss costs zero points');
+      const deltas = await prisma.matchPlayer.findMany({ where: { matchId: protectedMatch.id }, orderBy: { seat: 'asc' }, select: { ratingBefore: true, ratingDelta: true } });
+      assert.deepEqual(deltas.map(row => [row.ratingBefore, row.ratingDelta]), [[1000, 24], [1000, 0]]);
+      await assert.rejects(
+        submitBattleSolution(prisma, { matchId: protectedMatch.id, userId: novice.id, sourceCode: 'def solve(): return 1', judge }),
+        error => error.code === 'ACTIVE_MATCH_NOT_FOUND'
+      );
+      assert.equal((await prisma.rating.findUnique({ where: { userId: winner.id } })).points, 1424, 'a repeated result must not settle twice');
+
+      const silver = await makePlayer('silver');
+      const bronze = await makePlayer('bronze');
+      await setPoints(silver.id, 1300);
+      await setPoints(bronze.id, 1100);
+      const crossing = await createMatch(prisma, { userIds: [silver.id, bronze.id], type: 'RANKED', problemId: 'algo-sort' });
+      await submitBattleSolution(prisma, { matchId: crossing.id, userId: silver.id, sourceCode: 'def solve(): return 1', judge });
+      const silverAfter = await prisma.rating.findUnique({ where: { userId: silver.id } });
+      const bronzeAfter = await prisma.rating.findUnique({ where: { userId: bronze.id } });
+      assert.equal(silverAfter.points, 1320);
+      assert.equal(bronzeAfter.points, 1084);
+      assert.equal(rankForPoints(silverAfter.points).name, 'Silver');
+      assert.equal(rankForPoints(bronzeAfter.points).name, 'Novice', '1100 - 16 drops Bronze into Novice');
+
+      const friendlyBefore = await prisma.rating.findMany({
+        where: { userId: { in: [silver.id, bronze.id] } }, orderBy: { userId: 'asc' }, select: { points: true, wins: true, losses: true }
+      });
+      const invite = await createFriendlyInvite(prisma, silver.id);
+      const friendly = await joinFriendlyInvite(prisma, bronze.id, invite.inviteCode);
+      await submitBattleSolution(prisma, { matchId: friendly.id, userId: bronze.id, sourceCode: 'def solve(): return 1', judge });
+      const friendlyAfter = await prisma.rating.findMany({
+        where: { userId: { in: [silver.id, bronze.id] } }, orderBy: { userId: 'asc' }, select: { points: true, wins: true, losses: true }
+      });
+      assert.deepEqual(friendlyAfter, friendlyBefore, 'friendly battles never change ratings');
+      assert.equal((await prisma.match.findUnique({ where: { id: friendly.id } })).status, 'COMPLETED');
     });
 
     await t.test('public API exposes starters and only sample cases; server can access hidden cases',async()=>{

@@ -21,7 +21,7 @@ test('ranked match starts ACTIVE and initializes both ratings in one transaction
     $transaction: async (callback, options) => {
       calls.isolation = options?.isolationLevel;
       return callback({
-        rating: { upsert: async args => { calls.ratings.push(args.where.userId); return { points: 1000 }; } },
+        rating: { upsert: async args => { calls.ratings.push(args.where.userId); return { userId: args.where.userId, points: 1000 }; } },
         match: { create: async args => { calls.match = args.data; return { id: 'ranked-1', ...args.data }; } }
       });
     }
@@ -34,6 +34,7 @@ test('ranked match starts ACTIVE and initializes both ratings in one transaction
   assert.ok(calls.match.startedAt instanceof Date);
   assert.equal(calls.isolation, 'Serializable');
   assert.deepEqual(calls.match.players.create.map(p => p.seat), [0, 1]);
+  assert.deepEqual(calls.match.players.create.map(p => p.ratingBefore), [1000, 1000]);
 });
 
 test('ranked match rejects duplicate players and non-ranked types', async () => {
