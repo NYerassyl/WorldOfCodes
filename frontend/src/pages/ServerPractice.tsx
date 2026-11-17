@@ -332,7 +332,7 @@ function ProblemWorkspace({
         </Notice>
       </div>
       <div>
-        <Editor title={p.language === "sql" ? "solution.sql" : "solution.py"} value={code} onChange={setCode} />
+        <Editor title={p.language === "sql" ? "solution.sql" : "solution.py"} value={code} onChange={setCode} smartEditing language={p.language} />
         {!user ? (
           <Gate />
         ) : (
@@ -455,7 +455,7 @@ export function ServerCopy() {
             </pre>
           </div>
           <div>
-            <Editor title="practice.py" value={code} onChange={setCode} />
+            <Editor title="practice.py" value={code} onChange={setCode} smartEditing={false} />
             {user ? (
               <button
                 className="btn"

@@ -4398,3 +4398,5 @@ main > *,
 .trace-practice li a:hover {background:#f6f2ec}.trace-practice small {color:#625f56}
 .trace-practice pre {max-width:100%;overflow:auto;background:#232527;color:#f9f6ef;padding:18px;border-radius:12px;line-height:1.65}
 .trace-practice form,.trace-practice form label {display:grid;gap:10px}.trace-practice form button,.trace-practice form a {justify-self:start}
+
+.editor-key-help { display: block; padding: 8px 16px; color: #bfb7ad; font-size: 11px; line-height: 1.6; }

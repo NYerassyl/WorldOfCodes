@@ -25,7 +25,7 @@ export function LessonExample({lessonId, example}:{lessonId:string;example:Lesso
     <h2>Try the example</h2>
     <p>Change the code{example.language==='python'?' or input arguments':''}, run it, and compare the result. Example runs do not award XP.</p>
     {example.language==='sql'&&example.fixture&&<details><summary>Sample tables and rows</summary><pre><code>{example.fixture.setupSQL}</code></pre></details>}
-    <Editor title={example.language==='sql'?'experiment.sql':'experiment.py'} value={code} onChange={setCode}/>
+    <Editor title={example.language==='sql'?'experiment.sql':'experiment.py'} value={code} onChange={setCode} smartEditing language={example.language}/>
     {example.language==='python'&&<label className="example-arguments">Arguments (JSON array)<textarea aria-label="Example arguments" rows={3} maxLength={8000} value={args} onChange={e=>setArgs(e.target.value)} spellCheck={false}/></label>}
     <div className="inline-actions">
       <button className="btn" disabled={busy||!user||!code.trim()} onClick={()=>void run()}>{busy?'Running example…':'Run example'}</button>

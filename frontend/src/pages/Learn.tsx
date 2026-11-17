@@ -1,4 +1,5 @@
 import { useAuth } from "../lib/auth";
+import { handleEditorKeyDown } from "../lib/editor-keys";
 import * as learningApi from "../lib/learning-api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
@@ -651,12 +652,15 @@ function LessonView({
                 </label>
                 <textarea
                   id="lab-editor"
+                  aria-describedby="lab-editor-help"
                   className="lab-editor"
                   value={labDraft}
                   spellCheck={false}
                   rows={12}
                   onChange={(event) => editLab(event.target.value)}
+                  onKeyDown={(event) => handleEditorKeyDown(event, labDraft, editLab, {language: language.id})}
                 />
+                <small id="lab-editor-help">Tab indents or skips a closing bracket. Press Esc then Tab to move focus.</small>
                 {labIsRender && (
                   <div className="lab-preview">
                     <span className="lab-editor-label">Live preview</span>
