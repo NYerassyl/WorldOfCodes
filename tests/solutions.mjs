@@ -1,4 +1,24 @@
+import { readFileSync } from "node:fs";
+
+const pack = JSON.parse(
+  readFileSync(
+    new URL("../services/learning-backend/prisma/learning-pack.json", import.meta.url),
+    "utf8",
+  ),
+);
+
+// The battle queue draws from every published Python problem, including pack
+// problems, so their reference programs must be available to the scenarios.
+const packSolutions = Object.fromEntries(
+  pack.lessons
+    .flatMap((lesson) => lesson.problems)
+    .filter((problem) => problem.referenceCode)
+    .map((problem) => [problem.id, problem.referenceCode]),
+);
+
 export const solutions = {
+  ...packSolutions,
+
   "py-double": "def double(n):\n    return n * 2",
   "py-area": "def rectangle_area(width, height):\n    return width * height",
   "py-even": "def is_even(n):\n    return n % 2 == 0",
