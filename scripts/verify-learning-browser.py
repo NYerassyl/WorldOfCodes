@@ -49,6 +49,7 @@ def verify():
                 expect(page.locator('[data-lang="sql"]')).to_contain_text('1 lessons')
                 page.goto(BASE+'/#algorithms')
                 expect(page.locator('.server-card-grid > a')).to_have_count(31)
+                page.screenshot(path=str(ARTIFACTS/'learning-catalog.png'),full_page=True)
                 page.get_by_label('Difficulty',exact=True).select_option('4')
                 expect(page.locator('.server-card-grid > a')).to_have_count(3)
                 page.screenshot(path=str(ARTIFACTS/'learning-five-levels.png'),full_page=True)

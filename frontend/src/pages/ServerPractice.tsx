@@ -223,6 +223,7 @@ export function ServerProblems({ id }: { id?: string }) {
         <label>
           Difficulty
           <select
+            aria-label="Difficulty"
             value={difficulty}
             onChange={(e) => setDifficulty(e.target.value)}
           >
@@ -234,7 +235,7 @@ export function ServerProblems({ id }: { id?: string }) {
         </label>
         <label>
           Topic
-          <select value={topic} onChange={(e) => setTopic(e.target.value)}>
+          <select aria-label="Topic" value={topic} onChange={(e) => setTopic(e.target.value)}>
             <option value="">All topics</option>
             {[...new Set(problems.map((p) => p.topicSlug))].map((t) => (
               <option key={t}>{t}</option>
