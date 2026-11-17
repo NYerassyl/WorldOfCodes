@@ -356,14 +356,29 @@ try {
   );
   pass("comments: authenticated comment is stored in shared PostgreSQL", comment.json.id);
 
+  // Final ranked duel comes after profile, follow, chat, lesson, analytics and comment.
+  await setPoints(alice.user.id, 1300);
+  await setPoints(bob.user.id, 1290);
+  const finalRanked = await playMatch(alice, bob, "post-learning/comment ranked duel");
+  const finalRankedProblem = await request(`/problems/${finalRanked.problemId}`);
+  assert.equal(finalRankedProblem.status, 200);
+  const finalRankedWin = await request(`/battle/matches/${finalRanked.id}/submit`, {
+    token: alice.token, method: "POST",
+    body: { code: solutionFor(finalRanked.problemId) },
+  });
+  assert.equal(finalRankedWin.json.status, "ACCEPTED");
+  assert.equal(finalRankedWin.json.matchCompleted, true);
+  const finalRatings = { alice: (await rating(alice)).points, bob: (await rating(bob)).points };
+  pass("ranked: duel completes after learning, analytics and comments", finalRanked.id);
+
   if (process.env.GPT4_QA_STATE_FILE) {
     await writeFile(process.env.GPT4_QA_STATE_FILE, JSON.stringify({
       alice: { id: alice.user.id, token: alice.token },
       bob: { id: bob.user.id, token: bob.token },
       eve: { id: eve.user.id, token: eve.token },
-      rankedMatchId: rankedTwo.id,
+      rankedMatchId: finalRanked.id,
       expectedMessages: ["Hello from the arena check", "Second message for history"],
-      expectedRatings: { alice: 1271, bob: 1232 },
+      expectedRatings: finalRatings,
       lessonId,
       problemId,
       expectedCommentId: comment.json.id,
