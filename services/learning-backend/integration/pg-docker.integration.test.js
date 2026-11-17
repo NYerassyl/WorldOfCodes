@@ -64,10 +64,10 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
         const sql=readFileSync(new URL('../prisma/migrations/'+item.migration_name+'/migration.sql',import.meta.url));
         assert.equal(createHash('sha256').update(sql).digest('hex'),item.checksum);
       }
-      assert.equal(await prisma.course.count(),1);
-      assert.equal(await prisma.lesson.count(),6);
-      assert.equal(await prisma.problem.count(),16);
-      assert.equal(await prisma.testCase.count(),50);
+      assert.equal(await prisma.course.count(),2);
+      assert.equal(await prisma.lesson.count(),12);
+      assert.equal(await prisma.problem.count(),31);
+      assert.equal(await prisma.testCase.count(),145);
       assert.equal(await prisma.copyExercise.count(),3);
       for(const delegate of ['user','authSession','problem','testCase','submission','match','matchPlayer','rating','friendBattle'])
         assert.equal(typeof prisma[delegate].findMany,'function',delegate);

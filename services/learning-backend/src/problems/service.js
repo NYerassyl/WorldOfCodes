@@ -1,14 +1,15 @@
 import { AppError, isUniqueError, notFound } from '../lib/errors.js';
-import { judgePython } from './dockerJudge.js';
+import { judgeLearning } from './learningJudge.js';
+import { ensurePrerequisite } from '../learning/prerequisites.js';
 
 export const publicProblemSelect = {
-  id:true, lessonId:true, title:true, statement:true, language:true, topicSlug:true, difficulty:true,
+  id:true, lessonId:true, title:true, statement:true, language:true, topicSlug:true, difficulty:true, practiceLevel:true,
   functionName:true, starterCode:true, rewardXp:true, rewardCoins:true,
   testCases:{where:{isSample:true},orderBy:{position:'asc'},select:{argsJson:true,expectedJson:true}}
 };
-export async function getPublicProblemBank(prisma,{topic,difficulty}={}) {
+export async function getPublicProblemBank(prisma,{topic,difficulty,includeSql=false}={}) {
   return prisma.problem.findMany({
-    where:{isPublished:true,OR:[{lessonId:null},{lesson:{topic:{course:{isPublished:true}}}}],
+    where:{isPublished:true,...(!includeSql?{language:'python'}:{}),OR:[{lessonId:null},{lesson:{topic:{course:{isPublished:true}}}}],
       ...(topic?{topicSlug:topic}:{}),...(difficulty?{difficulty}:{})},
     orderBy:[{difficulty:'asc'},{id:'asc'}],select:publicProblemSelect
   });
@@ -22,12 +23,13 @@ export async function getJudgableProblem(prisma,problemId) {
   });
   if(!p)throw notFound();return p;
 }
-export async function submitProblem(prisma,{userId,problemId,sourceCode,judge=judgePython}) {
+export async function submitProblem(prisma,{userId,problemId,sourceCode,judge=judgeLearning}) {
   const problem=await prisma.problem.findFirst({where:{id:problemId,isPublished:true},
     include:{testCases:{orderBy:{position:'asc'}},lesson:{include:{topic:{include:{course:true}}}}}});
   if(!problem || (problem.lesson && !problem.lesson.topic.course.isPublished))throw notFound();
-  if(problem.language!=='python')throw new AppError(503,'JUDGE_UNAVAILABLE','No judge for language');
-  const verdict=await judge({sourceCode,functionName:problem.functionName,cases:problem.testCases});
+  if(!['python','sql'].includes(problem.language))throw new AppError(503,'JUDGE_UNAVAILABLE','No judge for language');
+  await ensurePrerequisite(prisma,userId,problem.lesson);
+  const verdict=await judge({language:problem.language,sourceCode,functionName:problem.functionName,cases:problem.testCases});
   if(!['ACCEPTED','WRONG_ANSWER','RUNTIME_ERROR','TIME_LIMIT'].includes(verdict?.status))
     throw new AppError(503,'JUDGE_UNAVAILABLE','Judge did not return a trustworthy verdict');
   const record=async(tx,rewarding)=>{
@@ -48,7 +50,8 @@ export async function submitProblem(prisma,{userId,problemId,sourceCode,judge=ju
     }
     return {submissionId:submission.id,status:verdict.status,passedCases:verdict.passedCases,
       totalCases:verdict.totalCases,rewarded:rewarding,earnedXp:rewarding?problem.rewardXp:0,
-      earnedCoins:rewarding?problem.rewardCoins:0};
+      earnedCoins:rewarding?problem.rewardCoins:0,
+      ...(verdict.status==='ACCEPTED'&&problem.editorial?{explanation:problem.editorial}:{})};
   };
   if(verdict.status!=='ACCEPTED')return prisma.$transaction(tx=>record(tx,false));
   for(let retry=0;retry<3;retry++){

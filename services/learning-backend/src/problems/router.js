@@ -8,7 +8,7 @@ export function createProblemsRouter(prisma,requireAuth,{judge}={}){
     const {topic,difficulty}=req.query;
     if(topic!==undefined&&(typeof topic!=='string'||!/^[a-z0-9-]{1,40}$/.test(topic)))throw badRequest('Invalid topic');
     if(difficulty!==undefined&&!['EASY','MEDIUM','HARD'].includes(difficulty))throw badRequest('Invalid difficulty');
-    const problems=await getPublicProblemBank(prisma,{topic,difficulty});
+    const problems=await getPublicProblemBank(prisma,{topic,difficulty,includeSql:true});
     res.json({problems:problems.map(p=>({...p,examples:p.testCases.map(c=>({args:JSON.parse(c.argsJson),expected:JSON.parse(c.expectedJson)})),testCases:undefined}))});
   }));
   router.get('/problems/my-submissions',requireAuth,asyncRoute(async(req,res)=>{

@@ -108,10 +108,15 @@ model Lesson {
   title       String
   position    Int
   theoryMd    String           @db.Text
+  prerequisiteId String?
+  prerequisite Lesson? @relation("LessonPrerequisite", fields: [prerequisiteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dependents Lesson[] @relation("LessonPrerequisite")
+  exampleJson String? @db.Text
   topic       Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
   problems    Problem[]
   progresses  LessonProgress[]
   @@unique([topicId, position])
+  @@index([prerequisiteId])
 }
 
 model Problem {
@@ -121,6 +126,8 @@ model Problem {
   statement    String              @db.Text
   language     String              @default("python")
   topicSlug    String
+  editorial    String?             @db.Text
+  practiceLevel Int?
   difficulty   Difficulty
   functionName String
   starterCode  String              @default("") @db.Text

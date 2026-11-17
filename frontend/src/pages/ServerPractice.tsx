@@ -3,6 +3,7 @@ import { Heading, Editor, Notice } from "../components/UI";
 import { useAuth, authErrorMessage } from "../lib/auth";
 import * as api from "../lib/learning-api";
 import "./server-practice.css";
+import { LessonExample } from "../components/LessonExample";
 import { ProblemComments } from "../components/ProblemComments";
 function useResource<T>(load: () => Promise<T>, key: string) {
   const [data, setData] = useState<T>();
@@ -57,9 +58,9 @@ function Theory({ text }: { text: string }) {
           part
             .split("\n\n")
             .map((p, j) =>
-              p.startsWith("# ") ? (
-                <h2 key={`${i}-${j}`}>{p.slice(2)}</h2>
-              ) : (
+              p.trim().startsWith("# ") ? (
+                <h2 key={`${i}-${j}`}>{p.trim().slice(2)}</h2>
+               ) : p.trim().startsWith("## ") ? (<h3 key={`${i}-${j}`}>{p.trim().slice(3)}</h3>) : (
                 <p key={`${i}-${j}`}>{p}</p>
               ),
             )
@@ -88,7 +89,7 @@ function Card({
     </a>
   );
 }
-export function ServerLearning({ lessonId }: { lessonId?: string }) {
+export function ServerLearning({ lessonId, languageId = "python" }: { lessonId?: string; languageId?: string }) {
   const { user } = useAuth();
   const resource = useResource(() => api.courses(), "courses");
   const state = useResource(
@@ -102,8 +103,8 @@ export function ServerLearning({ lessonId }: { lessonId?: string }) {
   return (
     <>
       <Heading
-        title="Build your Python foundations."
-        description="Six topics. Read the theory, then solve every practice problem to complete each lesson."
+        title={languageId === "sql" ? "Practice relational thinking." : "Build your Python foundations."}
+        description="Read the theory, experiment with runnable examples, then solve the practice problems to save your progress."
       />
       {!user && <Gate />}
       {!resource.data ? (
@@ -111,19 +112,19 @@ export function ServerLearning({ lessonId }: { lessonId?: string }) {
       ) : (
         <div className="server-card-grid">
           {resource.data.courses
-            .filter((c) => c.language === "python")
+            .filter((c) => c.language === languageId)
             .flatMap((c) => c.topics)
             .flatMap((t) =>
               t.lessons.map((l) => (
                 <Card
                   key={l.id}
-                  href={`#learn/python/${l.id}`}
+                  href={`#learn/${languageId}/${l.id}`}
                   title={t.title}
                   detail={
                     state.data?.lessons.find((p) => p.lessonId === l.id)
                       ?.state === "COMPLETED"
                       ? "Completed"
-                      : "Python · Theory + practice"
+                      : `${languageId === "sql" ? "SQL" : "Python"} · Theory + practice`
                   }
                 />
               )),
@@ -152,8 +153,8 @@ function LessonWorkspace({ id }: { id: string }) {
   const chosen = selected || lesson.problems[0]?.id;
   return (
     <>
-      <a className="text-link" href="#learn/python">
-        ← Python foundations
+      <a className="text-link" href={`#learn/${lesson.topic?.course.language ?? "python"}`}>
+        ← Lesson catalog
       </a>
       <Heading
         title={lesson.title}
@@ -166,6 +167,8 @@ function LessonWorkspace({ id }: { id: string }) {
       <section className="panel">
         <Theory text={lesson.theoryMd} />
       </section>
+      {lesson.prerequisite && <Notice>Prerequisite: <a href={`#learn/python/${lesson.prerequisite.id}`}>{lesson.prerequisite.title}</a></Notice>}
+      {lesson.example && <LessonExample key={id} lessonId={id} example={lesson.example} />}
       <div
         className="server-problem-tabs"
         role="group"
@@ -224,8 +227,8 @@ export function ServerProblems({ id }: { id?: string }) {
             onChange={(e) => setDifficulty(e.target.value)}
           >
             <option value="">All difficulties</option>
-            {["EASY", "MEDIUM", "HARD"].map((d) => (
-              <option key={d}>{d}</option>
+            {api.PRACTICE_LEVELS.map((label, index) => (
+              <option key={label} value={String(index + 1)}>{label}</option>
             ))}
           </select>
         </label>
@@ -246,7 +249,7 @@ export function ServerProblems({ id }: { id?: string }) {
           {problems
             .filter(
               (p) =>
-                (!difficulty || p.difficulty === difficulty) &&
+                (!difficulty || api.practiceLevel(p) === Number(difficulty)) &&
                 (!topic || p.topicSlug === topic),
             )
             .map((p) => (
@@ -254,9 +257,9 @@ export function ServerProblems({ id }: { id?: string }) {
                 key={p.id}
                 href={`#algorithms/${p.id}`}
                 title={p.title}
-                detail={`${p.difficulty} · ${p.topicSlug}`}
+                detail={`${api.PRACTICE_LEVELS[api.practiceLevel(p)-1]} · ${p.language.toUpperCase()} · ${p.topicSlug}`}
               >
-                <p>{p.statement}</p>
+                <p className="server-statement">{p.statement}</p>
                 <p>
                   {p.rewardXp} XP · {p.rewardCoins} coins on first completion
                 </p>
@@ -267,7 +270,7 @@ export function ServerProblems({ id }: { id?: string }) {
       {resource.data &&
         !problems.some(
           (p) =>
-            (!difficulty || p.difficulty === difficulty) &&
+            (!difficulty || api.practiceLevel(p) === Number(difficulty)) &&
             (!topic || p.topicSlug === topic),
         ) && <Notice>No challenges match these filters yet.</Notice>}
     </>
@@ -314,22 +317,21 @@ function ProblemWorkspace({
     <>
     <section className="server-workspace">
       <div className="panel">
-        <span className="tag">{p.difficulty} · Python</span>
+        <span className="tag">{api.PRACTICE_LEVELS[api.practiceLevel(p)-1]} · {p.language.toUpperCase()}</span>
         <h2>{p.title}</h2>
-        <p>{p.statement}</p>
+        <p className="server-statement">{p.statement}</p>
         <h3>Example</h3>
         {p.examples.map((e, i) => (
           <pre key={i}>
-            <code>{`${p.functionName}(${e.args.map((a) => JSON.stringify(a)).join(", ")})\nExpected: ${JSON.stringify(e.expected)}`}</code>
+            <code>{p.language === "sql" ? `Sample data:\n${(e.args[0] as {setupSQL?:string})?.setupSQL ?? ""}\nExpected rows: ${JSON.stringify(e.expected)}` : `${p.functionName}(${e.args.map((a) => JSON.stringify(a)).join(", ")})\nExpected: ${JSON.stringify(e.expected)}`}</code>
           </pre>
         ))}
         <Notice>
-          Return the result from your function. All sample and hidden tests must
-          pass. First completion: {p.rewardXp} XP and {p.rewardCoins} coins.
+          {p.language === "sql" ? "Write a SELECT or WITH query with the required column names and row order." : "Return the result from your function."} All sample and hidden tests must pass. First completion: {p.rewardXp} XP and {p.rewardCoins} coins.
         </Notice>
       </div>
       <div>
-        <Editor title="solution.py" value={code} onChange={setCode} />
+        <Editor title={p.language === "sql" ? "solution.sql" : "solution.py"} value={code} onChange={setCode} />
         {!user ? (
           <Gate />
         ) : (
@@ -338,7 +340,7 @@ function ProblemWorkspace({
             disabled={busy || !code.trim()}
             onClick={() => void submit()}
           >
-            {busy ? "Running tests…" : "Submit Python solution"}
+            {busy ? "Running tests…" : p.language === "sql" ? "Submit SQL query" : "Submit Python solution"}
           </button>
         )}
         {busy && (
@@ -361,7 +363,8 @@ function ProblemWorkspace({
               ? `+${result.earnedXp} XP · +${result.earnedCoins} coins`
               : result.status === "ACCEPTED"
                 ? "Already completed. No duplicate rewards."
-                : "No rewards awarded. Revise your function and try again."}
+                : "No rewards awarded. Revise your solution and try again."}
+            {result.explanation && <details><summary>Why this approach works</summary><p className="server-statement">{result.explanation}</p></details>}
           </div>
         )}
       </div>

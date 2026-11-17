@@ -74,3 +74,17 @@ export async function judgePython({ sourceCode, functionName, cases, image = pro
     await rm(directory, { recursive: true, force: true });
   }
 }
+
+/** Editable lesson examples use the same isolated process and never award XP. */
+export async function runPythonExample({sourceCode,functionName='experiment',args=[] ,image=process.env.JUDGE_IMAGE||'python:3.12-alpine',timeoutMs=4000}) {
+  if(typeof sourceCode!=='string'||sourceCode.length>20000||!Array.isArray(args)||JSON.stringify(args).length>8000)
+    throw new AppError(400,'INVALID_INPUT','Example code or arguments are too large');
+  if(!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(functionName))throw new AppError(503,'JUDGE_MISCONFIGURED','Invalid example function name');
+  const directory=await mkdtemp(join(tmpdir(),'woc-example-'));
+  try {
+    await writeFile(join(directory,'solution.py'),sourceCode,{encoding:'utf8',mode:0o644});
+    await chmod(directory,0o755);
+    const result=await runDockerOnce(directory,image,functionName,args,timeoutMs);
+    return result.status==='EXECUTED'?{status:'EXECUTED',value:result.value}:{status:result.status};
+  } finally { await rm(directory,{recursive:true,force:true}); }
+}

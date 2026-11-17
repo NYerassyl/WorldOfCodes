@@ -208,8 +208,8 @@ function Shell() {
           {page === "home" ? (
             <Home />
           ) : page === "learn" ? (
-            id === "python" ? (
-              <ServerLearning key={route} lessonId={sub} />
+            id === "python" || id === "sql" ? (
+              <ServerLearning key={route} lessonId={sub} languageId={id} />
             ) : (
               <Learn key={route} languageId={id} lessonId={sub} />
             )
