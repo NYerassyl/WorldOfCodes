@@ -59,6 +59,8 @@ Intentional migration from the classroom contract:
   cannot create rewarding problems. Existing seeded content has no creator.
   Published problems are immutable; publish a new ID for a changed version.
   Drafts with submissions/matches/completions are protected against deletion.
+  Adding/publishing problems also requires parent-lesson ownership and no learner
+  history; completed lessons cannot silently acquire new unsolved requirements.
 - Prisma owns the additive nullable `createdById` FKs on Lesson/Problem. Alembic
   continues to own only the profile view/version table. PR #16's independent
   demo migrations are not applied to this database. Existing demo records are

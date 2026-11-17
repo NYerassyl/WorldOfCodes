@@ -82,9 +82,20 @@ def problem_data(session,row):
     return safe
 
 
+def mutable_lesson_membership(session,lesson_id,actor):
+    # Publishing/adding a problem must not leave an already completed lesson
+    # marked complete while its new problem remains unsolved. The parent row
+    # lock also orders this operation against new LessonProgress FK inserts.
+    author(session,Lesson,lesson_id,actor)
+    in_use=session.scalar(text('''SELECT 1 FROM "LessonProgress" WHERE "lessonId"=:id
+        UNION ALL SELECT 1 FROM "Submission" s JOIN "Problem" p ON p.id=s."problemId"
+        WHERE p."lessonId"=:id LIMIT 1'''),{'id':lesson_id})
+    if in_use:raise DomainError(409,'LESSON_IN_USE','Lessons with learner history require a new version before adding or publishing problems.')
+
+
 def create_problem(session,payload,actor):
     author(session,Problem,None,actor)
-    if payload.lessonId:one(session,Lesson,payload.lessonId)
+    if payload.lessonId:mutable_lesson_membership(session,payload.lessonId,actor)
     data=payload.model_dump(exclude={'id','testCases'});key=payload.id or str(uuid4())
     row=Problem(id=key,createdById=actor,language='python',**data);session.add(row);session.flush()
     for i,c in enumerate(payload.testCases):
@@ -105,6 +116,7 @@ def unused_problem(session,key):
 
 def change_problem(session,key,payload,actor):
     row=author(session,Problem,key,actor);unused_problem(session,key)
+    if payload.isPublished is True and row.lessonId:mutable_lesson_membership(session,row.lessonId,actor)
     for k,v in payload.model_dump(exclude_unset=True).items():setattr(row,k,v)
     session.flush();return problem_data(session,row)
 
