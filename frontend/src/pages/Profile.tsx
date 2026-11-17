@@ -2,7 +2,8 @@ import { useEffect, useState } from "react";
 import { useStore } from "../lib/store";
 import { useAuth } from "../lib/auth";
 import { levelFor } from "../lib/progress.mjs";
-import { Heading, Notice, Icon } from "../components/UI";
+import { Heading, Icon } from "../components/UI";
+import PlayerProfile from "../components/PlayerProfile";
 import Players from "../components/Players";
 import AccountPanel from "../components/AccountPanel";
 import AvatarFace from "../components/Avatar";
@@ -21,11 +22,6 @@ export default function Profile() {
   useEffect(() => {
     setName(state.name);
   }, [state.name]);
-  const days = Array.from({ length: 56 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (55 - i));
-    return d.toISOString().slice(0, 10);
-  });
   function save(e: React.FormEvent) {
     e.preventDefault();
     if (signedIn) {
@@ -55,9 +51,6 @@ export default function Profile() {
   }
   const displayName = account?.displayName ?? account?.nickname ?? state.name;
   const handle = (account?.nickname ?? displayName).trim().toLowerCase().replace(/\s+/g, "_");
-  const activeDays = Object.keys(state.activity).filter((d) =>
-    days.includes(d),
-  ).length;
   return (
     <>
       <Heading
@@ -98,6 +91,7 @@ export default function Profile() {
           </div>
         </div>
       </section>
+      {account && <PlayerProfile key={account.id} id={account.id} me={account.id}/>}
       <AccountPanel />
       {account && <Players key={account.id} me={account.id}/>}
       <div className="profile-layout">
@@ -124,28 +118,6 @@ export default function Profile() {
               <span>Rating</span>
             </div>
           </div>
-          <h3>Local practice activity</h3>
-          <div
-            className="heatmap"
-            aria-label="Learning activity over the last 56 days"
-          >
-            {days.map((day) => (
-              <span
-                key={day}
-                className={state.activity[day] ? "on" : ""}
-                title={`${day}: ${state.activity[day] || 0} exercises`}
-              />
-            ))}
-          </div>
-          <p className="muted">
-            Last 56 days · {activeDays} active{" "}
-            {activeDays === 1 ? "day" : "days"}
-          </p>
-          <Notice>
-            Python rewards and completed lessons are saved to your account. The
-            activity grid shows local practice; live battle ratings are pending
-            integration.
-          </Notice>
         </section>
         <section className="panel">
           <div className="section-head">

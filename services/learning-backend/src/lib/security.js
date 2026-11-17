@@ -12,6 +12,10 @@ export function normalizeNickname(nickname) {
   if (typeof nickname !== 'string' || !/^[a-zA-Z0-9_]{3,24}$/.test(nickname)) throw badRequest('Nickname must be 3-24 Latin letters, digits, or underscores');
   return nickname.toLowerCase();
 }
+export function newUsername(value) {
+  if (typeof value !== 'string' || !/^[a-z]{3,24}$/.test(value)) throw badRequest('Username must be 3–24 lowercase letters.');
+  return value;
+}
 export async function hashPassword(password) {
   if (typeof password !== 'string' || password.length < 8 || password.length > 128) throw badRequest('Password must be 8-128 characters');
   const salt = randomBytes(16).toString('hex');

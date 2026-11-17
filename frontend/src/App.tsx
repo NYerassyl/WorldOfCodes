@@ -13,6 +13,8 @@ import {
   ServerCopy,
 } from "./pages/ServerPractice";
 
+import Players from "./components/Players";
+import PlayerProfile from "./components/PlayerProfile";
 import Profile from "./pages/Profile";
 import Trace from "./pages/Trace";
 import Arena from "./pages/Arena";
@@ -24,6 +26,7 @@ const routes = [
   { id: "trace", name: "Trace Practice", icon: "code" },
   { id: "duel", name: "Duel Arena", icon: "duel" },
   { id: "friends", name: "Friendly Battle", icon: "friends" },
+  { id: "chat", name: "Chat", icon: "friends" },
   { id: "profile", name: "My Profile", icon: "profile" },
 ];
 function Shell() {
@@ -216,8 +219,10 @@ function Shell() {
             <Trace key={id} id={id} />
           ) : page === "copy" ? (
             <ServerCopy />
+          ) : page === "chat" ? (
+            account ? <Players key={id || account.id} me={account.id} peerId={id} chat/> : <a href="#profile">Sign in to open chat</a>
           ) : page === "profile" ? (
-            <Profile />
+            id && account && id!==account.id ? <PlayerProfile key={id} id={id} me={account.id}/> : <Profile />
           ) : page === "duel" || page === "friends" ? (
             <Arena key={page} friendly={page === "friends"} />
           ) : (

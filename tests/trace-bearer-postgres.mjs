@@ -17,14 +17,14 @@ async function json(path, options = {}) {
 }
 
 try {
-  const email = `trace-ci-${Date.now()}@worldofcodes.dev`;
+  const email = `trace-ci-${Date.now().toString().replace(/\d/g, d => String.fromCharCode(97 + Number(d)))}@worldofcodes.dev`;
   const register = await json("/api/auth/register", {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
       email,
       password: "TraceCI-Pass-123",
-      nickname: `traceci${Date.now()}`.slice(0, 24),
+      nickname: `traceci${Date.now().toString().replace(/\d/g, d => String.fromCharCode(97 + Number(d)))}`.slice(0, 24),
     }),
   });
   assert.equal(register.status, 201, JSON.stringify(register.body));

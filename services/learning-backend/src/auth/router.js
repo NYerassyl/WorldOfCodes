@@ -1,7 +1,7 @@
 import { socialRouter } from './social.js';
 import { Router } from 'express';
 import { asyncRoute, ensureKeys, notFound, requireString, badRequest, AppError } from '../lib/errors.js';
-import { createSessionToken, hashSessionToken, hashPassword, verifyPassword, normalizeEmail, normalizeNickname, publicUser, privateUser } from '../lib/security.js';
+import { createSessionToken, hashSessionToken, hashPassword, verifyPassword, normalizeEmail, newUsername, normalizeNickname, publicUser, privateUser } from '../lib/security.js';
 import { resolveAuthSession } from './session.js';
 import { editOwnProfile } from './service.js';
 const SESSION_DAYS = 30;
@@ -26,7 +26,7 @@ export function createAuthRouter(prisma) {
   router.use(socialRouter(prisma,auth));
   router.post('/auth/register',asyncRoute(async (req,res)=>{
     ensureKeys(req.body,['email','password','nickname']);
-    const email=normalizeEmail(req.body.email), nickname=requireString(req.body.nickname,'nickname',24), normalizedNickname=normalizeNickname(nickname);
+    const email=normalizeEmail(req.body.email), nickname=requireString(req.body.nickname,'nickname',24), normalizedNickname=newUsername(nickname);
     const passwordHash=await hashPassword(req.body.password), token=createSessionToken();
     const user=await prisma.user.create({data:{email,passwordHash,nickname,normalizedNickname,sessions:{create:{tokenHash:hashSessionToken(token),expiresAt:new Date(Date.now()+SESSION_DAYS*86_400_000)}}}});
     res.status(201).json({token,user:privateUser(user)});

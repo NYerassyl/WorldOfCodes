@@ -19,7 +19,7 @@ if (!['localhost', '127.0.0.1'].includes(database.hostname)
   throw new Error('Refusing to run on any non-local or non-isolated PostgreSQL test database');
 }
 const prisma = new PrismaClient();
-const suffix = randomBytes(4).toString('hex');
+const suffix = Array.from(randomBytes(8), n => String.fromCharCode(97 + n % 26)).join('');
 const exec = promisify(execFile);
 
 async function startApp() {
@@ -77,7 +77,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     });
     await t.test('register/login, private profile and authorization',async()=>{
       const register=await request('/auth/register',{method:'POST',auth:null,data:{
-        email:'first-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'first_'+suffix
+        email:'first-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'first'+suffix
       }});
       assert.equal(register.status,201);
       token=register.body.token;user=register.body.user;
@@ -89,7 +89,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const me=await request('/users/me');
       assert.equal(me.status,200);assert.equal(me.body.id,user.id);assert.equal(me.body.coins,0);
       const second=await request('/auth/register',{method:'POST',auth:null,data:{
-        email:'second-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'second_'+suffix
+        email:'second-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'second'+suffix
       }});
       assert.equal(second.status,201);
       assert.equal((await request('/users/me',{method:'PATCH',data:{userId:second.body.user.id,nickname:'attacker'}})).status,400);
@@ -99,18 +99,18 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','avatarUrl','xp','level','completedLessons'].sort());
       assert.equal((await request('/users/me',{auth:null})).status,401);
       assert.equal((await request('/auth/login',{method:'POST',auth:null,data:{email:user.email,password:'wrong'}})).status,401);
-      const renamed=await request('/users/me',{method:'PATCH',data:{nickname:'new_'+suffix}});
+      const renamed=await request('/users/me',{method:'PATCH',data:{nickname:'new'+suffix}});
       assert.equal(renamed.status,200);
       assert.equal(renamed.body.nextNicknameChange,'PAYMENT_REQUIRED');
-      assert.equal((await request('/users/me',{method:'PATCH',data:{nickname:'again_'+suffix}})).status,402);
+      assert.equal((await request('/users/me',{method:'PATCH',data:{nickname:'again'+suffix}})).status,402);
       assert.deepEqual(await resolveAuthSession(prisma,token),{userId:user.id,sessionId:session.id});
     });
     await t.test('concurrent ranked ACCEPTED submissions settle once and update both Elo ratings once', async () => {
       const rival = await prisma.user.create({ data: {
         email: 'battle-rival-' + suffix + '@example.test',
         passwordHash: 'integration-test-hash',
-        nickname: 'rival_' + suffix,
-        normalizedNickname: ('rival_' + suffix).toLowerCase()
+        nickname: 'rival' + suffix,
+        normalizedNickname: ('rival' + suffix).toLowerCase()
       } });
       const problem = await prisma.problem.findUnique({ where: { id: 'algo-sort' } });
       assert.ok(problem, 'seeded battle problem must exist');

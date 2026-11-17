@@ -154,13 +154,13 @@ function SignedOut() {
               required
               minLength={3}
               maxLength={24}
-              pattern="[A-Za-z0-9_]+"
+              pattern="[a-z]+"
               autoComplete="username"
               value={nickname}
               onChange={(event) => setNickname(event.target.value)}
             />
             <small className="account-hint">
-              3–24 Latin letters, digits or underscores.
+              3–24 lowercase letters.
             </small>
           </label>
         )}
@@ -184,6 +184,7 @@ function SignedOut() {
 
 function SignedIn() {
   const { user, logout, updateProfile } = useAuth();
+  const [handle,setHandle] = useState(user?.nickname ?? "");
   const [name,setName] = useState(user?.displayName ?? user?.nickname ?? "");
   const [bio,setBio] = useState(user?.bio ?? "");
   const [avatarUrl, setAvatarUrl] = useState(user?.avatarUrl ?? "");
@@ -199,6 +200,7 @@ function SignedIn() {
     try {
       const next = await updateProfile({
         displayName:name.trim(), bio,
+        ...(handle !== user?.nickname ? {nickname:handle} : {}),
         ...(avatarUrl === user?.avatarUrl ? {} : {avatarUrl: avatarUrl.trim() || null}),
       });
       dialog.current?.close();
@@ -255,7 +257,7 @@ function SignedIn() {
         )}
       </dl>
       <div className="account-actions"><button className="btn" onClick={()=>{
-        setName(user.displayName ?? user.nickname); setBio(user.bio ?? ""); setAvatarUrl(user.avatarUrl ?? "");
+        setHandle(user.nickname); setName(user.displayName ?? user.nickname); setBio(user.bio ?? ""); setAvatarUrl(user.avatarUrl ?? "");
         setNotice(null); dialog.current?.showModal();
       }}>Edit profile</button><button className="btn secondary" disabled={busy} onClick={signOut}>Sign out</button></div>
       <NoticeLine notice={notice?.tone === "ok" ? notice : null}/>
@@ -265,6 +267,7 @@ function SignedIn() {
           <div className="edit-avatar"><span className="account-avatar"><AvatarFace url={avatarUrl || null} name={name || user.nickname}/></span><div><strong>{name || user.nickname}</strong><small>@{user.nickname}</small></div></div>
           <label>Profile photo link<input type="url" pattern="https://.+" placeholder="https://example.com/photo.jpg" maxLength={512} value={avatarUrl.startsWith("data:")?"":avatarUrl} onChange={e=>setAvatarUrl(e.target.value)}/></label>
           {avatarUrl && <button type="button" className="remove-photo" onClick={()=>setAvatarUrl("")}>Remove photo</button>}
+          <label>Username<input required maxLength={24} minLength={3} pattern={handle===user.nickname?undefined:"[a-z]+"} value={handle} onChange={e=>setHandle(e.target.value)}/><small>3–24 lowercase letters.</small></label>
           <label>Display name<input required maxLength={40} value={name} onChange={e=>setName(e.target.value)}/><small>Change once every 14 days.</small></label>
           <label>Bio<textarea rows={3} maxLength={300} value={bio} onChange={e=>setBio(e.target.value)}/><small>{bio.length}/300</small></label>
           <NoticeLine notice={notice?.tone === "error" ? notice : null}/>

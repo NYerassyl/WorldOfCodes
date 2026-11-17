@@ -14,9 +14,9 @@ const page = await browser.newPage({ viewport: { width: 1440, height: 1000 } });
 const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 const base = process.env.APP_URL || "http://127.0.0.1:4001";
-const suffix = Date.now().toString(36);
+const suffix = Date.now().toString().replace(/\d/g, d => String.fromCharCode(97 + Number(d)));
 const email = `browser-${suffix}@example.test`;
-const nickname = `browser_${suffix}`;
+const nickname = `browser${suffix}`;
 const waitText = (text) =>
   page.getByText(text, { exact: false }).first().waitFor({ timeout: 20000 });
 await mkdir("/private/tmp/worldofcodes-qa", { recursive: true });

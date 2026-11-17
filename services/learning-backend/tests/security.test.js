@@ -27,7 +27,7 @@ test('nickname and email validation',()=>{
 });
 test('public user excludes private account data',()=>{
  const u={id:'u1',nickname:'Hero',avatarUrl:null,xp:101,coins:900,email:'private@example.com',passwordHash:'secret',nicknameChanges:1};
- assert.deepEqual(publicUser(u),{id:'u1',nickname:'Hero',avatarUrl:null,xp:101,level:2});
+ assert.deepEqual(publicUser(u),{id:'u1',nickname:'Hero',displayName:'Hero',bio:'',avatarUrl:null,xp:101,level:2});
  assert.equal(privateUser(u).nextNicknameChange,'PAYMENT_REQUIRED');
  assert.equal(levelFromXp(199),2);
 });

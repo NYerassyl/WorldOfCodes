@@ -24,7 +24,7 @@ const serve = async (app) =>
       resolve({ server: s, url: `http://127.0.0.1:${s.address().port}/api` }),
     );
   });
-const suffix = Date.now().toString(36);
+const suffix = Date.now().toString().replace(/\d/g, d => String.fromCharCode(97 + Number(d)));
 let token, user, other;
 let server, url;
 async function request(
@@ -87,7 +87,7 @@ test(
             auth: null,
             body: {
               email: `integration-${suffix}@example.test`,
-              nickname: `it_${suffix}`,
+              nickname: `it${suffix}`,
               password: "LongTestPassword_123",
             },
           });
@@ -105,7 +105,7 @@ test(
             auth: null,
             body: {
               email: `second-${suffix}@example.test`,
-              nickname: `second_${suffix}`,
+              nickname: `second${suffix}`,
               password: "LongTestPassword_123",
             },
           });
@@ -154,7 +154,7 @@ test(
           );
           const own = await request("/users/me", {
             method: "PATCH",
-            body: { nickname: `renamed_${suffix}` },
+            body: { nickname: `renamed${suffix}` },
           });
           assert.equal(own.status, 200);
           user = own.body;
@@ -162,7 +162,7 @@ test(
             (
               await request("/users/me", {
                 method: "PATCH",
-                body: { nickname: `again_${suffix}` },
+                body: { nickname: `again${suffix}` },
               })
             ).status,
             402,

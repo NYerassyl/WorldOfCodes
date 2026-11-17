@@ -16,6 +16,41 @@ export function socialRouter(db, auth) {
     });
     res.json(rows.map(({followers,...player})=>({...player,following:followers.length>0})));
   }));
+  router.get('/players/:id/profile', asyncRoute(async (req, res) => {
+    const user = await db.user.findUnique({
+      where: {id: req.params.id},
+      select: {...profile, _count: {select: {followers: true, following: true}},
+        followers: {where: {followerId: req.auth.userId}, select: {followerId: true}}}
+    });
+    if (!user) throw notFound();
+    const {followers, _count, ...player} = user;
+    res.json({...player, counts: _count, following: followers.length > 0});
+  }));
+  for (const direction of ['followers', 'following']) {
+    router.get('/players/:id/' + direction, asyncRoute(async (req, res) => {
+      const incoming = direction === 'followers';
+      const where = incoming ? {followedId: req.params.id} : {followerId: req.params.id};
+      const person = incoming ? 'follower' : 'followed';
+      const key = incoming ? 'followerId' : 'followedId';
+      if (req.query.after) where[key] = {gt: String(req.query.after)};
+      const rows = await db.follow.findMany({where, orderBy: {[key]: 'asc'}, take: 51,
+        select: {[person]: {select: profile}}});
+      const players = rows.slice(0, 50).map(row => row[person]);
+      res.json({players, next: rows.length > 50 ? players.at(-1).id : null});
+    }));
+  }
+  router.get('/players/:id/activity', asyncRoute(async (req, res) => {
+    const base = process.env.FASTAPI_INTERNAL_URL || 'http://127.0.0.1:8000';
+    try {
+      const upstream = await fetch(new URL('/api/players/' + encodeURIComponent(req.params.id) + '/activity', base), {
+        headers: {Authorization: req.get('authorization')}, redirect: 'error', signal: AbortSignal.timeout(5000)
+      });
+      if (!upstream.ok) return res.status(upstream.status).json({error:{message:'Practice activity is unavailable.'}});
+      res.json(await upstream.json());
+    } catch {
+      res.status(503).json({error:{message:'Practice activity is unavailable.'}});
+    }
+  }));
   router.use('/players/:id', asyncRoute(async(req,_res,next)=>{
     if(req.params.id===req.auth.userId) throw badRequest('Choose another player');
     if(!await db.user.findUnique({where:{id:req.params.id},select:{id:true}})) throw notFound();

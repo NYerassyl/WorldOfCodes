@@ -1,5 +1,5 @@
 import { AppError, badRequest, requireString } from '../lib/errors.js';
-import { normalizeNickname, privateUser } from '../lib/security.js';
+import { newUsername, normalizeNickname, privateUser } from '../lib/security.js';
 
 function validateAvatar(value) {
   if (value === null) return null;
@@ -34,7 +34,7 @@ export async function editOwnProfile(prisma, { userId, current, changes: input }
     const normalizedNickname = normalizeNickname(nickname);
     if (normalizedNickname !== current.normalizedNickname) {
       if (current.nicknameChanges > 0) throw new AppError(402,'NICKNAME_CHANGE_PAYMENT_REQUIRED','Additional nickname changes require payment; payment is not available this week');
-      changes.nickname = nickname;
+      changes.nickname = newUsername(nickname);
       changes.normalizedNickname = normalizedNickname;
       changes.nicknameChanges = { increment: 1 };
     }

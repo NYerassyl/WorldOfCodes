@@ -66,7 +66,7 @@ test('copy exercise rewards only exact source, once per user',async()=>{
 test('profile changes are restricted to authenticated user, and only first rename is free',async()=>{
  const users={u1:{id:'u1',nickname:'First',normalizedNickname:'first',nicknameChanges:0,xp:0,coins:0,avatarUrl:null},u2:{id:'u2',nickname:'Other',normalizedNickname:'other',nicknameChanges:0,xp:0,coins:0,avatarUrl:null}};
  const prisma={user:{updateMany:async({where,data})=>{const u=users[where.id];if(!u||(where.nicknameChanges!==undefined&&u.nicknameChanges!==where.nicknameChanges))return {count:0};for(const [key,val] of Object.entries(data))u[key]=val&&typeof val==='object'&&'increment'in val?u[key]+val.increment:val;return {count:1};},findUniqueOrThrow:async({where})=>users[where.id]}};
- const renamed=await editOwnProfile(prisma,{userId:'u1',current:users.u1,changes:{nickname:'NewName'}});
- assert.equal(renamed.nickname,'NewName');assert.equal(renamed.nextNicknameChange,'PAYMENT_REQUIRED');assert.equal(users.u2.nickname,'Other');
+ const renamed=await editOwnProfile(prisma,{userId:'u1',current:users.u1,changes:{nickname:'newname'}});
+ assert.equal(renamed.nickname,'newname');assert.equal(renamed.nextNicknameChange,'PAYMENT_REQUIRED');assert.equal(users.u2.nickname,'Other');
  await assert.rejects(editOwnProfile(prisma,{userId:'u1',current:users.u1,changes:{nickname:'Again'}}),e=>e.status===402);
 });
