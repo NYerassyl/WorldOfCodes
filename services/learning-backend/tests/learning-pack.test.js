@@ -3,6 +3,15 @@ import assert from 'node:assert/strict';
 import { advancedLessons, advancedProblems } from '../prisma/learningPack.js';
 import { syllabus, algorithms } from '../prisma/seedData.js';
 import { getPublicProblemBank } from '../src/problems/service.js';
+import { solutions } from '../../../tests/solutions.mjs';
+
+test('battle solution fixtures cover every learning-pack program',()=>{
+  for(const problem of advancedProblems.filter(problem=>problem.language==='python')){
+    const source=solutions[problem.id];
+    assert.equal(typeof source,'string',`missing solution fixture for ${problem.id}`);
+    assert.ok(source.includes(`def ${problem.functionName}(`),`${problem.id} fixture defines ${problem.functionName}`);
+  }
+});
 
 test('15 original problems add three per practice level without replacing existing IDs',()=>{
   assert.equal(advancedProblems.length,15);
