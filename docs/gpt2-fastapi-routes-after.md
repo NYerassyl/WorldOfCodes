@@ -21,8 +21,8 @@ All runtime records use canonical Prisma PostgreSQL tables; no mutable account/l
 | `GET /api/learning/courses` | Public | Published Course / Topic / Lesson |
 | `GET /api/learning/progress` | Bearer AuthSession | Own LessonProgress, ProblemCompletion, User |
 | `GET /api/learning/lessons/{lesson_id}` | Public | Published Course / Topic / Lesson |
-| `POST /api/learning/lessons/{lesson_id}/start` | Bearer AuthSession | Lesson / Topic / Course; admin+author for content; owned LessonProgress for start |
-| `POST /api/learning/lessons/{lesson_id}/run-example` | Bearer AuthSession | Lesson / Topic / Course; admin+author for content; owned LessonProgress for start |
+| `POST /api/learning/lessons/{lesson_id}/start` | Bearer AuthSession | Own LessonProgress via canonical service; prerequisite checked; no reward |
+| `POST /api/learning/lessons/{lesson_id}/run-example` | Bearer AuthSession | Read Lesson/example configuration; isolated worker; no Submission, progress or reward writes |
 | `GET /api/lessons` | Public | Published Course / Topic / Lesson |
 | `POST /api/lessons` | Bearer AuthSession | Lesson / Topic / Course; admin+author for content; owned LessonProgress for start |
 | `GET /api/lessons/{lesson_id}` | Public | Published Course / Topic / Lesson |
@@ -33,7 +33,7 @@ All runtime records use canonical Prisma PostgreSQL tables; no mutable account/l
 | `DELETE /api/users/{user_id}/progress/{lesson_id}` | Bearer AuthSession | Own LessonProgress; confirmation from ProblemCompletion; no manual XP |
 | `GET /api/problems` | Public | Published Problem / sample-only TestCase |
 | `POST /api/problems` | Bearer AuthSession | Problem / TestCase; admin+author, immutable published content |
-| `GET /api/problems/my-submissions` | Bearer AuthSession | Published Problem / sample-only TestCase |
+| `GET /api/problems/my-submissions` | Bearer AuthSession | Own canonical Submission metadata only |
 | `GET /api/problems/{problem_id}` | Public | Published Problem / sample-only TestCase |
 | `PATCH /api/problems/{problem_id}` | Bearer AuthSession | Problem / TestCase; admin+author, immutable published content |
 | `DELETE /api/problems/{problem_id}` | Bearer AuthSession | Problem / TestCase; admin+author, immutable published content |

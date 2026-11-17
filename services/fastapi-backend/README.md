@@ -11,6 +11,15 @@ then the existing profile Alembic migration. `DATABASE_URL` and
 `EXPRESS_INTERNAL_URL` defaults to `http://127.0.0.1:4001`;
 `FASTAPI_INTERNAL_URL` on Express points to `http://127.0.0.1:8000`.
 
+Export the connection variables in the shell running Alembic/FastAPI (Express
+loading its own `.env` does not export variables into a separate Python process):
+
+```sh
+export DATABASE_URL='postgresql://woc:YOUR_PASSWORD@127.0.0.1:5432/worldofcodes_test?schema=public'
+export FASTAPI_DATABASE_URL='postgresql+psycopg://woc:YOUR_PASSWORD@127.0.0.1:5432/worldofcodes_test'
+export EXPRESS_INTERNAL_URL='http://127.0.0.1:4001'
+```
+
 ```sh
 npm run db:generate
 npm run db:migrate
