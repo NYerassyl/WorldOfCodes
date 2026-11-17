@@ -1,81 +1,35 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
-
+from sqlalchemy import text
 from errors import DomainError
+from canonical_api import router as canonical_router
 from comment_api import router as comments_router
-from routers import lessons, problems, users
 from profile_activity import router as profile_router
-from trace_api import router as trace_router
-from storage import store
+from site_auth import SiteSession
 
-DESCRIPTION = """
-Educational FastAPI service for the WorldOfCodes REST API assignment.
+app=FastAPI(title='WorldOfCodes Shared Learning API',version='3.0.0',description='''
+Uses the site's canonical Prisma PostgreSQL accounts, string IDs and AuthSession.
+Register/login once through /api/auth, then use **Authorize → Bearer token**.
+Site and FastAPI share Submission, progress, comments and first-completion rewards.
 
-It is independent from the production Express/PostgreSQL application and keeps
-all data in memory. Restarting the process restores the seeded demo data.
-
-## Demo authentication
-
-Mutations and submissions read the `X-User-Id` header. Seeded users are `1`
-(ada) and `2` (grace). Unknown, missing or non-numeric headers are rejected.
-"""
-
-app = FastAPI(
-    title="WorldOfCodes FastAPI Learning API",
-    description=DESCRIPTION,
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-    openapi_tags=[
-        {"name": "users", "description": "Registration, profiles, updates and leaderboard."},
-        {"name": "lessons", "description": "Lesson catalog management."},
-        {"name": "progress", "description": "Per-user lesson completion and XP."},
-        {"name": "problems", "description": "Problem catalog and submission review."},
-        {"name": "submissions", "description": "Submission lookup."},
-        {"name": "meta", "description": "Health and service metadata."},
-    ],
-)
-
+Account/judge operations call the existing Express service (EXPRESS_INTERNAL_URL);
+SQLAlchemy owns direct shared reads, authorized content CRUD and comment writes.
+No fallback accounts, integer X-User-Id authentication or mutable in-memory data.
+Content authoring requires FASTAPI_CONTENT_ADMIN_IDS; ordinary players cannot mint rewards.
+Apply Prisma migrations, then the profile Alembic view before startup.
+''')
 
 @app.exception_handler(DomainError)
-async def domain_error_handler(request: Request, exc: DomainError) -> JSONResponse:
-    return JSONResponse(
-        status_code=exc.status_code,
-        content={"error": {"code": exc.code, "message": exc.message}},
-    )
+async def domain_error(request:Request,exc:DomainError):
+    return JSONResponse(status_code=exc.status_code,content={'error':{'code':exc.code,'message':exc.message}})
 
+@app.get('/',tags=['meta'])
+def index():return {'service':'fastapi-backend','storage':'postgresql','identity':'Prisma User/AuthSession','docs':'/docs','health':'/api/health'}
 
-@app.get("/", tags=["meta"])
-def service_index() -> dict:
-    return {
-        "service": "fastapi-backend",
-        "storage": "in-memory",
-        "docs": "/docs",
-        "redoc": "/redoc",
-        "health": "/api/health",
-    }
+@app.get('/api/health',tags=['meta'])
+def health(session:SiteSession):
+    return {'status':'ok','service':'fastapi-backend','storage':'postgresql',**{name:session.scalar(text(f'SELECT count(*) FROM "{table}"')) for name,table in [('users','User'),('lessons','Lesson'),('problems','Problem'),('submissions','Submission')]}}
 
-
-@app.get("/api/health", tags=["meta"])
-def health() -> dict:
-    with store.lock:
-        return {
-            "status": "ok",
-            "service": "fastapi-backend",
-            "storage": "in-memory",
-            "users": len(store.users),
-            "lessons": len(store.lessons),
-            "problems": len(store.problems),
-            "submissions": len(store.submissions),
-        }
-
-
-app.include_router(users.router, prefix="/api")
-app.include_router(lessons.router, prefix="/api")
-app.include_router(lessons.progress_router, prefix="/api")
-app.include_router(problems.router, prefix="/api")
-app.include_router(problems.submissions_router, prefix="/api")
-app.include_router(trace_router, prefix="/api")
+app.include_router(canonical_router)
 app.include_router(profile_router)
-
 app.include_router(comments_router)

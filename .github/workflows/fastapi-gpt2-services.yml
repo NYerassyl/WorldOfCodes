@@ -28,18 +28,5 @@ jobs:
         run: python -m pip install -r requirements.txt
       - name: Run all GPT 4 routers and GPT 2 service tests
         run: python -m pytest -q
-      - name: Verify OpenAPI/Swagger and in-memory health
-        run: |
-          python - <<'PY'
-          from fastapi.testclient import TestClient
-          from main import app
-          from storage import store
-
-          store.reset()
-          with TestClient(app) as client:
-              assert client.get("/docs").status_code == 200
-              assert client.get("/openapi.json").status_code == 200
-              data = client.get("/api/health").json()
-              assert (data["users"], data["lessons"], data["problems"]) == (2, 3, 3)
-              print("Swagger/OpenAPI and in-memory health PASS")
-          PY
+      - name: Verify canonical Swagger contract
+        run: python -m pytest -q tests/test_meta.py tests/test_canonical_bridge.py

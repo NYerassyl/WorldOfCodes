@@ -40,7 +40,7 @@ class TraceSubmissionInput(TraceModel):
 
 class TraceSubmissionResult(TraceModel):
     exercise_id: str
-    user_id: int
+    user_id: str
     correct: bool
     verdict: Literal["CORRECT", "INCORRECT"]
     submitted_output: str

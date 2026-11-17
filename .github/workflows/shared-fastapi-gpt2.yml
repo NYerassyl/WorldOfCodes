@@ -1,0 +1,83 @@
+name: Canonical FastAPI persistence, Swagger and cross-runtime rewards
+on:
+  push:
+    branches: [feat/fastapi-shared-storage-gpt2]
+  pull_request:
+    paths:
+      - 'services/fastapi-backend/**'
+      - 'services/learning-backend/prisma/**'
+      - 'scripts/verify-shared-fastapi.py'
+      - '.github/workflows/shared-fastapi-gpt2.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: woc
+          POSTGRES_PASSWORD: woc
+          POSTGRES_DB: worldofcodes_unified_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U woc -d worldofcodes_unified_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://woc:woc@127.0.0.1:5432/worldofcodes_unified_test?schema=public
+      FASTAPI_DATABASE_URL: postgresql+psycopg://woc:woc@127.0.0.1:5432/worldofcodes_unified_test
+      SHARED_DATABASE_TEST_URL: postgresql://woc:woc@127.0.0.1:5432/worldofcodes_unified_test
+      EXPRESS_INTERNAL_URL: http://127.0.0.1:4001
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
+      JUDGE_IMAGE: python:3.12-alpine
+      SQL_JUDGE_IMAGE: postgres:17
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node scripts/ensure-ci-native.mjs
+      - name: Canonical Prisma migrations and idempotent seed
+        run: |
+          npm run db:validate
+          npm run db:generate
+          npm run db:migrate
+          npm run db:migrate
+          npm run db:seed
+          npm run db:seed
+      - name: Python and Chromium
+        run: |
+          python -m pip install -r services/fastapi-backend/requirements.txt 'playwright>=1.50,<2'
+          python -m playwright install --with-deps chromium
+      - name: Profile Alembic after Prisma
+        working-directory: services/fastapi-backend
+        run: python -m alembic upgrade head
+      - name: Python, Node and build regression
+        run: |
+          python -m pytest -q services/fastapi-backend/tests
+          npm test
+          npm run build
+      - name: Trusted isolated worker images
+        run: |
+          docker pull python:3.12-alpine
+          docker pull postgres:17
+      - name: Real Swagger, two accounts, cross-runtime rewards and server restarts
+        run: python scripts/verify-shared-fastapi.py
+      - name: Comments acceptance on the unified runtime
+        run: python scripts/verify-comments-browser.py
+      - name: Learning acceptance on the unified runtime
+        run: python scripts/verify-learning-browser.py
+      - name: Editor acceptance on the unified runtime
+        run: python scripts/verify-editor-browser.py
+      - name: Upload Swagger and integration evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: canonical-fastapi-evidence
+          path: artifacts/

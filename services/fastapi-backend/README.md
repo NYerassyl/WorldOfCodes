@@ -1,193 +1,72 @@
-# WorldOfCodes FastAPI learning API
+# WorldOfCodes shared FastAPI API
 
-Educational FastAPI + Pydantic REST API for today's assignment. It is a
-separate Python service for the WorldOfCodes project; the production app stays
-on Express, PostgreSQL and Prisma, and the two services do not share data.
+This service uses the same PostgreSQL `public` schema and Prisma string IDs as
+Express. There is no classroom MemoryStore or integer account registration.
+Register/login once, then use the returned Bearer token in `/docs` → Authorize.
+The same token works in the site and FastAPI; logout/revocation is shared.
 
-All data lives in memory. Restarting the process restores the seeded demo
-records, so this service never touches PostgreSQL and never executes user code.
+Run Express on port 4001 and FastAPI on port 8000 after Prisma migrations/seed,
+then the existing profile Alembic migration. `DATABASE_URL` and
+`FASTAPI_DATABASE_URL` must identify the same database/public schema.
+`EXPRESS_INTERNAL_URL` defaults to `http://127.0.0.1:4001`;
+`FASTAPI_INTERNAL_URL` on Express points to `http://127.0.0.1:8000`.
 
-## Run it on macOS
-
-```bash
+```sh
+npm run db:generate
+npm run db:migrate
+npm run db:seed
 cd services/fastapi-backend
-
-# One-time setup
-/usr/local/bin/python3 -m venv .venv
-.venv/bin/python -m pip install -r requirements.txt
-
-# Start with auto-reload
-/usr/local/bin/python3 -m uvicorn main:app --reload --host 127.0.0.1 --port 8000
+python -m pip install -r requirements.txt
+python -m alembic upgrade head
+python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-If the packages were installed globally instead of into `.venv`, the same
-command without the venv path works:
+Express remains the canonical password/session/profile/judge/reward service.
+FastAPI exposes those typed operations through a bounded HTTP adapter and uses
+SQLAlchemy for canonical profile/history reads, authorized content/progress CRUD,
+credentials and comments. Neither service forwards learning calls back to
+FastAPI; only comments/activity flow Express → FastAPI. Service outages return
+503 rather than falling back to local accounts or invented judge results.
 
-```bash
-/usr/local/bin/python3 -m uvicorn main:app --reload
+`GET /api/users/{id}` is a public ID lookup, with no email/password/coins.
+`GET /api/users/me` is private. Submission source and per-user progress are owner
+only. `PATCH /api/users/{id}/credentials` requires the current password and uses
+the canonical scrypt format, then revokes every old session in both runtimes.
+
+Intentional migration from the classroom contract:
+
+- IDs are canonical strings; `X-User-Id` no longer authenticates.
+- `POST /api/users` is a deprecated alias for `/api/auth/register`, returning
+  `{token,user}`. Login and logout are now available in Swagger.
+- Graded requests accept `{code}` and invoke the real isolated Python/SQL judge;
+  classroom `{answer}` text equality cannot grant site XP.
+- Lesson completion is derived from canonical ProblemCompletion. The legacy
+  completion endpoint confirms earned progress without adding rewards. Completed
+  progress cannot be reset to replay rewards; incomplete progress may be reset.
+- Content CRUD uses canonical `topicId`, `theoryMd`, `lessonId`, function starter
+  and test cases, rather than the unrelated demo-level/answer columns.
+- Content CRUD requires an allowlisted canonical User.id in
+  `FASTAPI_CONTENT_ADMIN_IDS` (comma separated), plus ownership. Ordinary players
+  cannot create rewarding problems. Existing seeded content has no creator.
+  Published problems are immutable; publish a new ID for a changed version.
+  Drafts with submissions/matches/completions are protected against deletion.
+- Prisma owns the additive nullable `createdById` FKs on Lesson/Problem. Alembic
+  continues to own only the profile view/version table. PR #16's independent
+  demo migrations are not applied to this database. Existing demo records are
+  not automatically interpreted as site accounts or submissions.
+
+The obsolete demo runtime and tests were replaced, not mounted alongside this
+API. PR #16 retains the separate assignment implementation/history. Tests now
+cover the canonical transport contract, trusted Trace references, real shared
+PostgreSQL comments and actual Swagger workflows. Run:
+
+```sh
+python -m pytest -q services/fastapi-backend/tests
+# After a dedicated localhost *_test database, migrations and worker images:
+python scripts/verify-shared-fastapi.py
 ```
 
-From the repository root you can also use the integrated script after
-activating the virtual environment (or installing the requirements globally):
-
-```bash
-source services/fastapi-backend/.venv/bin/activate
-npm run dev:fastapi
-```
-
-It runs the same app from `services/fastapi-backend` on port 8000.
-
-Open **http://127.0.0.1:8000/docs** for Swagger UI and
-**http://127.0.0.1:8000/redoc** for ReDoc. The OpenAPI document is served at
-`/openapi.json`.
-
-### Ports
-
-FastAPI listens on **8000** by default. The Express API listens on **4001**
-(`server/config.js`) and the Vite frontend on **5173**. They are independent
-processes: this service does not replace or proxy the Express API. If port 8000
-is busy, add `--port 8001`; Swagger then moves to
-`http://127.0.0.1:8001/docs`.
-
-## Architecture
-
-```
-main.py          FastAPI app, /api routers, domain-error mapping, /api/health
-routers/         HTTP layer only (paths, status codes, query/path params)
-schemas.py       Pydantic request/response models and validation rules
-services.py      Business rules and consistency checks
-storage.py       Thread-safe in-memory collections with seeded demo data
-tests/           TestClient suite covering every endpoint
-```
-
-Routers are split per workflow and mounted under `/api` in `main.py`. Handlers
-call `services.py`; only the service layer mutates storage. `DomainError`
-carries the HTTP status and a stable machine-readable code, which `main.py`
-renders as `{"error": {"code": "...", "message": "..."}}`. Pydantic failures
-keep FastAPI's standard `422` body with `detail`.
-
-## Demo authentication
-
-Protected routes read an `X-User-Id` header. This is demo identity, not real
-authentication.
-
-| User id | Email | Nickname | Password |
-| --- | --- | --- | --- |
-| 1 | ada@worldofcodes.dev | ada | ada-password-1 |
-| 2 | grace@worldofcodes.dev | grace | grace-password-2 |
-
-Missing or non-numeric headers return `401` / `422`; acting on another user's
-profile, lesson or problem returns `403`.
-
-## Workflows and endpoints
-
-### 1. Users and profiles
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/users?q=&limit=` | List or search users |
-| POST | `/api/users` | Register (unique email, nickname 3-20, password 8+ with letter and digit) |
-| GET | `/api/users/{user_id}` | Read one user |
-| GET | `/api/users/{user_id}/profile` | XP, coins, completions, solved problems, rank |
-| GET | `/api/users/leaderboard?limit=` | Ranked users by XP |
-| PATCH | `/api/users/{user_id}` | Owner-only update of email, nickname, password or bio |
-| DELETE | `/api/users/{user_id}` | Owner-only delete; blocked while the user authors content |
-
-### 2. Lessons and progress
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/lessons?level=&topic=&include_unpublished=` | Catalog with filters |
-| POST | `/api/lessons` | Create a lesson (author must exist, XP 10-100, optional prerequisite) |
-| GET | `/api/lessons/{lesson_id}` | Read one lesson |
-| PATCH | `/api/lessons/{lesson_id}` | Author-only update; cycles rejected |
-| DELETE | `/api/lessons/{lesson_id}` | Author-only delete; blocked by progress or dependents |
-| GET | `/api/users/{user_id}/progress` | Completions, XP, coins and next recommended lesson |
-| POST | `/api/users/{user_id}/progress` | Complete `{ "lesson_id": 2 }`; awards XP once |
-| DELETE | `/api/users/{user_id}/progress/{lesson_id}` | Reset progress; blocked by completed dependents |
-
-Rules: a lesson can only be completed once (`409 LESSON_ALREADY_COMPLETED`),
-its prerequisite must be completed first (`409 PREREQUISITE_INCOMPLETE`),
-unpublished lessons cannot be completed, and resetting a prerequisite refunds
-its XP only when no completed lesson depends on it.
-
-### 3. Problems and submissions
-
-| Method | Path | Purpose |
-| --- | --- | --- |
-| GET | `/api/problems?difficulty=&topic=` | Catalog with filters |
-| POST | `/api/problems` | Create a problem; `expected_answer` is never returned |
-| GET | `/api/problems/{problem_id}` | Read one problem (answer hidden) |
-| PATCH | `/api/problems/{problem_id}` | Author-only update |
-| DELETE | `/api/problems/{problem_id}` | Author-only delete; blocked by submissions |
-| POST | `/api/problems/{problem_id}/submissions` | Submit `{ "answer": "15" }` |
-| GET | `/api/problems/{problem_id}/submissions?user_id=` | Submission history |
-| GET | `/api/submissions/{submission_id}` | Read one submission |
-
-A correct answer is `ACCEPTED` and awards XP/coins only on the first solved
-submission. Repeats are accepted with `rewarded: false`; wrong answers are
-`WRONG_ANSWER` with no reward. This is answer comparison for the assignment, not
-a code judge.
-
-## Status codes
-
-| Code | Used for |
-| --- | --- |
-| 200 | Successful reads and updates |
-| 201 | Created users, lessons, problems, completions and submissions |
-| 204 | Successful deletes and progress resets |
-| 400 | Invalid lesson prerequisite chain (`LESSON_CYCLE`) |
-| 401 | Missing demo `X-User-Id` header |
-| 403 | Acting on another user's resource |
-| 404 | Unknown user, lesson, problem, submission or progress |
-| 409 | Duplicate email, repeated completion, missing prerequisite, dependent progress, content still referenced |
-| 422 | Pydantic validation failures and non-numeric path/header ids |
-
-## Tests
-
-```bash
-cd services/fastapi-backend
-.venv/bin/python -m pytest -q
-```
-
-The suite uses `fastapi.testclient.TestClient` and resets the in-memory store
-before every test. It covers success paths plus `401`, `403`, `404`, `409`,
-`422`, wrong submissions and repeated rewards.
-
-## Manual Swagger checklist
-
-1. `GET /api/health` returns `status: ok`.
-2. `POST /api/users` with a new email returns `201`; repeat it to see `409 EMAIL_TAKEN`.
-3. Submit an invalid email or a 2-character nickname to see `422`.
-4. `PATCH /api/users/1` with header `X-User-Id: 2` returns `403`.
-5. `POST /api/users/1/progress` with `{"lesson_id": 1}` returns `409 LESSON_ALREADY_COMPLETED`.
-6. `POST /api/users/2/progress` with `{"lesson_id": 3}` returns `409 PREREQUISITE_INCOMPLETE`.
-7. `POST /api/problems/1/submissions` with `{"answer": "15"}` and `X-User-Id: 2` awards the first reward; repeat and confirm `rewarded: false`.
-8. `DELETE /api/problems/1` returns `409 PROBLEM_HAS_SUBMISSIONS`.
-
-Swagger does not have an Authorize button for this demo because identity is a
-plain header: expand an endpoint, choose **Try it out**, and add `X-User-Id` in
-the header fields before **Execute**.
-
-## Python Trace Practice (five levels, 50 exercises)
-
-The separate FastAPI module provides three additional endpoints:
-
-- `GET /api/trace/exercises` — list 50 exercises; filter using `level=1..5`,
-  `difficulty=easy|easy-medium|medium|medium-hard|hard`, and `topic`.
-- `GET /api/trace/exercises/{exercise_id}` — view English title,
-  instructions and fixed Python snippet, without the expected output.
-- `POST /api/trace/exercises/{exercise_id}/submit` — submit
-  `{"answer":"printed line 1\\nprinted line 2"}` with demo
-  `X-User-Id: 1`; returns correctness, actual expected output,
-  explanation and attempt number **after** submission.
-
-Inputs are embedded in 10–20-line deterministic snippets. This exercises
-hand-tracing only; players submit text, not runnable code. A user may omit
-the terminal newline from the typed answer; interior spaces and line breaks
-must match exactly. All explanations appear in English.
-
-`tests/test_trace_practice.py` executes all 50 repository snippets via
-Python subprocess and checks saved stdout, counts (10 per level), code
-length, answer privacy and the three API contracts. See
-`docs/PYTHON_TRACE_PRACTICE_GPT2.md` for five complete examples and CI.
+The new workflow also repeats comments, learning and editor browser acceptance
+on this runtime. Evidence includes screenshots, exact Swagger status codes and
+both service logs. Main merging belongs to GPT1; production migration/deployment
+is not part of this change.
