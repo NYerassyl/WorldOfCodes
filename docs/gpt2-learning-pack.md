@@ -47,6 +47,10 @@ checked server-side for start, example execution and problem submission. Existin
 foundation lessons keep their prior behavior. Passing every published practice
 problem completes a lesson in Prisma `LessonProgress`; reopening reads saved state.
 
+Learning Python uses a two-second in-worker execution deadline and a separate
+12-second container startup/cleanup ceiling. Existing Battle calls retain their
+prior default worker timing.
+
 Example runs return actual JSON values/rows and do not write Submission,
 ProblemCompletion or RewardLedger, nor award XP/coins. Graded work remains in the
 canonical Prisma Submission history and is visible to PR #15 profile analytics.

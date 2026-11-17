@@ -61,6 +61,8 @@ test('original learning pack: real isolated Python/SQL, shared history and saved
       assert.equal((await runSqlQuery({sourceCode:'SELECT pg_sleep(5)',fixture})).status,'TIME_LIMIT');
       assert.equal((await runSqlQuery({sourceCode:'SELECT 1; \\! echo not-a-query',fixture})).status,'RUNTIME_ERROR');
       await assert.rejects(runSqlQuery({sourceCode:'SELECT 1',fixture,image:'worldofcodes-missing-image:never-pull'}),error=>error.code==='JUDGE_UNAVAILABLE'&&error.status===503);
+      const pythonTimeout=await judgeLearning({kind:'example',language:'python',sourceCode:'def experiment():\n    while True: pass',args:[]});
+      assert.equal(pythonTimeout.status,'TIME_LIMIT');
     });
     await t.test('prerequisites are enforced before grading or running examples, then example edits never award XP',async()=>{
       assert.equal((await request('/learning/lessons/py-patterns-lesson/start',{method:'POST'})).status,409);

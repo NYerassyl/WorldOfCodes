@@ -152,10 +152,10 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
 
     await t.test('public API exposes starters and only sample cases; server can access hidden cases',async()=>{
       const all=await request('/problems',{auth:null});
-      assert.equal(all.status,200);assert.equal(all.body.problems.length,16);
+      assert.equal(all.status,200);assert.equal(all.body.problems.length,31);
       for(const p of all.body.problems){
-        assert.ok(p.starterCode.startsWith('def '+p.functionName+'('));
-        assert.equal(p.examples.length,1);
+        assert.ok(p.language==='sql' ? p.starterCode.startsWith('SELECT') : p.starterCode.startsWith('def '+p.functionName+'('));
+        assert.equal(p.examples.length,p.id.startsWith('pack-')?2:1);
         assert.equal(Object.hasOwn(p,'testCases'),false);
         const item=await request('/problems/'+p.id,{auth:null});
         assert.equal(item.status,200);
@@ -167,7 +167,8 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       }
       assert.equal((await request('/problems?topic=sorting&difficulty=EASY',{auth:null})).body.problems.length,1);
       const course=await request('/learning/courses',{auth:null});
-      assert.equal(course.body.courses[0].topics.length,6);
+      assert.equal(course.body.courses.find(c=>c.language==='python').topics.length,11);
+      assert.equal(course.body.courses.find(c=>c.language==='sql').topics.length,1);
     });
     await t.test('wrong answers and runtime errors do not complete lesson or award rewards',async()=>{
       const started=await request('/learning/lessons/py-variables-lesson/start',{method:'POST'});
