@@ -33,7 +33,9 @@ def ready(url,child):
 
 
 def verify():
-    assert os.environ['SHARED_DATABASE_TEST_URL'].split('?')[0].endswith('_test')
+    from sqlalchemy.engine import make_url
+    test_url=make_url(os.environ['SHARED_DATABASE_TEST_URL'])
+    assert test_url.host in {'127.0.0.1','localhost'} and test_url.database.endswith('_test')
     ART.mkdir(exist_ok=True)
     env={**os.environ,'PORT':'4001','HOST':'127.0.0.1','FASTAPI_INTERNAL_URL':FAST,'EXPRESS_INTERNAL_URL':EXPRESS}
     logs=[];children=[];events=[]
@@ -58,7 +60,7 @@ def verify():
             try:
                 page.goto(FAST+'/docs');page.locator('.swagger-ui .opblock').first.wait_for(timeout=60000)
                 def docs(method,path,status=200,data=None,params=None):
-                    block=page.locator('.opblock').filter(has=page.locator('.opblock-summary-path[data-path="'+path+'"]')).filter(has=page.locator('.opblock-summary-method').filter(has_text=re.compile('^'+method+'$')))
+                    block=page.locator('.opblock').filter(has=page.locator('[data-path="'+path+'"]')).filter(has=page.locator('.opblock-summary-method').filter(has_text=re.compile('^'+method+'$')))
                     assert block.count()==1,(method,path,block.count())
                     if 'is-open' not in block.get_attribute('class'):block.locator('.opblock-summary').click()
                     attempt=block.get_by_role('button',name='Try it out',exact=True)
@@ -131,6 +133,9 @@ def verify():
                     concurrent=[f.result() for f in futures]
                 assert all(x['status']=='ACCEPTED' for x in concurrent),concurrent
                 assert sum(x['rewarded'] for x in concurrent)==1,concurrent
+                call('GET','/api/problems/py-double/submissions?user_id='+bid,403,token=token)
+                assert call('GET','/api/problems/py-double/submissions',token=bt)['submissions']==[]
+                print('PASS: Swagger workflows and canonical concurrent reward/owner-only history.',flush=True)
                 before=call('GET','/api/users/me',token=token)
                 progress=call('GET','/api/learning/progress',token=token)
                 history=call('GET','/api/problems/my-submissions',token=token)
@@ -149,6 +154,7 @@ def verify():
                 assert any(c['id']==comment['id'] and c['body']=='Owner edited' for c in comments)
                 assert all(c['id']!=comment['id'] for c in call('GET','/api/problems/py-area/comments')['comments'])
                 assert call('GET','/api/users/me',token=token,origin=EXPRESS)['bio']=='Saved through canonical Swagger'
+                print('PASS: both-server restart preserved account, profile, progress, submissions, analytics and comments.',flush=True)
                 # Canonical authored CRUD, graph integrity, protection against another author.
                 lesson=call('POST','/api/lessons',201,{'title':'Owned test lesson','topicId':'py-variables','position':90,'theoryMd':'Persistent test lesson theory'},token)
                 lid=lesson['id']
@@ -160,6 +166,7 @@ def verify():
                 call('PATCH','/api/problems/'+pid,200,{'title':'Owned revised problem'},token)
                 call('DELETE','/api/lessons/'+lid,409,token=token)
                 call('DELETE','/api/problems/'+pid,204,token=token);call('DELETE','/api/lessons/'+lid,204,token=token)
+                print('PASS: canonical authored CRUD, prerequisite cycles and foreign-author protections.',flush=True)
                 # Reauthenticate before credential edits; other accounts cannot change credentials.
                 credentials={'currentPassword':'shared-password-123','password':'changed-password-456'}
                 call('PATCH','/api/users/'+uid+'/credentials',403,credentials,bt)
