@@ -1,0 +1,80 @@
+name: Original learning pack, isolated SQL and editable lesson browser acceptance
+on:
+  push:
+    branches: [feat/learning-pack-gpt2]
+  pull_request:
+    paths:
+      - 'services/learning-backend/**'
+      - 'frontend/src/**'
+      - 'server/app.js'
+      - 'scripts/verify-learning*'
+      - '.github/workflows/learning-pack-gpt2.yml'
+permissions:
+  contents: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: woc
+          POSTGRES_PASSWORD: woc
+          POSTGRES_DB: worldofcodes_integration_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U woc -d worldofcodes_integration_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://woc:woc@127.0.0.1:5432/worldofcodes_integration_test?schema=public
+      FASTAPI_DATABASE_URL: postgresql+psycopg://woc:woc@127.0.0.1:5432/worldofcodes_integration_test
+      SHARED_DATABASE_TEST_URL: postgresql://woc:woc@127.0.0.1:5432/worldofcodes_integration_test
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
+      SQL_JUDGE_IMAGE: postgres:17
+      JUDGE_IMAGE: python:3.12-alpine
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: node scripts/ensure-ci-native.mjs
+      - name: Validate migrations and idempotent authored content seed
+        run: |
+          npm run db:validate
+          npm run db:generate
+          npm run db:migrate
+          npm run db:migrate
+          npm run db:seed
+          npm run db:seed
+      - name: Install Python and Chromium verifier
+        run: |
+          python -m pip install -r services/fastapi-backend/requirements.txt 'playwright>=1.50,<2'
+          python -m playwright install --with-deps chromium
+      - name: Apply shared profile view after Prisma tables
+        working-directory: services/fastapi-backend
+        run: python -m alembic upgrade head
+      - name: Unit regression, independent reference oracles and frontend build
+        run: |
+          npm test
+          python -m pytest -q services/fastapi-backend/tests
+          python scripts/verify-learning-references.py
+          npm run build
+      - name: Pull trusted isolated worker images
+        run: |
+          docker pull python:3.12-alpine
+          docker pull postgres:17
+      - name: Execute all authored references and SQL fixtures, examples, permissions and saved progress
+        run: node --test --test-concurrency=1 services/learning-backend/integration/learning-pack.integration.test.js
+      - name: Browser acceptance for five levels, editable SQL, canonical profile and reopened lessons
+        run: python scripts/verify-learning-browser.py
+      - name: Upload browser evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: learning-pack-browser
+          path: artifacts/

@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, useRef, useId, type ReactNode } from "react";
+import { handleEditorKeyDown, languageForFile } from "../lib/editor-keys";
 import {
   House,
   BookOpen,
@@ -126,12 +127,21 @@ export function Editor({
   onChange,
   title = "solution.js",
   placeholder,
+  smartEditing = false,
+  language,
+  indent,
+  autoIndent = true,
 }: {
   value: string;
   onChange: (value: string) => void;
   title?: string;
   placeholder?: string;
+  smartEditing?: boolean;
+  language?: string;
+  indent?: string;
+  autoIndent?: boolean;
 }) {
+  const helpId = useId();
   return (
     <div className="editor">
       <div className="editor-head">
@@ -142,13 +152,16 @@ export function Editor({
       </div>
       <textarea
         aria-label="Code editor"
+        aria-describedby={smartEditing ? helpId : undefined}
         value={value}
         onChange={(e) => onChange(e.target.value)}
+        onKeyDown={(event) => smartEditing && handleEditorKeyDown(event, value, onChange, {language: language ?? languageForFile(title), indent, autoIndent})}
         placeholder={placeholder}
         spellCheck={false}
         autoCapitalize="off"
         autoCorrect="off"
       />
+      {smartEditing && <small id={helpId} className="editor-key-help">Tab indents or moves past a closing bracket. Press Esc then Tab to move focus.</small>}
     </div>
   );
 }

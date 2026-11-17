@@ -1,4 +1,6 @@
 import { useAuth } from "../lib/auth";
+import { handleEditorKeyDown } from "../lib/editor-keys";
+import * as learningApi from "../lib/learning-api";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   PASS_MARK,
@@ -35,20 +37,35 @@ function Missing({ title, body }: { title: string; body: string }) {
 function LanguagePicker() {
   const { user } = useAuth();
   const { state } = useStore();
+  const [courses, setCourses] = useState<learningApi.Course[]>();
+  const [completed, setCompleted] = useState<Set<string>>(new Set());
+  const [catalogError, setCatalogError] = useState("");
+  const [catalogVersion, setCatalogVersion] = useState(0);
+  useEffect(() => {
+    let active = true;
+    setCatalogError("");
+    Promise.all([learningApi.courses(), user ? learningApi.progress() : Promise.resolve({lessons: [], completedProblems: []})])
+      .then(([catalog, progress]) => { if (active) { setCourses(catalog.courses); setCompleted(new Set(progress.lessons.filter(item => item.state === "COMPLETED").map(item => item.lessonId))); } })
+      .catch(() => { if (active) setCatalogError("The saved lesson catalog is unavailable. Try again."); });
+    return () => { active = false; };
+  }, [user?.id, catalogVersion]);
+  const serverLessons = (language: string) => courses?.filter(course => course.language === language).flatMap(course => course.topics).flatMap(topic => topic.lessons);
+  const sqlLessons = serverLessons("sql");
   return (
     <>
       <Heading
         title="Choose your language."
-        description="Python foundations with verified rewards, plus five tracks for local practice."
+        description="Python and SQL with saved progress, plus five tracks for local practice."
       >
-        <span className="lesson-summary">Python syncs with your account</span>
+        <span className="lesson-summary">Python and SQL sync with your account</span>
       </Heading>
       <div className="language-grid">
         {languages.map((language) => {
           const isPython = language.id === "python";
-          const count = isPython ? 6 : language.lessons.length;
+          const savedLessons = isPython ? serverLessons("python") : undefined;
+          const count = isPython ? savedLessons?.length : language.lessons.length;
           const done = isPython
-            ? (user?.completedLessons ?? 0)
+            ? (savedLessons?.filter(lesson => completed.has(lesson.id)).length ?? 0)
             : trackProgress(state.practice, language);
           const next = firstUnfinished(state.practice, language);
           return (
@@ -60,7 +77,7 @@ function LanguagePicker() {
             >
               <div className="language-card-top">
                 <span className="language-badge">{language.badge}</span>
-                <span className="tag">{count} lessons</span>
+                <span className="tag">{count ?? "…"} lessons</span>
               </div>
               <h2>{language.name}</h2>
               <p>{language.tagline}</p>
@@ -68,12 +85,12 @@ function LanguagePicker() {
                 <div className="progress">
                   <span
                     style={{
-                      width: `${(done / count) * 100}%`,
+                      width: `${count ? Math.min(100, (done / count) * 100) : 0}%`,
                     }}
                   />
                 </div>
                 <small>
-                  {done} of {count} lessons passed
+                  {done} of {count ?? "…"} lessons passed
                 </small>
               </div>
               <div className="language-card-foot">
@@ -91,10 +108,17 @@ function LanguagePicker() {
             </a>
           );
         })}
+        {sqlLessons && sqlLessons.length > 0 && <a className="language-card" data-lang="sql" href="#learn/sql">
+          <div className="language-card-top"><span className="language-badge">SQL</span><span className="tag">{sqlLessons.length} lessons</span></div>
+          <h2>SQL</h2><p>Explore joins, aggregation and window queries with real test data.</p>
+          <div className="language-progress"><small>{sqlLessons.filter(lesson => completed.has(lesson.id)).length} of {sqlLessons.length} lessons passed</small></div>
+          <div className="language-card-foot"><span>Open SQL workshop</span><span className="round-arrow"><Icon name="arrow" /></span></div>
+        </a>}
       </div>
+      {catalogError && <div className="result error" role="alert">{catalogError} <button className="btn secondary" onClick={() => setCatalogVersion(value => value + 1)}>Retry lesson catalog</button></div>}
       <Notice>
         Pick any language at any time. Quiz answers and code-lab drafts are
-        saved in this browser. Only verified Python and typing exercises earn
+        saved in this browser. Only verified Python, SQL and typing exercises earn
         account XP and coins.
       </Notice>
     </>
@@ -628,12 +652,15 @@ function LessonView({
                 </label>
                 <textarea
                   id="lab-editor"
+                  aria-describedby="lab-editor-help"
                   className="lab-editor"
                   value={labDraft}
                   spellCheck={false}
                   rows={12}
                   onChange={(event) => editLab(event.target.value)}
+                  onKeyDown={(event) => handleEditorKeyDown(event, labDraft, editLab, {language: language.id})}
                 />
+                <small id="lab-editor-help">Tab indents or skips a closing bracket. Press Esc then Tab to move focus.</small>
                 {labIsRender && (
                   <div className="lab-preview">
                     <span className="lab-editor-label">Live preview</span>

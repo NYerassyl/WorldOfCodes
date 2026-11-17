@@ -1,0 +1,7 @@
+.lesson-example { margin: 24px 0; }
+.lesson-example .editor { margin: 16px 0; }
+.lesson-example .editor textarea { min-height: 210px; }
+.example-arguments { display: grid; gap: 8px; margin: 14px 0; }
+.example-arguments textarea { width: 100%; padding: 12px; font: 12px/1.7 var(--mono); border: 1px solid #d9d2c8; border-radius: 8px; resize: vertical; }
+.lesson-example pre, .server-theory pre { overflow-x: auto; }
+.server-statement { white-space: pre-wrap; overflow-wrap: anywhere; }

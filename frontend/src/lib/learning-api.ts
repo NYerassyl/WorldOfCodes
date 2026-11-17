@@ -5,6 +5,7 @@ export type Problem = {
   title: string;
   statement: string;
   difficulty: string;
+  practiceLevel?: number | null;
   language: string;
   topicSlug: string;
   functionName: string;
@@ -27,6 +28,10 @@ export type Lesson = {
   id: string;
   title: string;
   theoryMd: string;
+  prerequisiteId?: string | null;
+  prerequisite?: {id:string;title:string} | null;
+  topic?: {course:{language:string}};
+  example?: LessonExampleData | null;
   problems: Pick<Problem, "id" | "title" | "starterCode" | "difficulty">[];
 };
 export type Progress = {
@@ -42,6 +47,7 @@ export type Exercise = {
   rewardCoins: number;
 };
 export type Verdict = {
+  explanation?: string;
   status: string;
   passedCases: number;
   totalCases: number;
@@ -83,3 +89,33 @@ export const submitCopy = (id: string, code: string) =>
     method: "POST",
     body: { code },
   });
+
+export type ProblemComment = {
+  id: string;
+  problemId: string;
+  author: { id: string; nickname: string; avatarUrl: string | null };
+  body: string;
+  createdAt: string;
+  updatedAt: string;
+};
+export type CommentPage = { comments: ProblemComment[]; nextCursor: string | null };
+export const comments = (id: string, before?: string, signal?: AbortSignal) =>
+  request<CommentPage>(`/problems/${encodeURIComponent(id)}/comments${before ? '?before=' + encodeURIComponent(before) : ''}`, { signal });
+export const createComment = (id: string, body: string) =>
+  request<ProblemComment>(`/problems/${encodeURIComponent(id)}/comments`, { method: 'POST', body: { body } });
+export const updateComment = (id: string, commentId: string, body: string) =>
+  request<ProblemComment>(`/problems/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, { method: 'PATCH', body: { body } });
+export const deleteComment = (id: string, commentId: string) =>
+  request<void>(`/problems/${encodeURIComponent(id)}/comments/${encodeURIComponent(commentId)}`, { method: 'DELETE' });
+
+export type LessonExampleData = {
+  language: 'python' | 'sql'; code: string; functionName: string;
+  args: unknown[]; expected: unknown; fixture?: { setupSQL: string };
+};
+export const runLessonExample = (id: string, code: string, args: unknown[]) =>
+  request<{ status: string; value?: unknown }>(`/learning/lessons/${encodeURIComponent(id)}/run-example`, {
+    method: 'POST', body: { code, args }, timeoutMs: 180000,
+  });
+export const practiceLevel = (problem: Pick<Problem, 'difficulty' | 'practiceLevel'>) =>
+  problem.practiceLevel ?? (problem.difficulty === "MEDIUM" ? 3 : problem.difficulty === "HARD" ? 5 : 1);
+export const PRACTICE_LEVELS = ['Easy', 'Easy–Medium', 'Medium', 'Medium–Hard', 'Hard'];

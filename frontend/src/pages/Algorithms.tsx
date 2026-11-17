@@ -49,6 +49,8 @@ export default function Algorithms({ id }: { id?: string }) {
           </section>
           <section>
             <Editor
+              smartEditing
+              language="javascript"
               value={state.drafts[problem.id] ?? problem.starter}
               onChange={(code) => draft(problem.id, code)}
             />

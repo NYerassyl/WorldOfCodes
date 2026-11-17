@@ -2,6 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from errors import DomainError
+from comment_api import router as comments_router
 from routers import lessons, problems, users
 from profile_activity import router as profile_router
 from trace_api import router as trace_router
@@ -76,3 +77,5 @@ app.include_router(problems.router, prefix="/api")
 app.include_router(problems.submissions_router, prefix="/api")
 app.include_router(trace_router, prefix="/api")
 app.include_router(profile_router)
+
+app.include_router(comments_router)

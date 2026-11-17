@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { createCommentsBridge } from './commentsBridge.js';
 import { asyncRoute,badRequest,ensureKeys,notFound,requireString } from '../lib/errors.js';
 import { getPublicProblemBank,publicProblemSelect,submitProblem } from './service.js';
 export function createProblemsRouter(prisma,requireAuth,{judge}={}){
@@ -7,7 +8,7 @@ export function createProblemsRouter(prisma,requireAuth,{judge}={}){
     const {topic,difficulty}=req.query;
     if(topic!==undefined&&(typeof topic!=='string'||!/^[a-z0-9-]{1,40}$/.test(topic)))throw badRequest('Invalid topic');
     if(difficulty!==undefined&&!['EASY','MEDIUM','HARD'].includes(difficulty))throw badRequest('Invalid difficulty');
-    const problems=await getPublicProblemBank(prisma,{topic,difficulty});
+    const problems=await getPublicProblemBank(prisma,{topic,difficulty,includeSql:true});
     res.json({problems:problems.map(p=>({...p,examples:p.testCases.map(c=>({args:JSON.parse(c.argsJson),expected:JSON.parse(c.expectedJson)})),testCases:undefined}))});
   }));
   router.get('/problems/my-submissions',requireAuth,asyncRoute(async(req,res)=>{
@@ -26,5 +27,6 @@ export function createProblemsRouter(prisma,requireAuth,{judge}={}){
     const sourceCode=requireString(req.body.code,'code',20000);
     res.json(await submitProblem(prisma,{userId:req.auth.userId,problemId:req.params.id,sourceCode,...(judge?{judge}:{})}));
   }));
+  router.use(createCommentsBridge(requireAuth));
   return router;
 }

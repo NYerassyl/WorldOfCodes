@@ -65,6 +65,7 @@ model User {
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
   sessions           AuthSession[]
+  comments           ProblemComment[]
   submissions        Submission[]
   completions        ProblemCompletion[]
   lessonProgress     LessonProgress[]
@@ -114,10 +115,15 @@ model Lesson {
   title       String
   position    Int
   theoryMd    String           @db.Text
+  prerequisiteId String?
+  prerequisite Lesson? @relation("LessonPrerequisite", fields: [prerequisiteId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+  dependents Lesson[] @relation("LessonPrerequisite")
+  exampleJson String? @db.Text
   topic       Topic            @relation(fields: [topicId], references: [id], onDelete: Cascade)
   problems    Problem[]
   progresses  LessonProgress[]
   @@unique([topicId, position])
+  @@index([prerequisiteId])
 }
 
 model Problem {
@@ -127,6 +133,8 @@ model Problem {
   statement    String              @db.Text
   language     String              @default("python")
   topicSlug    String
+  editorial    String?             @db.Text
+  practiceLevel Int?
   difficulty   Difficulty
   functionName String
   starterCode  String              @default("") @db.Text
@@ -135,6 +143,7 @@ model Problem {
   isPublished  Boolean             @default(true)
   lesson       Lesson?             @relation(fields: [lessonId], references: [id])
   testCases    TestCase[]
+  comments     ProblemComment[]
   submissions  Submission[]
   completions  ProblemCompletion[]
   matches      Match[]
@@ -347,4 +356,17 @@ model Notification {
   actor       User             @relation("NotificationActor", fields: [actorId], references: [id], onDelete: Cascade)
   @@index([recipientId, createdAt])
   @@index([recipientId, readAt])
+}
+
+model ProblemComment {
+  id        String   @id @default(uuid())
+  problemId String
+  authorId  String
+  body      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+  problem   Problem  @relation(fields: [problemId], references: [id], onDelete: Cascade)
+  author    User     @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  @@index([problemId, createdAt, id])
+  @@index([authorId])
 }

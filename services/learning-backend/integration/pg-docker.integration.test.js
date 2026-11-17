@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { randomBytes, createHash } from 'node:crypto';
-import { readFileSync } from 'node:fs';
+import { readFileSync, readdirSync } from 'node:fs';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
 import express from 'express';
@@ -55,13 +55,9 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
   try {
     await prisma.$connect();
     ({server,url}=await startApp());
-    await t.test('eight additive migration checksums match source and seed remains idempotent',async()=>{
-      const names=[
-        '20261103000000_init','20261103170000_add_battle_models',
-        '20261103220000_match_status_type_index','20261103230000_problem_starter_code',
-        '20261110200000_trace_attempts','20261111010000_player_social',
-        '20261117010000_username_policy','20261117130000_chat_notifications'
-      ];
+    await t.test('all additive migration checksums match source and seed remains idempotent',async()=>{
+      const names = readdirSync(new URL('../prisma/migrations/', import.meta.url))
+        .filter(name => /^\d{14}_/.test(name)).sort();
       const entries=await prisma.$queryRawUnsafe('SELECT migration_name, checksum, finished_at FROM "_prisma_migrations" ORDER BY migration_name');
       assert.deepEqual(entries.map(x=>x.migration_name),names);
       for(const item of entries){
@@ -69,10 +65,10 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
         const sql=readFileSync(new URL('../prisma/migrations/'+item.migration_name+'/migration.sql',import.meta.url));
         assert.equal(createHash('sha256').update(sql).digest('hex'),item.checksum);
       }
-      assert.equal(await prisma.course.count(),1);
-      assert.equal(await prisma.lesson.count(),6);
-      assert.equal(await prisma.problem.count(),16);
-      assert.equal(await prisma.testCase.count(),50);
+      assert.equal(await prisma.course.count(),2);
+      assert.equal(await prisma.lesson.count(),12);
+      assert.equal(await prisma.problem.count(),31);
+      assert.equal(await prisma.testCase.count(),145);
       assert.equal(await prisma.copyExercise.count(),3);
       for(const delegate of ['user','authSession','problem','testCase','submission','match','matchPlayer','rating','friendBattle','follow','directMessage','notification'])
         assert.equal(typeof prisma[delegate].findMany,'function',delegate);
@@ -98,7 +94,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       assert.equal((await request('/users/me',{method:'PATCH',data:{coins:9999,xp:9999}})).status,400);
       const pub=await request('/users/'+second.body.user.nickname,{auth:null});
       assert.equal(pub.status,200);
-      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','displayName','bio','avatarUrl','xp','level','completedLessons'].sort());
+      assert.deepEqual(Object.keys(pub.body).sort(),['id','nickname','avatarUrl','xp','level','completedLessons','displayName','bio'].sort());
       assert.equal((await request('/users/me',{auth:null})).status,401);
       assert.equal((await request('/auth/login',{method:'POST',auth:null,data:{email:user.email,password:'wrong'}})).status,401);
       const renamed=await request('/users/me',{method:'PATCH',data:{nickname:'new'+suffix}});
@@ -344,10 +340,10 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
 
     await t.test('public API exposes starters and only sample cases; server can access hidden cases',async()=>{
       const all=await request('/problems',{auth:null});
-      assert.equal(all.status,200);assert.equal(all.body.problems.length,16);
+      assert.equal(all.status,200);assert.equal(all.body.problems.length,31);
       for(const p of all.body.problems){
-        assert.ok(p.starterCode.startsWith('def '+p.functionName+'('));
-        assert.equal(p.examples.length,1);
+        assert.ok(p.language==='sql' ? p.starterCode.startsWith('SELECT') : p.starterCode.startsWith('def '+p.functionName+'('));
+        assert.equal(p.examples.length,p.id.startsWith('pack-')?2:1);
         assert.equal(Object.hasOwn(p,'testCases'),false);
         const item=await request('/problems/'+p.id,{auth:null});
         assert.equal(item.status,200);
@@ -359,7 +355,8 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       }
       assert.equal((await request('/problems?topic=sorting&difficulty=EASY',{auth:null})).body.problems.length,1);
       const course=await request('/learning/courses',{auth:null});
-      assert.equal(course.body.courses[0].topics.length,6);
+      assert.equal(course.body.courses.find(c=>c.language==='python').topics.length,11);
+      assert.equal(course.body.courses.find(c=>c.language==='sql').topics.length,1);
     });
     await t.test('wrong answers and runtime errors do not complete lesson or award rewards',async()=>{
       const started=await request('/learning/lessons/py-variables-lesson/start',{method:'POST'});

@@ -14,7 +14,7 @@ writeFileSync(
   entry,
   `export * from ${JSON.stringify(join(frontend, "src/lib/battle-session.ts"))}; export { ApiError } from ${JSON.stringify(join(frontend, "src/lib/api.ts"))};`,
 );
-execFileSync(join(frontend, "node_modules/.bin/esbuild"), [
+execFileSync(fileURLToPath(import.meta.resolve("esbuild/bin/esbuild")), [
   entry, "--bundle", "--format=esm", "--platform=node", `--outfile=${join(temp, "session.mjs")}`, "--log-level=warning",
 ]);
 const { BattleSession, battleErrorMessage, ApiError } = await import(
