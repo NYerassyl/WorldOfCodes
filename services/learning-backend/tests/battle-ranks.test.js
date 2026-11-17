@@ -31,7 +31,11 @@ test('each delta is read from that player pre-match rank', () => {
 });
 
 test('one result can cross a rank boundary in either direction', () => {
+  assert.equal(rankForPoints(1099).win, 24);
+  assert.equal(1099 + rankForPoints(1099).win, 1123);
   assert.equal(rankForPoints(1099 + rankForPoints(1099).win).name, 'Bronze');
+  assert.equal(rankForPoints(1100).loss, -16);
+  assert.equal(1100 + rankForPoints(1100).loss, 1084);
   assert.equal(rankForPoints(1100 + rankForPoints(1100).loss).name, 'Novice');
   assert.equal(rankForPoints(1249 + rankForPoints(1249).win).name, 'Silver');
 });

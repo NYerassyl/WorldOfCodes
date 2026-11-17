@@ -31,7 +31,7 @@ function publicMatch(match) {
 export async function attachBattleSocket(server, prisma, {
   queue = new MatchmakingQueue(prisma), cors = {},
   allowedOrigins = Array.isArray(cors.origin) ? cors.origin : [],
-  ServerClass, submissionCooldownMs = 1500, judge, notifier
+  ServerClass, submissionCooldownMs = 1500, judge, notifier, sweepIntervalMs = 1000
 } = {}) {
   const SocketServer = ServerClass || (await import('socket.io')).Server;
   const io = new SocketServer(server, {
@@ -182,6 +182,25 @@ export async function attachBattleSocket(server, prisma, {
     });
   });
 
-  io.on('close', () => { if (typeof unsubscribe === 'function') unsubscribe(); });
+  const announceMatches = matches => {
+    for (const match of matches) {
+      const payload = publicMatch(match);
+      if (!payload) continue;
+      if (notifier) notifier.publish({ type: 'battle:matched', match: payload });
+      else for (const player of payload.players) io.to(USER_ROOM(player.userId)).emit('battle:matched', payload);
+    }
+  };
+  let sweepTimer = null;
+  if (sweepIntervalMs > 0 && typeof queue.sweep === 'function') {
+    sweepTimer = setInterval(() => {
+      queue.sweep().then(announceMatches, () => {});
+    }, sweepIntervalMs);
+    if (typeof sweepTimer.unref === 'function') sweepTimer.unref();
+  }
+
+  io.on('close', () => {
+    if (sweepTimer) clearInterval(sweepTimer);
+    if (typeof unsubscribe === 'function') unsubscribe();
+  });
   return io;
 }

@@ -203,3 +203,26 @@ test('match:submit rejects oversized match IDs without consuming the submission 
   assert.equal(validAck.code, 'ACTIVE_MATCH_NOT_FOUND');
   assert.equal(matchLookupCalls, 1);
 });
+
+test('the sweep timer announces a match without any new ranked:join', async () => {
+  const match = {
+    id: 'ranked-sweep', type: 'RANKED', status: 'ACTIVE', problemId: 'p1',
+    players: [{ userId: 'player-1', seat: 0 }, { userId: 'player-2', seat: 1 }]
+  };
+  let sweeps = 0;
+  const queue = {
+    join: async () => assert.fail('sweep must not need a joining player'),
+    leave: () => ({ status: 'LEFT_QUEUE' }),
+    sweep: async () => { sweeps += 1; return [match]; }
+  };
+  await attachBattleSocket({}, {}, { ServerClass: FakeSocketServer, queue, sweepIntervalMs: 10 });
+  const io = FakeSocketServer.instance;
+  for (let attempt = 0; attempt < 100 && io.emitted.length < 2; attempt++) {
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+  assert.ok(sweeps >= 1);
+  assert.deepEqual(io.emitted.slice(0, 2).map(item => [item.room, item.event, item.payload.id]), [
+    ['user:player-1', 'battle:matched', 'ranked-sweep'],
+    ['user:player-2', 'battle:matched', 'ranked-sweep']
+  ]);
+});

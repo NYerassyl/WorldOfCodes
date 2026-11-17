@@ -105,6 +105,39 @@ test('nearest rating wins and an equal gap goes to the longest wait', () => {
   assert.equal(bestOpponent(tickets, candidate, now).userId, 'waiting-near');
 });
 
+test('a 150-point gap pairs at 15 seconds without a third player joining', async () => {
+  const ratings = { 'player-a': 1000, 'player-b': 1150 };
+  const prisma = {
+    rating: { findUnique: async ({ where }) => ({ points: ratings[where.userId] }) },
+    problem: {
+      findMany: async () => [{ id: 'problem-1' }],
+      findFirst: async () => ({ id: 'problem-1', language: 'python', functionName: 'solve',
+        testCases: [{ argsJson: '[]', expectedJson: '0' }] })
+    },
+    $transaction: async callback => callback({
+      rating: { upsert: async ({ where }) => ({ userId: where.userId, points: ratings[where.userId] }) },
+      match: { create: async ({ data }) => ({ id: 'ranked-sweep', ...data }) }
+    })
+  };
+  const queue = new MatchmakingQueue(prisma);
+  assert.equal((await queue.join('player-a')).status, 'QUEUED');
+  assert.equal((await queue.join('player-b')).status, 'QUEUED');
+  assert.equal(queue.waiting.size, 2);
+
+  const now = Date.now();
+  for (const ticket of queue.waiting.values()) ticket.joinedAt = now - 14_999;
+  assert.deepEqual(await queue.sweep(now), []);
+  assert.equal(queue.waiting.size, 2);
+
+  for (const ticket of queue.waiting.values()) ticket.joinedAt = now - 15_000;
+  const matches = await queue.sweep(now);
+  assert.equal(matches.length, 1);
+  assert.equal(matches[0].status, 'ACTIVE');
+  assert.deepEqual(matches[0].players.create.map(player => player.userId).sort(), ['player-a', 'player-b']);
+  assert.equal(queue.waiting.size, 0);
+  assert.deepEqual(await queue.sweep(now), []);
+});
+
 test('pairing prefers the closest eligible rating over a distant ticket', async () => {
   const ratings = { elite: 1300, close: 1040, joining: 1000 };
   const prisma = {

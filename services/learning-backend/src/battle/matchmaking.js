@@ -88,13 +88,55 @@ export class MatchmakingQueue {
       const match = await createMatch(this.prisma, { userIds: [opponent.userId, userId], type: 'RANKED' });
       return { status: 'MATCHED', match };
     } catch (error) {
-      if (!this.waiting.has(opponent.ticketId) && opponent.joinedAt >= Date.now() - this.maxWaitMs &&
+      if (!this.waiting.has(opponent.ticketId) && this.restorable(opponent) &&
           await this.validateUser(opponent.userId).catch(() => false)) this.waiting.set(opponent.ticketId, opponent);
       throw error;
     } finally {
       this.pairingUsers.delete(opponent.userId);
       this.pairingUsers.delete(userId);
     }
+  }
+
+  /** Re-evaluates tickets already in the queue, without waiting for a new player to join. */
+  async sweep(now = Date.now()) {
+    this.prune(now);
+    const matches = [];
+    const tickets = [...this.waiting.values()]
+      .sort((left, right) => left.joinedAt - right.joinedAt || left.ticketId.localeCompare(right.ticketId));
+    for (const first of tickets) {
+      if (!this.waiting.has(first.ticketId) || this.pairingUsers.has(first.userId)) continue;
+      const pool = [...this.waiting.values()]
+        .filter(ticket => ticket.ticketId !== first.ticketId && !this.pairingUsers.has(ticket.userId));
+      const second = bestOpponent(pool, first, now);
+      if (!second) continue;
+
+      this.waiting.delete(first.ticketId);
+      this.waiting.delete(second.ticketId);
+      this.pairingUsers.add(first.userId);
+      this.pairingUsers.add(second.userId);
+      try {
+        const [firstValid, secondValid] = await Promise.all([
+          this.validateUser(first.userId), this.validateUser(second.userId)
+        ]);
+        if (!firstValid || !secondValid) {
+          if (firstValid && this.restorable(first)) this.waiting.set(first.ticketId, first);
+          if (secondValid && this.restorable(second)) this.waiting.set(second.ticketId, second);
+          continue;
+        }
+        matches.push(await createMatch(this.prisma, { userIds: [first.userId, second.userId], type: 'RANKED' }));
+      } catch {
+        if (this.restorable(first) && await this.validateUser(first.userId).catch(() => false)) {
+          this.waiting.set(first.ticketId, first);
+        }
+        if (this.restorable(second) && await this.validateUser(second.userId).catch(() => false)) {
+          this.waiting.set(second.ticketId, second);
+        }
+      } finally {
+        this.pairingUsers.delete(first.userId);
+        this.pairingUsers.delete(second.userId);
+      }
+    }
+    return matches;
   }
 
   leave(userId) {
@@ -113,8 +155,12 @@ export class MatchmakingQueue {
     return { status: 'QUEUED', ticketId, position: index + 1, joinedAt: new Date(ticket.joinedAt).toISOString() };
   }
 
-  prune() {
-    const cutoff = Date.now() - this.maxWaitMs;
+  restorable(ticket) {
+    return ticket.joinedAt >= Date.now() - this.maxWaitMs;
+  }
+
+  prune(now = Date.now()) {
+    const cutoff = now - this.maxWaitMs;
     for (const [id, ticket] of this.waiting) if (ticket.joinedAt < cutoff) this.waiting.delete(id);
   }
 }
