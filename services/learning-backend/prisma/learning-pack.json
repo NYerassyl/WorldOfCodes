@@ -1,0 +1,1500 @@
+{
+  "version": 1,
+  "lessons": [
+    {
+      "id": "patterns",
+      "title": "Prefix Sums, Windows and Interval Invariants",
+      "prerequisiteLessonId": "py-arrays-lesson",
+      "theory": "# Prefix sums, windows and interval invariants\n\n A useful loop carries a fact that remains true after each iteration. For prefix sums, prefix[i] equals the total of the first i values. Adding one new value extends that fact in constant time. With an initial zero, the sum of [left,right) is prefix[right]-prefix[left], including an empty range. Signed values are safe for prefix sums; they are not automatically safe for a shrinking sliding window.\n\n A nonnegative-cost window maintains its current total and two endpoints. After extending the right endpoint, remove left values while the total exceeds the budget. Nonnegativity is the reason this does not discard a future better answer: extending a window never reduces its total. If negative values were allowed, this argument would fail. State your assumptions before selecting a technique.\n\n For interval union, sorting creates an order invariant. After processing a sorted prefix, the output is a sorted, disjoint representation of exactly that prefix. The next interval can only overlap the last output interval. Contained intervals must not shorten its end. Whether touching intervals merge is a contract decision, not a detail to guess from a sample.\n\n ## Debugging checklist\n Check empty input, all-zero costs, a value larger than the budget, repeated endpoints, negative ledger entries and multiple valid balance indices. Track index boundaries explicitly; the chosen balance entry belongs to neither side. Prefer one linear scan to recomputing every prefix or trying every window.\n\n## Worked example\n```python\ndef experiment(values):\n     prefix = [0]\n     for value in values:\n         prefix.append(prefix[-1] + value)\n     return prefix\n```\n\nExample arguments: [[3, -1, 4]]. Expected result before changes: [0, 3, 2, 6].\n\n## Change it and investigate\nChange the input to an empty list, then to [0,0,0]. Verify that prefix always has one more element than the input. Modify the function to return the total between indices 1 and 3 using two prefix entries. Explain why this still works with negative numbers.\n\n## Practice and completion\nSolve every linked problem using the stated contracts. Opening this lesson or running its example does not award points. Graded practice and saved completions are server-authoritative; you can reopen them later.",
+      "example": {
+        "language": "python",
+        "code": "def experiment(values):\n     prefix = [0]\n     for value in values:\n         prefix.append(prefix[-1] + value)\n     return prefix\n",
+        "functionName": "experiment",
+        "args": [
+          [
+            3,
+            -1,
+            4
+          ]
+        ],
+        "expected": [
+          0,
+          3,
+          2,
+          6
+        ]
+      },
+      "problems": [
+        {
+          "id": "pack-balance",
+          "title": "Cargo Balance Point",
+          "practiceLevel": 1,
+          "difficulty": "EASY",
+          "language": "python",
+          "topicSlug": "patterns",
+          "functionName": "balance_point",
+          "starterCode": "def balance_point(changes):\n    pass\n",
+          "statement": "A cargo ledger records signed changes in weight. Find the smallest index whose entries strictly before it sum to the same value as entries strictly after it. The entry at the chosen index belongs to neither side. Return -1 if no such index exists; do not change the input.\n\nConstraints: 0 ≤ len(changes) ≤ 20000; -1000000 ≤ changes[i] ≤ 1000000. An empty side sums to zero.\n\nExample 1: balance_point([2, -1, 0, 1, 0]) → 0\n\nExample 2: balance_point([1, 2, 3]) → -1",
+          "cases": [
+            [
+              [
+                [
+                  2,
+                  -1,
+                  0,
+                  1,
+                  0
+                ]
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  1,
+                  2,
+                  3
+                ]
+              ],
+              -1
+            ],
+            [
+              [
+                []
+              ],
+              -1
+            ],
+            [
+              [
+                [
+                  7
+                ]
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  0,
+                  0,
+                  0
+                ]
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  -2,
+                  1,
+                  -1,
+                  2
+                ]
+              ],
+              -1
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def balance_point(changes):\n    total = sum(changes)\n    left = 0\n    for i, value in enumerate(changes):\n        if left == total - left - value:\n            return i\n        left += value\n    return -1\n",
+          "explanation": "Keep the sum of the scanned prefix and derive the remaining suffix from the total. Test the balance before adding the current entry. Return immediately to enforce the smallest-index rule.",
+          "complexity": "O(n) time, O(1) extra space."
+        },
+        {
+          "id": "pack-bookings",
+          "title": "Workshop Booking Union",
+          "practiceLevel": 2,
+          "difficulty": "EASY",
+          "language": "python",
+          "topicSlug": "patterns",
+          "functionName": "merge_bookings",
+          "starterCode": "def merge_bookings(bookings):\n    pass\n",
+          "statement": "Each workshop booking is an integer interval [start, end]. Produce the sorted union as non-overlapping intervals. Overlapping or touching bookings must merge, including zero-length bookings. The input may be unsorted and contain duplicates. Return a new list.\n\nConstraints: 0 ≤ len(bookings) ≤ 5000; -1000000 ≤ start ≤ end ≤ 1000000. Touching means the next start equals the current end.\n\nExample 1: merge_bookings([[5, 8], [1, 3], [3, 4], [7, 9]]) → [[1, 4], [5, 9]]\n\nExample 2: merge_bookings([[2, 2], [2, 2]]) → [[2, 2]]",
+          "cases": [
+            [
+              [
+                [
+                  [
+                    5,
+                    8
+                  ],
+                  [
+                    1,
+                    3
+                  ],
+                  [
+                    3,
+                    4
+                  ],
+                  [
+                    7,
+                    9
+                  ]
+                ]
+              ],
+              [
+                [
+                  1,
+                  4
+                ],
+                [
+                  5,
+                  9
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  [
+                    2,
+                    2
+                  ],
+                  [
+                    2,
+                    2
+                  ]
+                ]
+              ],
+              [
+                [
+                  2,
+                  2
+                ]
+              ]
+            ],
+            [
+              [
+                []
+              ],
+              []
+            ],
+            [
+              [
+                [
+                  [
+                    -5,
+                    -2
+                  ],
+                  [
+                    -1,
+                    0
+                  ]
+                ]
+              ],
+              [
+                [
+                  -5,
+                  -2
+                ],
+                [
+                  -1,
+                  0
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  [
+                    1,
+                    10
+                  ],
+                  [
+                    2,
+                    3
+                  ],
+                  [
+                    4,
+                    7
+                  ]
+                ]
+              ],
+              [
+                [
+                  1,
+                  10
+                ]
+              ]
+            ],
+            [
+              [
+                [
+                  [
+                    4,
+                    5
+                  ],
+                  [
+                    1,
+                    2
+                  ]
+                ]
+              ],
+              [
+                [
+                  1,
+                  2
+                ],
+                [
+                  4,
+                  5
+                ]
+              ]
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def merge_bookings(bookings):\n    merged = []\n    for start, end in sorted(bookings):\n        if merged and start <= merged[-1][1]:\n            merged[-1][1] = max(merged[-1][1], end)\n        else:\n            merged.append([start, end])\n    return merged\n",
+          "explanation": "Sort by start. A booking can affect only the last output interval. Extend the last end with max rather than replacing it: a contained booking must not shorten the union.",
+          "complexity": "O(n log n) time and O(n) output space."
+        },
+        {
+          "id": "pack-window",
+          "title": "Longest Affordable Route",
+          "practiceLevel": 2,
+          "difficulty": "EASY",
+          "language": "python",
+          "topicSlug": "patterns",
+          "functionName": "affordable_route",
+          "starterCode": "def affordable_route(costs, budget):\n    pass\n",
+          "statement": "A courier must choose consecutive road segments. Each segment has a nonnegative cost. Return the greatest number of consecutive segments whose total cost does not exceed budget. Taking no segment is allowed. Zero-cost segments count toward the length.\n\nConstraints: 0 ≤ len(costs) ≤ 20000; 0 ≤ costs[i] ≤ 1000000; 0 ≤ budget ≤ 1000000000. Costs are never negative.\n\nExample 1: affordable_route([2, 1, 4, 1, 1], 6) → 3\n\nExample 2: affordable_route([0, 0, 1, 0], 0) → 2",
+          "cases": [
+            [
+              [
+                [
+                  2,
+                  1,
+                  4,
+                  1,
+                  1
+                ],
+                6
+              ],
+              3
+            ],
+            [
+              [
+                [
+                  0,
+                  0,
+                  1,
+                  0
+                ],
+                0
+              ],
+              2
+            ],
+            [
+              [
+                [],
+                5
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  9,
+                  10
+                ],
+                3
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  1,
+                  1,
+                  1
+                ],
+                3
+              ],
+              3
+            ],
+            [
+              [
+                [
+                  5,
+                  0,
+                  0,
+                  5
+                ],
+                5
+              ],
+              3
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def affordable_route(costs, budget):\n    left = total = best = 0\n    for right, cost in enumerate(costs):\n        total += cost\n        while total > budget and left <= right:\n            total -= costs[left]\n            left += 1\n        best = max(best, right - left + 1)\n    return best\n",
+          "explanation": "Nonnegative costs make the window sum monotone when the right edge grows. Remove left entries until the sum is feasible, then measure the window. Every entry is added and removed at most once.",
+          "complexity": "O(n) time, O(1) extra space."
+        }
+      ]
+    },
+    {
+      "id": "strings",
+      "title": "String State and Interval Dynamic Programming",
+      "prerequisiteLessonId": "py-methods-lesson",
+      "theory": "# String state and interval dynamic programming\n\n Strings contain order, not just frequencies. A run is a maximal consecutive block of equal letters; two occurrences separated by another letter belong to different runs. A scan can remember the current run and update one output pair at a time. This state is smaller than the full history but still retains exactly the information needed for the next character.\n\n Mirroring introduces a different kind of state: a substring bounded by left and right indices. If the ends already match, they can form the outer layer of a repaired palindrome. If they differ, one end must receive a matching inserted character, leaving one of two smaller substring problems. Choosing the locally more frequent letter is not a correctness argument; compare both optimal subproblems.\n\n Fill substring states in increasing length so every dependency is already available. A one-letter or empty substring needs no insertions. For size two with equal ends, the inner substring is empty; guard that boundary rather than accidentally indexing another row. Keeping an entire table makes the recurrence easier to inspect before considering memory optimization.\n\n ## Testing your explanation\n Distinguish a global count from a run count with ababa. Test an empty label, one character, a label already mirrored and a label with all distinct characters. For a short label, enumerate subsequences and check that minimum insertions equals length minus longest palindromic subsequence length. This gives an independent small-input check for an interval recurrence.\n\n## Worked example\n```python\ndef experiment(text):\n     boundaries = []\n     for index, letter in enumerate(text):\n         if index == 0 or letter != text[index - 1]:\n             boundaries.append(index)\n     return boundaries\n```\n\nExample arguments: [\"aabbc\"]. Expected result before changes: [0, 2, 4].\n\n## Change it and investigate\nTry ababa, an empty string and a single repeated letter. Change the example to return both boundary indices and run lengths. Before solving mirror repair, draw a 4×4 substring table for abca and mark which shorter intervals each cell uses.\n\n## Practice and completion\nSolve every linked problem using the stated contracts. Opening this lesson or running its example does not award points. Graded practice and saved completions are server-authoritative; you can reopen them later.",
+      "example": {
+        "language": "python",
+        "code": "def experiment(text):\n     boundaries = []\n     for index, letter in enumerate(text):\n         if index == 0 or letter != text[index - 1]:\n             boundaries.append(index)\n     return boundaries\n",
+        "functionName": "experiment",
+        "args": [
+          "aabbc"
+        ],
+        "expected": [
+          0,
+          2,
+          4
+        ]
+      },
+      "problems": [
+        {
+          "id": "pack-runs",
+          "title": "Signal Run Log",
+          "practiceLevel": 1,
+          "difficulty": "EASY",
+          "language": "python",
+          "topicSlug": "strings",
+          "functionName": "signal_runs",
+          "starterCode": "def signal_runs(text):\n    pass\n",
+          "statement": "A sensor sends a lowercase letter for each tick. Replace each maximal consecutive run by [letter, length], preserving run order. Equal letters separated by another run must remain separate. Return an empty list for an empty signal.\n\nConstraints: 0 ≤ len(text) ≤ 5000; text contains only ASCII a-z.\n\nExample 1: signal_runs(\"aaabbca\") → [[\"a\", 3], [\"b\", 2], [\"c\", 1], [\"a\", 1]]\n\nExample 2: signal_runs(\"ab\") → [[\"a\", 1], [\"b\", 1]]",
+          "cases": [
+            [
+              [
+                "aaabbca"
+              ],
+              [
+                [
+                  "a",
+                  3
+                ],
+                [
+                  "b",
+                  2
+                ],
+                [
+                  "c",
+                  1
+                ],
+                [
+                  "a",
+                  1
+                ]
+              ]
+            ],
+            [
+              [
+                "ab"
+              ],
+              [
+                [
+                  "a",
+                  1
+                ],
+                [
+                  "b",
+                  1
+                ]
+              ]
+            ],
+            [
+              [
+                ""
+              ],
+              []
+            ],
+            [
+              [
+                "z"
+              ],
+              [
+                [
+                  "z",
+                  1
+                ]
+              ]
+            ],
+            [
+              [
+                "aaaa"
+              ],
+              [
+                [
+                  "a",
+                  4
+                ]
+              ]
+            ],
+            [
+              [
+                "ababa"
+              ],
+              [
+                [
+                  "a",
+                  1
+                ],
+                [
+                  "b",
+                  1
+                ],
+                [
+                  "a",
+                  1
+                ],
+                [
+                  "b",
+                  1
+                ],
+                [
+                  "a",
+                  1
+                ]
+              ]
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def signal_runs(text):\n    result = []\n    for letter in text:\n        if result and result[-1][0] == letter:\n            result[-1][1] += 1\n        else:\n            result.append([letter, 1])\n    return result\n",
+          "explanation": "The last output pair describes the current run. Extend it only when its letter matches; otherwise append a new pair. This avoids treating a run log as a global frequency table.",
+          "complexity": "O(n) time and O(r) output space for r runs."
+        },
+        {
+          "id": "pack-palindrome",
+          "title": "Mirror Label Repair",
+          "practiceLevel": 4,
+          "difficulty": "HARD",
+          "language": "python",
+          "topicSlug": "strings",
+          "functionName": "mirror_insertions",
+          "starterCode": "def mirror_insertions(text):\n    pass\n",
+          "statement": "A label must read the same forward and backward. You may insert lowercase letters anywhere, but cannot delete, replace or reorder existing letters. Return the minimum number of inserted letters required to make text a palindrome.\n\nConstraints: 0 ≤ len(text) ≤ 300; text contains ASCII a-z. Return only the minimum count, not a repaired label.\n\nExample 1: mirror_insertions(\"abca\") → 1\n\nExample 2: mirror_insertions(\"abc\") → 2",
+          "cases": [
+            [
+              [
+                "abca"
+              ],
+              1
+            ],
+            [
+              [
+                "abc"
+              ],
+              2
+            ],
+            [
+              [
+                ""
+              ],
+              0
+            ],
+            [
+              [
+                "racecar"
+              ],
+              0
+            ],
+            [
+              [
+                "a"
+              ],
+              0
+            ],
+            [
+              [
+                "aebcbda"
+              ],
+              2
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def mirror_insertions(text):\n    n = len(text)\n    if n == 0:\n        return 0\n    dp = [[0] * n for _ in range(n)]\n    for size in range(2, n + 1):\n        for left in range(n - size + 1):\n            right = left + size - 1\n            if text[left] == text[right]:\n                dp[left][right] = dp[left + 1][right - 1] if size > 2 else 0\n            else:\n                dp[left][right] = 1 + min(dp[left + 1][right], dp[left][right - 1])\n    return dp[0][n - 1]\n",
+          "explanation": "Define the optimum for each substring. Matching ends can share the same outer palindrome layer. Different ends force an insertion matching one end, leaving one of two smaller substrings. Evaluate increasing substring lengths.",
+          "complexity": "O(n²) time and space."
+        }
+      ]
+    },
+    {
+      "id": "search",
+      "title": "Binary Search on a Feasibility Predicate",
+      "prerequisiteLessonId": "py-patterns-lesson",
+      "theory": "# Binary search on a feasibility predicate\n\n Binary search does not require looking for an element in an array. It requires an ordered answer space and a monotone predicate. A parcel capacity is feasible if all parcels can be shipped within the allowed days. Once a capacity is feasible, every larger capacity is feasible too: the original loading plan still fits. This creates a false-to-true boundary to locate.\n\n The smallest possible capacity is at least the heaviest parcel. The sum of all weights is always feasible when at least one day is available. For each candidate, greedily take the longest possible next prefix for the current day. Starting a new day before necessary cannot help ship more with the same capacity, because order is fixed and parcels are indivisible.\n\n Maintain a closed search interval containing the smallest feasible capacity. On a feasible midpoint, keep it as a possible answer by moving high to midpoint. On an infeasible midpoint, exclude it and every smaller capacity by moving low to midpoint+1. The interval strictly shrinks, even when low and high differ by one. Searching for an exact number of days would be wrong: several capacities may need fewer days than requested.\n\n ## Boundary reasoning\n Empty input has its own documented answer. One parcel, more days than parcels, a single allowed day, equal parcel weights and a very heavy parcel expose common lower-bound and off-by-one errors. Evaluate your predicate separately before embedding it in the search loop. For a tiny input, enumerate all possible cuts into days to verify the optimum independently.\n\n## Worked example\n```python\ndef experiment(weights, capacities):\n     counts = []\n     for capacity in capacities:\n         if weights and capacity < max(weights):\n             counts.append(-1)\n             continue\n         days, load = (1 if weights else 0), 0\n         for weight in weights:\n             if load + weight > capacity:\n                 days += 1\n                 load = 0\n             load += weight\n         counts.append(days)\n     return counts\n```\n\nExample arguments: [[3, 1, 2], [3, 4, 6]]. Expected result before changes: [2, 2, 1].\n\n## Change it and investigate\nAdd capacities 1 and 2; -1 means an individual parcel cannot fit. Change the allowed day count on paper and identify the first feasible capacity in the returned sequence. Replace the list of candidates with your own binary-search loop for the practice problem.\n\n## Practice and completion\nSolve every linked problem using the stated contracts. Opening this lesson or running its example does not award points. Graded practice and saved completions are server-authoritative; you can reopen them later.",
+      "example": {
+        "language": "python",
+        "code": "def experiment(weights, capacities):\n     counts = []\n     for capacity in capacities:\n         if weights and capacity < max(weights):\n             counts.append(-1)\n             continue\n         days, load = (1 if weights else 0), 0\n         for weight in weights:\n             if load + weight > capacity:\n                 days += 1\n                 load = 0\n             load += weight\n         counts.append(days)\n     return counts\n",
+        "functionName": "experiment",
+        "args": [
+          [
+            3,
+            1,
+            2
+          ],
+          [
+            3,
+            4,
+            6
+          ]
+        ],
+        "expected": [
+          2,
+          2,
+          1
+        ]
+      },
+      "problems": [
+        {
+          "id": "pack-capacity",
+          "title": "Daily Parcel Capacity",
+          "practiceLevel": 3,
+          "difficulty": "MEDIUM",
+          "language": "python",
+          "topicSlug": "search",
+          "functionName": "parcel_capacity",
+          "starterCode": "def parcel_capacity(weights, days):\n    pass\n",
+          "statement": "Parcels must be shipped in the listed order. Each day ships one consecutive prefix of the remaining parcels, with total weight at most capacity. Find the smallest integer capacity that ships every parcel within days days. A parcel cannot be split; empty days are allowed.\n\nConstraints: 0 ≤ len(weights) ≤ 10000; 1 ≤ weights[i] ≤ 1000000; 1 ≤ days ≤ 10000. For no parcels, return 0.\n\nExample 1: parcel_capacity([3, 2, 2, 4, 1, 4], 3) → 6\n\nExample 2: parcel_capacity([8, 1, 1], 1) → 10",
+          "cases": [
+            [
+              [
+                [
+                  3,
+                  2,
+                  2,
+                  4,
+                  1,
+                  4
+                ],
+                3
+              ],
+              6
+            ],
+            [
+              [
+                [
+                  8,
+                  1,
+                  1
+                ],
+                1
+              ],
+              10
+            ],
+            [
+              [
+                [],
+                2
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  5
+                ],
+                9
+              ],
+              5
+            ],
+            [
+              [
+                [
+                  1,
+                  2,
+                  3,
+                  4
+                ],
+                8
+              ],
+              4
+            ],
+            [
+              [
+                [
+                  10,
+                  10,
+                  10
+                ],
+                2
+              ],
+              20
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def parcel_capacity(weights, days):\n    if not weights:\n        return 0\n    low, high = max(weights), sum(weights)\n    while low < high:\n        capacity = (low + high) // 2\n        used, load = 1, 0\n        for weight in weights:\n            if load + weight > capacity:\n                used += 1\n                load = 0\n            load += weight\n        if used <= days:\n            high = capacity\n        else:\n            low = capacity + 1\n    return low\n",
+          "explanation": "A feasible capacity stays feasible when increased. Greedy packing counts the fewest days for a fixed capacity, enabling binary search between the heaviest parcel and the total weight. Search for the first feasible capacity, not a matching day count.",
+          "complexity": "O(n log(sum(weights))) time, O(1) extra space."
+        }
+      ]
+    },
+    {
+      "id": "graphs",
+      "title": "Graph State, Dependencies and Weighted Routes",
+      "prerequisiteLessonId": "py-search-lesson",
+      "theory": "# Graph state, dependencies and weighted routes\n\n A graph state must include every fact that affects future choices. For an ordinary unweighted route, the current vertex is enough, and breadth-first search processes distances in nondecreasing order. Mark a state when enqueuing it so several incoming edges do not enqueue the same work repeatedly. A disconnected vertex keeps distance -1.\n\n An emergency passage changes the state to (cell, passage-used). Visiting the same cell after spending the passage must not prevent revisiting it while the passage is still available. Likewise, discounted travel needs both the number of coupons spent and whether the previous road was discounted. Collapsing these states into one distance per city loses valid alternatives.\n\n Weighted nonnegative roads call for Dijkstra rather than ordinary BFS. The heap contains candidate prices; ignore an entry if a later relaxation has already improved its state. Zero-cost roads and cycles are valid, so strictly improve distances rather than repeatedly accepting equal candidates. A target state removed from the heap has globally minimal price.\n\n Dependencies form a different graph workflow. Count indegrees, process ready tasks, propagate maximum prerequisite finish times and detect a cycle when fewer vertices are processed than exist. Repeated edges must be handled consistently. Parallel execution means summing all durations is usually incorrect; the critical dependency path determines the finish time.\n\n ## Experiments\n Draw the state graph before implementing transitions. Compare ordinary BFS with a small grid that has a single removable wall. Test disconnected components, zero-duration tasks, a self-loop and duplicate dependencies. For tiny weighted graphs, compare the heap solution with repeated edge relaxation over all expanded states.\n\n## Worked example\n```python\ndef experiment(graph):\n     from collections import deque\n     if not graph:\n         return []\n     distance = [-1] * len(graph)\n     distance[0] = 0\n     queue = deque([0])\n     while queue:\n         node = queue.popleft()\n         for child in graph[node]:\n             if distance[child] == -1:\n                 distance[child] = distance[node] + 1\n                 queue.append(child)\n     return distance\n```\n\nExample arguments: [[[1, 2], [3], [3], []]]. Expected result before changes: [0, 1, 1, 2].\n\n## Change it and investigate\nRemove the edges entering vertex 3 and observe -1. Add a cycle back to vertex 0 and confirm the loop still terminates. Then describe which extra state dimension is needed when exactly one blocked cell may be entered.\n\n## Practice and completion\nSolve every linked problem using the stated contracts. Opening this lesson or running its example does not award points. Graded practice and saved completions are server-authoritative; you can reopen them later.",
+      "example": {
+        "language": "python",
+        "code": "def experiment(graph):\n     from collections import deque\n     if not graph:\n         return []\n     distance = [-1] * len(graph)\n     distance[0] = 0\n     queue = deque([0])\n     while queue:\n         node = queue.popleft()\n         for child in graph[node]:\n             if distance[child] == -1:\n                 distance[child] = distance[node] + 1\n                 queue.append(child)\n     return distance\n",
+        "functionName": "experiment",
+        "args": [
+          [
+            [
+              1,
+              2
+            ],
+            [
+              3
+            ],
+            [
+              3
+            ],
+            []
+          ]
+        ],
+        "expected": [
+          0,
+          1,
+          1,
+          2
+        ]
+      },
+      "problems": [
+        {
+          "id": "pack-maze",
+          "title": "One Emergency Passage",
+          "practiceLevel": 3,
+          "difficulty": "MEDIUM",
+          "language": "python",
+          "topicSlug": "graphs",
+          "functionName": "emergency_path",
+          "starterCode": "def emergency_path(grid):\n    pass\n",
+          "statement": "Move from the top-left cell to the bottom-right cell of a rectangular map using four-direction moves. Dots are open and # cells are blocked. You may enter at most one blocked cell during the entire route by using an emergency passage. Return the minimum number of moves, or -1 if the destination is unreachable.\n\nConstraints: 1 ≤ rows, columns ≤ 100; every row has equal length; start and destination are dots. A move to a neighbor costs one, including entering a broken wall.\n\nExample 1: emergency_path([\".#.\", \".#.\", \"...\"]) → 4\n\nExample 2: emergency_path([\".##\", \"###\", \"##.\"]) → -1",
+          "cases": [
+            [
+              [
+                [
+                  ".#.",
+                  ".#.",
+                  "..."
+                ]
+              ],
+              4
+            ],
+            [
+              [
+                [
+                  ".##",
+                  "###",
+                  "##."
+                ]
+              ],
+              -1
+            ],
+            [
+              [
+                [
+                  "."
+                ]
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  "..#.."
+                ]
+              ],
+              4
+            ],
+            [
+              [
+                [
+                  "..",
+                  ".."
+                ]
+              ],
+              2
+            ],
+            [
+              [
+                [
+                  ".#",
+                  "#."
+                ]
+              ],
+              2
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def emergency_path(grid):\n    from collections import deque\n    rows, cols = len(grid), len(grid[0])\n    queue = deque([(0, 0, 0, 0)])\n    seen = {(0, 0, 0)}\n    while queue:\n        r, c, used, distance = queue.popleft()\n        if (r, c) == (rows - 1, cols - 1):\n            return distance\n        for dr, dc in ((1,0),(-1,0),(0,1),(0,-1)):\n            nr, nc = r + dr, c + dc\n            if 0 <= nr < rows and 0 <= nc < cols:\n                next_used = used + (grid[nr][nc] == '#')\n                state = (nr, nc, next_used)\n                if next_used <= 1 and state not in seen:\n                    seen.add(state)\n                    queue.append((nr, nc, next_used, distance + 1))\n    return -1\n",
+          "explanation": "The same cell reached with the emergency passage unused and already used represents two different states. BFS over (row, column, used) finds a shortest route; marking only cells visited can incorrectly discard the better state.",
+          "complexity": "O(rows × columns) time and space."
+        },
+        {
+          "id": "pack-pipeline",
+          "title": "Parallel Build Deadline",
+          "practiceLevel": 4,
+          "difficulty": "HARD",
+          "language": "python",
+          "topicSlug": "graphs",
+          "functionName": "build_time",
+          "starterCode": "def build_time(durations, dependencies):\n    pass\n",
+          "statement": "Task i takes durations[i] time units. Dependency [a,b] means task b may start only after task a finishes. Any number of ready tasks can run in parallel from time zero. Return the earliest time when all tasks finish, or -1 if a directed dependency cycle prevents completion. Repeated edges count only once.\n\nConstraints: 0 ≤ n=len(durations) ≤ 20000; 0 ≤ durations[i] ≤ 1000000; 0 ≤ len(dependencies) ≤ 40000; endpoints are 0..n-1. Self-dependencies are cycles. An empty build finishes at time zero.\n\nExample 1: build_time([3, 2, 4, 1], [[0, 2], [1, 2], [2, 3]]) → 8\n\nExample 2: build_time([2, 3], [[0, 1], [1, 0]]) → -1",
+          "cases": [
+            [
+              [
+                [
+                  3,
+                  2,
+                  4,
+                  1
+                ],
+                [
+                  [
+                    0,
+                    2
+                  ],
+                  [
+                    1,
+                    2
+                  ],
+                  [
+                    2,
+                    3
+                  ]
+                ]
+              ],
+              8
+            ],
+            [
+              [
+                [
+                  2,
+                  3
+                ],
+                [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ]
+              ],
+              -1
+            ],
+            [
+              [
+                [],
+                []
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  4,
+                  5,
+                  2
+                ],
+                []
+              ],
+              5
+            ],
+            [
+              [
+                [
+                  1,
+                  2
+                ],
+                [
+                  [
+                    0,
+                    1
+                  ],
+                  [
+                    0,
+                    1
+                  ]
+                ]
+              ],
+              3
+            ],
+            [
+              [
+                [
+                  0
+                ],
+                [
+                  [
+                    0,
+                    0
+                  ]
+                ]
+              ],
+              -1
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def build_time(durations, dependencies):\n    from collections import deque\n    n = len(durations)\n    edges = [set() for _ in range(n)]\n    indegree = [0] * n\n    for a, b in dependencies:\n        if b not in edges[a]:\n            edges[a].add(b)\n            indegree[b] += 1\n    finish = list(durations)\n    queue = deque(i for i in range(n) if indegree[i] == 0)\n    processed = 0\n    while queue:\n        node = queue.popleft()\n        processed += 1\n        for child in edges[node]:\n            finish[child] = max(finish[child], finish[node] + durations[child])\n            indegree[child] -= 1\n            if indegree[child] == 0:\n                queue.append(child)\n    return max(finish, default=0) if processed == n else -1\n",
+          "explanation": "Process tasks in topological order while tracking each task’s latest prerequisite finish. A child’s finish is the maximum predecessor finish plus its own duration. If fewer than n tasks are processed, the graph has a cycle.",
+          "complexity": "O(n+m) time and space after deduplicating edges."
+        },
+        {
+          "id": "pack-discount",
+          "title": "Nonadjacent Travel Coupons",
+          "practiceLevel": 5,
+          "difficulty": "HARD",
+          "language": "python",
+          "topicSlug": "graphs",
+          "functionName": "coupon_route",
+          "starterCode": "def coupon_route(n, roads):\n    pass\n",
+          "statement": "Travel from city 0 to city n-1 on directed roads [from,to,cost]. You have at most two coupons. A coupon changes one traversed road’s cost to floor(cost/2), but coupons cannot be used on consecutive road traversals: at least one full-price road must separate them. Return the minimum total price, or -1 if no route exists.\n\nConstraints: 1 ≤ n ≤ 10000; 0 ≤ len(roads) ≤ 30000; 0 ≤ cost ≤ 1000000; valid endpoints 0..n-1. Parallel roads and zero-cost cycles are allowed. Staying in city 0 when n=1 costs zero.\n\nExample 1: coupon_route(4, [[0, 1, 8], [1, 2, 8], [2, 3, 8], [0, 3, 30]]) → 15\n\nExample 2: coupon_route(3, [[0, 1, 9], [1, 2, 9]]) → 13",
+          "cases": [
+            [
+              [
+                4,
+                [
+                  [
+                    0,
+                    1,
+                    8
+                  ],
+                  [
+                    1,
+                    2,
+                    8
+                  ],
+                  [
+                    2,
+                    3,
+                    8
+                  ],
+                  [
+                    0,
+                    3,
+                    30
+                  ]
+                ]
+              ],
+              15
+            ],
+            [
+              [
+                3,
+                [
+                  [
+                    0,
+                    1,
+                    9
+                  ],
+                  [
+                    1,
+                    2,
+                    9
+                  ]
+                ]
+              ],
+              13
+            ],
+            [
+              [
+                1,
+                []
+              ],
+              0
+            ],
+            [
+              [
+                2,
+                []
+              ],
+              -1
+            ],
+            [
+              [
+                3,
+                [
+                  [
+                    0,
+                    1,
+                    0
+                  ],
+                  [
+                    1,
+                    0,
+                    0
+                  ],
+                  [
+                    1,
+                    2,
+                    5
+                  ]
+                ]
+              ],
+              2
+            ],
+            [
+              [
+                2,
+                [
+                  [
+                    0,
+                    1,
+                    9
+                  ],
+                  [
+                    0,
+                    1,
+                    4
+                  ]
+                ]
+              ],
+              2
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def coupon_route(n, roads):\n    import heapq\n    graph = [[] for _ in range(n)]\n    for a, b, cost in roads:\n        graph[a].append((b, cost))\n    distance = {(0, 0, 0): 0}\n    heap = [(0, 0, 0, 0)]\n    while heap:\n        price, node, used, previous = heapq.heappop(heap)\n        if price != distance.get((node, used, previous)):\n            continue\n        if node == n - 1:\n            return price\n        for child, cost in graph[node]:\n            options = [(price + cost, used, 0)]\n            if used < 2 and not previous:\n                options.append((price + cost // 2, used + 1, 1))\n            for candidate, next_used, last in options:\n                state = (child, next_used, last)\n                if candidate < distance.get(state, float('inf')):\n                    distance[state] = candidate\n                    heapq.heappush(heap, (candidate, child, next_used, last))\n    return -1\n",
+          "explanation": "City alone is not enough state: remaining coupons and whether the previous road used one affect future choices. Dijkstra on (city, coupons used, previous discounted) explores at most six states per city. Nonnegative full and discounted prices preserve Dijkstra’s invariant.",
+          "complexity": "O((n+m) log n) time and O(n+m) space with a constant six-state factor."
+        }
+      ]
+    },
+    {
+      "id": "dynamic-programming",
+      "title": "Exact Scores, Subsets and Adjacent Merges",
+      "prerequisiteLessonId": "py-functions-lesson",
+      "theory": "# Exact scores, subsets and adjacent merges\n\n Dynamic programming starts with a state meaning, not a table shape. For an exact score, dp[s] is the fewest tokens that sum to s. Unreachable states need a sentinel that cannot be confused with a valid zero-token answer. Every possible final token gives a candidate smaller-score state. Repeated token values do not limit their supply.\n\n A sequence-dependent workshop needs to remember the completed subset and its last job. The subset records which jobs remain legal, while the last job determines the transition price. Neither the count of completed jobs nor the cheapest current total alone preserves enough information. Bitmasks encode subsets compactly when n is small, but 2^n growth makes explicit size constraints essential.\n\n Adjacent capsule fusion needs an interval state. The final operation merges a left and right subinterval; trying every final split covers every legal merge tree. Prefix sums make the final merge weight constant-time. A global lightest-pair greedy strategy ignores adjacency and can return an impossible or nonoptimal result.\n\n ## Build and verify a recurrence\n Write the state in a full sentence. Identify base cases, legal transitions and a traversal order in which dependencies are already solved. Estimate time and memory against the problem’s limits before coding. Empty inputs, unreachable exact totals, asymmetric transition costs and zero weights must follow the written contracts.\n\n For small instances, brute force is a useful independent oracle: enumerate job permutations or recursively try every adjacent merge. Compare many short random inputs with the optimized solution. Agreement on tiny cases is evidence for the implementation, while the recurrence explains why it remains correct on larger cases.\n\n## Worked example\n```python\ndef experiment(n):\n     if n < 0:\n         return 0\n     ways = [0] * (n + 1)\n     ways[0] = 1\n     for total in range(1, n + 1):\n         ways[total] += ways[total - 1]\n         if total >= 2:\n             ways[total] += ways[total - 2]\n     return ways[n]\n```\n\nExample arguments: [5]. Expected result before changes: 8.\n\n## Change it and investigate\nRun n=0 and explain why the answer is 1 rather than 0: there is one empty construction. Change allowed step sizes from 1 and 2 to 1 and 3, then compare the first six outputs by hand. The example is an experiment and awards no learning rewards.\n\n## Practice and completion\nSolve every linked problem using the stated contracts. Opening this lesson or running its example does not award points. Graded practice and saved completions are server-authoritative; you can reopen them later.",
+      "example": {
+        "language": "python",
+        "code": "def experiment(n):\n     if n < 0:\n         return 0\n     ways = [0] * (n + 1)\n     ways[0] = 1\n     for total in range(1, n + 1):\n         ways[total] += ways[total - 1]\n         if total >= 2:\n             ways[total] += ways[total - 2]\n     return ways[n]\n",
+        "functionName": "experiment",
+        "args": [
+          5
+        ],
+        "expected": 8
+      },
+      "problems": [
+        {
+          "id": "pack-tokens",
+          "title": "Exact Training Score",
+          "practiceLevel": 3,
+          "difficulty": "MEDIUM",
+          "language": "python",
+          "topicSlug": "dynamic-programming",
+          "functionName": "minimum_tokens",
+          "starterCode": "def minimum_tokens(values, target):\n    pass\n",
+          "statement": "A training station gives a token worth one of the positive values. You may take unlimited tokens of every value. Return the minimum number of tokens needed to score exactly target; return -1 if it is impossible. Duplicate values do not represent a limited supply.\n\nConstraints: 0 ≤ len(values) ≤ 30; 1 ≤ values[i] ≤ 1000; 0 ≤ target ≤ 10000. Target zero needs zero tokens, even when there are no values.\n\nExample 1: minimum_tokens([1, 3, 4], 6) → 2\n\nExample 2: minimum_tokens([4, 6], 7) → -1",
+          "cases": [
+            [
+              [
+                [
+                  1,
+                  3,
+                  4
+                ],
+                6
+              ],
+              2
+            ],
+            [
+              [
+                [
+                  4,
+                  6
+                ],
+                7
+              ],
+              -1
+            ],
+            [
+              [
+                [],
+                0
+              ],
+              0
+            ],
+            [
+              [
+                [],
+                9
+              ],
+              -1
+            ],
+            [
+              [
+                [
+                  2,
+                  2,
+                  5
+                ],
+                10
+              ],
+              2
+            ],
+            [
+              [
+                [
+                  7
+                ],
+                14
+              ],
+              2
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def minimum_tokens(values, target):\n    unreachable = target + 1\n    dp = [0] + [unreachable] * target\n    for total in range(1, target + 1):\n        for value in set(values):\n            if value <= total:\n                dp[total] = min(dp[total], dp[total - value] + 1)\n    return dp[target] if dp[target] <= target else -1\n",
+          "explanation": "Let dp[s] be the fewest tokens for exact score s. Every final token reduces the problem to a smaller score. Greedy selection fails for values [1,3,4] and target 6, where two threes beat four plus two ones.",
+          "complexity": "O(target × distinct values) time and O(target) space."
+        },
+        {
+          "id": "pack-jobs",
+          "title": "Sequence-Dependent Workshop",
+          "practiceLevel": 5,
+          "difficulty": "HARD",
+          "language": "python",
+          "topicSlug": "dynamic-programming",
+          "functionName": "workshop_order",
+          "starterCode": "def workshop_order(start, transition):\n    pass\n",
+          "statement": "Complete every workshop job exactly once in any order. If job j is first, pay start[j]. Moving directly from completed job i to next job j costs transition[i][j]. No payment is needed after the final job. Return the smallest possible total cost; jobs are distinct even if their costs match.\n\nConstraints: 0 ≤ n=len(start) ≤ 12; transition is n×n; every cost is an integer 0..1000000; diagonal values are zero. Costs may be asymmetric. With no jobs, return zero.\n\nExample 1: workshop_order([7, 2, 6], [[0, 8, 1], [3, 0, 5], [4, 2, 0]]) → 6\n\nExample 2: workshop_order([], []) → 0",
+          "cases": [
+            [
+              [
+                [
+                  7,
+                  2,
+                  6
+                ],
+                [
+                  [
+                    0,
+                    8,
+                    1
+                  ],
+                  [
+                    3,
+                    0,
+                    5
+                  ],
+                  [
+                    4,
+                    2,
+                    0
+                  ]
+                ]
+              ],
+              6
+            ],
+            [
+              [
+                [],
+                []
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  5
+                ],
+                [
+                  [
+                    0
+                  ]
+                ]
+              ],
+              5
+            ],
+            [
+              [
+                [
+                  0,
+                  0
+                ],
+                [
+                  [
+                    0,
+                    100
+                  ],
+                  [
+                    1,
+                    0
+                  ]
+                ]
+              ],
+              1
+            ],
+            [
+              [
+                [
+                  3,
+                  3,
+                  3
+                ],
+                [
+                  [
+                    0,
+                    1,
+                    1
+                  ],
+                  [
+                    1,
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    1,
+                    0
+                  ]
+                ]
+              ],
+              5
+            ],
+            [
+              [
+                [
+                  10,
+                  1,
+                  9
+                ],
+                [
+                  [
+                    0,
+                    1,
+                    9
+                  ],
+                  [
+                    9,
+                    0,
+                    1
+                  ],
+                  [
+                    1,
+                    9,
+                    0
+                  ]
+                ]
+              ],
+              3
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def workshop_order(start, transition):\n    n = len(start)\n    if n == 0:\n        return 0\n    dp = [[float('inf')] * n for _ in range(1 << n)]\n    for job in range(n):\n        dp[1 << job][job] = start[job]\n    for mask in range(1 << n):\n        for last in range(n):\n            if not (mask >> last & 1):\n                continue\n            for job in range(n):\n                if not (mask >> job & 1):\n                    nxt = mask | (1 << job)\n                    dp[nxt][job] = min(dp[nxt][job], dp[mask][last] + transition[last][job])\n    return min(dp[-1])\n",
+          "explanation": "A state records the completed-job subset and its final job. Append any uncompleted job using the directed transition cost. A locally cheap first job or next step need not produce the global optimum.",
+          "complexity": "O(2^n n²) time and O(2^n n) space."
+        },
+        {
+          "id": "pack-fusion",
+          "title": "Adjacent Capsule Fusion",
+          "practiceLevel": 5,
+          "difficulty": "HARD",
+          "language": "python",
+          "topicSlug": "dynamic-programming",
+          "functionName": "fusion_cost",
+          "starterCode": "def fusion_cost(weights):\n    pass\n",
+          "statement": "Capsules lie in a fixed row. Merge two adjacent capsules into one whose weight is their sum; this operation costs that sum. Continue until at most one capsule remains. Find the minimum total cost over all legal merge orders. Nonadjacent capsules can never merge directly.\n\nConstraints: 0 ≤ len(weights) ≤ 80; 0 ≤ weights[i] ≤ 10000. Empty and one-capsule rows cost zero. Input order must be preserved.\n\nExample 1: fusion_cost([3, 2, 4, 1]) → 20\n\nExample 2: fusion_cost([8, 1, 1, 8]) → 30",
+          "cases": [
+            [
+              [
+                [
+                  3,
+                  2,
+                  4,
+                  1
+                ]
+              ],
+              20
+            ],
+            [
+              [
+                [
+                  8,
+                  1,
+                  1,
+                  8
+                ]
+              ],
+              30
+            ],
+            [
+              [
+                []
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  9
+                ]
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  0,
+                  0,
+                  0
+                ]
+              ],
+              0
+            ],
+            [
+              [
+                [
+                  1,
+                  1,
+                  1,
+                  1
+                ]
+              ],
+              8
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "def fusion_cost(weights):\n    n = len(weights)\n    if n < 2:\n        return 0\n    prefix = [0]\n    for weight in weights:\n        prefix.append(prefix[-1] + weight)\n    dp = [[0] * n for _ in range(n)]\n    for size in range(2, n + 1):\n        for left in range(n - size + 1):\n            right = left + size - 1\n            interval_sum = prefix[right + 1] - prefix[left]\n            dp[left][right] = min(dp[left][split] + dp[split + 1][right] + interval_sum for split in range(left, right))\n    return dp[0][-1]\n",
+          "explanation": "The last merge splits an interval into two adjacent subintervals. Try every split, combine the two optimal subcosts, and add the interval weight from prefix sums. Globally merging the two lightest capsules is invalid because adjacency matters.",
+          "complexity": "O(n³) time and O(n²) space."
+        }
+      ]
+    },
+    {
+      "id": "sql-lab",
+      "title": "SQL Joins, Grouping and Consecutive-Day Windows",
+      "prerequisiteLessonId": null,
+      "theory": "# SQL joins, grouping and consecutive-day windows\n\n A query transforms a relation. Begin by writing the expected output columns and what one output row represents. If the output must include learners with no attempts, an inner join removes exactly the rows you need. A left join keeps them, but your NULL check must use a non-null matched key. NOT IN behaves unexpectedly when its subquery contains NULL; reason about three-valued logic or use NOT EXISTS.\n\n Aggregation changes the row grain. WHERE filters input rows before grouping; HAVING filters completed groups. COUNT(*) or COUNT(primary_key) counts result rows, whereas COUNT(points) skips NULL points. SUM ignores NULL values and can itself be NULL for a group without values, so state whether COALESCE to zero is required. Group by stable identifiers rather than names that may repeat.\n\n Consecutive-day analysis combines deduplication, ordering and aggregation. Multiple events on a date represent one active day. After deduplication, subtracting each learner’s row number from its date assigns the same key to a consecutive island. Group islands, take their maximum length, then left join all learners so zero-activity users remain visible. Month boundaries and leap days are normal date arithmetic, not string comparisons.\n\n ## Query contract and experiments\n Explicit ORDER BY is required whenever output order is specified. Column aliases are part of the contract. Example and practice queries run against disposable PostgreSQL data, as a read-only role without network access. They never run against WorldOfCodes account tables. Examples show their sample data; hidden grading fixtures remain server-side.\n\n Test duplicate names, repeated events, NULLs, absent groups, negative scores, empty tables and a streak crossing a year or leap-day boundary. A query that matches one sample but silently drops zero-activity learners is not complete.\n\n## Worked example\n```sql\nSELECT topic, COUNT(*) AS notes FROM study_notes GROUP BY topic ORDER BY topic\n```\n\nExample arguments: []. Expected result before changes: [{\"topic\": \"graphs\", \"notes\": 2}, {\"topic\": \"sql\", \"notes\": 1}].\n\n## Change it and investigate\nRun the query, then add HAVING COUNT(*) >= 2 and observe which group remains. Change COUNT(*) to COUNT(topic) and reason about what a NULL topic would change. Sample tables are fixed for an experiment; each graded exercise has several isolated fixtures.\n\n## Practice and completion\nSolve every linked problem using the stated contracts. Opening this lesson or running its example does not award points. Graded practice and saved completions are server-authoritative; you can reopen them later.",
+      "example": {
+        "language": "sql",
+        "code": "SELECT topic, COUNT(*) AS notes FROM study_notes GROUP BY topic ORDER BY topic\n",
+        "functionName": "experiment",
+        "args": [],
+        "expected": [
+          {
+            "topic": "graphs",
+            "notes": 2
+          },
+          {
+            "topic": "sql",
+            "notes": 1
+          }
+        ],
+        "fixture": {
+          "setupSQL": "CREATE TABLE study_notes(topic text); INSERT INTO study_notes VALUES('graphs'),('sql'),('graphs');"
+        }
+      },
+      "problems": [
+        {
+          "id": "pack-quiet",
+          "title": "Learners Without Attempts",
+          "practiceLevel": 1,
+          "difficulty": "EASY",
+          "language": "sql",
+          "topicSlug": "sql-lab",
+          "functionName": "query",
+          "starterCode": "SELECT\n    -- Write your PostgreSQL query here\n",
+          "statement": "Tables: learners(id INTEGER PRIMARY KEY, name TEXT NOT NULL) and attempts(id INTEGER PRIMARY KEY, learner_id INTEGER NULL). Return each learner with no matching attempt, with columns id and name, ordered by id ascending. An attempt with NULL learner_id belongs to nobody. Repeated attempts by another learner must not duplicate output.\n\nConstraints: 0..200 learners and 0..1000 attempts per fixture; learner names can repeat. Output column names and row order must match.",
+          "cases": [
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text NOT NULL); CREATE TABLE attempts(id integer PRIMARY KEY,learner_id integer); INSERT INTO learners VALUES(1,'Ada'),(2,'Grace'),(3,'Lin'); INSERT INTO attempts VALUES(1,1),(2,1),(3,NULL);"
+                }
+              ],
+              [
+                {
+                  "id": 2,
+                  "name": "Grace"
+                },
+                {
+                  "id": 3,
+                  "name": "Lin"
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text NOT NULL); CREATE TABLE attempts(id integer PRIMARY KEY,learner_id integer); INSERT INTO learners VALUES(4,'Same'),(8,'Same');"
+                }
+              ],
+              [
+                {
+                  "id": 4,
+                  "name": "Same"
+                },
+                {
+                  "id": 8,
+                  "name": "Same"
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text NOT NULL); CREATE TABLE attempts(id integer PRIMARY KEY,learner_id integer);"
+                }
+              ],
+              []
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text NOT NULL); CREATE TABLE attempts(id integer PRIMARY KEY,learner_id integer); INSERT INTO learners VALUES(1,'A'); INSERT INTO attempts VALUES(1,1),(2,NULL);"
+                }
+              ],
+              []
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "SELECT l.id, l.name FROM learners l LEFT JOIN attempts a ON a.learner_id=l.id WHERE a.id IS NULL ORDER BY l.id",
+          "explanation": "A left join retains learners without matches. Test the non-null attempt primary key for NULL, not the nullable learner_id. NOT EXISTS is an equally valid approach; NOT IN with a NULL subquery value is a trap.",
+          "complexity": "Use set-based joins/aggregation; indexes and execution plans depend on the fixture size."
+        },
+        {
+          "id": "pack-clubs",
+          "title": "Qualified Practice Clubs",
+          "practiceLevel": 2,
+          "difficulty": "EASY",
+          "language": "sql",
+          "topicSlug": "sql-lab",
+          "functionName": "query",
+          "starterCode": "SELECT\n    -- Write your PostgreSQL query here\n",
+          "statement": "Tables: clubs(id INTEGER PRIMARY KEY, name TEXT NOT NULL) and results(id INTEGER PRIMARY KEY, club_id INTEGER NULL, points INTEGER NULL). Return clubs having at least two result rows and total non-null points at least 10. Treat NULL points as zero. Output id, total_points and attempts, ordered by id. A result with NULL club_id belongs to no club.\n\nConstraints: 0..100 clubs; 0..1000 results; -100 ≤ points ≤ 100 when not NULL. Count result rows, including rows with NULL points. Output aliases must match.",
+          "cases": [
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE clubs(id integer PRIMARY KEY,name text); CREATE TABLE results(id integer PRIMARY KEY,club_id integer,points integer); INSERT INTO clubs VALUES(1,'A'),(2,'B'),(3,'C'); INSERT INTO results VALUES(1,1,4),(2,1,6),(3,2,20),(4,3,NULL),(5,3,11);"
+                }
+              ],
+              [
+                {
+                  "id": 1,
+                  "total_points": 10,
+                  "attempts": 2
+                },
+                {
+                  "id": 3,
+                  "total_points": 11,
+                  "attempts": 2
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE clubs(id integer PRIMARY KEY,name text); CREATE TABLE results(id integer PRIMARY KEY,club_id integer,points integer); INSERT INTO clubs VALUES(9,'Z'),(2,'Y'); INSERT INTO results VALUES(1,9,30),(2,9,-20),(3,2,8),(4,2,1),(5,NULL,100);"
+                }
+              ],
+              [
+                {
+                  "id": 9,
+                  "total_points": 10,
+                  "attempts": 2
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE clubs(id integer PRIMARY KEY,name text); CREATE TABLE results(id integer PRIMARY KEY,club_id integer,points integer);"
+                }
+              ],
+              []
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE clubs(id integer PRIMARY KEY,name text); CREATE TABLE results(id integer PRIMARY KEY,club_id integer,points integer); INSERT INTO clubs VALUES(1,'X'); INSERT INTO results VALUES(1,1,NULL),(2,1,NULL);"
+                }
+              ],
+              []
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "SELECT c.id, COALESCE(SUM(r.points),0) AS total_points, COUNT(r.id) AS attempts FROM clubs c JOIN results r ON r.club_id=c.id GROUP BY c.id HAVING COUNT(r.id)>=2 AND COALESCE(SUM(r.points),0)>=10 ORDER BY c.id",
+          "explanation": "Group joined result rows by club ID and apply both conditions in HAVING. COUNT(points) is incorrect because it skips NULL-valued rows. Negative points can reduce the total below the threshold.",
+          "complexity": "Use set-based joins/aggregation; indexes and execution plans depend on the fixture size."
+        },
+        {
+          "id": "pack-streak",
+          "title": "Longest Distinct-Day Streak",
+          "practiceLevel": 4,
+          "difficulty": "HARD",
+          "language": "sql",
+          "topicSlug": "sql-lab",
+          "functionName": "query",
+          "starterCode": "SELECT\n    -- Write your PostgreSQL query here\n",
+          "statement": "Tables: learners(id INTEGER PRIMARY KEY, name TEXT) and practice_events(id INTEGER PRIMARY KEY, learner_id INTEGER, day DATE). For every learner, return learner_id and longest_streak: the maximum number of consecutive distinct calendar dates with activity. Multiple events on one date count once; NULL days do not count. Include learners with no dated activity with streak zero. Order by learner_id.\n\nConstraints: 0..100 learners; 0..1000 events; day values are dates or NULL. Consecutive means a one-day difference, including month/year boundaries. Output aliases and order must match.",
+          "cases": [
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text); CREATE TABLE practice_events(id integer PRIMARY KEY,learner_id integer,day date); INSERT INTO learners VALUES(1,'A'),(2,'B'),(3,'C'); INSERT INTO practice_events VALUES(1,1,'2026-01-01'),(2,1,'2026-01-01'),(3,1,'2026-01-02'),(4,1,'2026-01-04'),(5,2,NULL);"
+                }
+              ],
+              [
+                {
+                  "learner_id": 1,
+                  "longest_streak": 2
+                },
+                {
+                  "learner_id": 2,
+                  "longest_streak": 0
+                },
+                {
+                  "learner_id": 3,
+                  "longest_streak": 0
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text); CREATE TABLE practice_events(id integer PRIMARY KEY,learner_id integer,day date); INSERT INTO learners VALUES(7,'A'); INSERT INTO practice_events VALUES(1,7,'2025-12-31'),(2,7,'2026-01-01'),(3,7,'2026-01-02'),(4,7,'2026-02-01');"
+                }
+              ],
+              [
+                {
+                  "learner_id": 7,
+                  "longest_streak": 3
+                }
+              ]
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text); CREATE TABLE practice_events(id integer PRIMARY KEY,learner_id integer,day date);"
+                }
+              ],
+              []
+            ],
+            [
+              [
+                {
+                  "setupSQL": "CREATE TABLE learners(id integer PRIMARY KEY,name text); CREATE TABLE practice_events(id integer PRIMARY KEY,learner_id integer,day date); INSERT INTO learners VALUES(2,'B'),(1,'A'); INSERT INTO practice_events VALUES(1,2,'2024-02-28'),(2,2,'2024-02-29'),(3,2,'2024-03-01'),(4,1,NULL);"
+                }
+              ],
+              [
+                {
+                  "learner_id": 1,
+                  "longest_streak": 0
+                },
+                {
+                  "learner_id": 2,
+                  "longest_streak": 3
+                }
+              ]
+            ]
+          ],
+          "sampleCount": 2,
+          "referenceCode": "WITH days AS (SELECT DISTINCT learner_id,day FROM practice_events WHERE day IS NOT NULL), islands AS (SELECT learner_id,day-(ROW_NUMBER() OVER(PARTITION BY learner_id ORDER BY day))::int AS grp FROM days), lengths AS (SELECT learner_id,grp,COUNT(*) AS streak FROM islands GROUP BY learner_id,grp), best AS (SELECT learner_id,MAX(streak) AS longest FROM lengths GROUP BY learner_id) SELECT l.id AS learner_id,COALESCE(b.longest,0) AS longest_streak FROM learners l LEFT JOIN best b ON b.learner_id=l.id ORDER BY l.id",
+          "explanation": "Deduplicate dates first. Within each learner’s ordered dates, subtracting the row number yields a constant date for each consecutive island. Count each island, take its maximum and left join all learners to restore zero-activity users.",
+          "complexity": "Use set-based joins/aggregation; indexes and execution plans depend on the fixture size."
+        }
+      ]
+    }
+  ]
+}

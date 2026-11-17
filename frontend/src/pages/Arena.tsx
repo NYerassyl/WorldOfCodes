@@ -341,6 +341,8 @@ function BattleView({
                   value={state.code}
                   onChange={session.setCode}
                   placeholder="Loading the server starter function…"
+                  smartEditing
+                  language="python"
                 />
                 <div className="inline-actions">
                   <button
@@ -404,7 +406,10 @@ function BattleView({
               </p>
             </div>
             <div className="battle-rating">
-              <span>Your server rating</span>
+              <span>
+                Your server rating
+                {state.rating?.rank ? ` · ${state.rating.rank}` : ""}
+              </span>
               <strong>{state.rating?.points ?? "…"}</strong>
               <small>
                 {state.rating
@@ -413,8 +418,9 @@ function BattleView({
               </small>
             </div>
             <Notice>
-              No topic filters, spectator access or beginner rating protection in
-              this version. Python functions only.
+              Ranked points come from the rank each player held when the match
+              started. Novice players keep their points on a loss. Python
+              functions only.
             </Notice>
           </section>
           <section className="panel battle-controls">

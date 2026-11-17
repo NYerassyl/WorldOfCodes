@@ -1,0 +1,9 @@
+.problem-comments { margin-top: 24px; }
+.comment-form { display: grid; gap: 10px; margin: 18px 0; }
+.comment-form textarea { width: 100%; resize: vertical; padding: 12px; border: 1px solid #d9d2c8; border-radius: 8px; font: inherit; background: #fffdfa; color: inherit; }
+.comment-form textarea:focus-visible { outline: 2px solid #ab5d35; outline-offset: 2px; }
+.comment-form .inline-actions { justify-content: space-between; }
+.problem-comment { padding: 20px 0; border-top: 1px solid #e7e3dc; }
+.comment-meta { display: flex; flex-wrap: wrap; gap: 12px; align-items: baseline; }
+.comment-meta time, .comment-meta small { color: #746d65; font-size: 0.8rem; }
+.comment-body { white-space: pre-wrap; overflow-wrap: anywhere; }

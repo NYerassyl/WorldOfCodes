@@ -9,3 +9,5 @@ export { judgePython } from './problems/dockerJudge.js';
 export { resolveAuthSession } from './auth/session.js';
 
 export { createTraceRouter } from "./trace/router.js";
+
+export { judgeLearning } from './problems/learningJudge.js';

@@ -10,7 +10,7 @@ import {
   createLearningRouter,
   makeRequireAuth,
   createProblemsRouter,
-  judgePython,
+  judgeLearning,
 } from "../services/learning-backend/src/index.js";
 import {
   MatchmakingQueue,
@@ -40,7 +40,7 @@ export function socketCors(origins = []) {
 export function createApp({
   prisma,
   config = readConfig(),
-  judge = judgePython,
+  judge = judgeLearning,
   judgeQueue,
   battleQueue = new MatchmakingQueue(prisma),
   battleNotifier,
@@ -91,6 +91,7 @@ export function createApp({
   api.use(
     [
       "/problems/:id/submit",
+      "/learning/lessons/:id/run-example",
       "/copy-exercises/:id/submit",
       "/trace/exercises/:exerciseId/attempts",
       "/battle/matches/:matchId/submit",
@@ -109,7 +110,7 @@ export function createApp({
     });
   api.get("/health", (_req, res) => res.json({ status: "ok" }));
   api.use(createAuthRouter(prisma));
-  api.use(createLearningRouter(prisma, auth));
+  api.use(createLearningRouter(prisma, auth, { runExample: queuedJudge }));
   api.use(createProblemsRouter(prisma, auth, { judge: queuedJudge }));
   api.use(createCopyRouter(prisma, auth));
   api.use(createTraceRouter(prisma, auth));
@@ -139,7 +140,7 @@ export function buildApp({
   battleQueue,
   corsOrigins = [],
   config = readConfig(),
-  judge = judgePython,
+  judge = judgeLearning,
   staticDirectory,
 } = {}) {
   const queue = battleQueue ?? new MatchmakingQueue(prisma);
@@ -159,7 +160,7 @@ export function buildApp({
 export async function startServer({
   prisma,
   config = readConfig(),
-  judge = judgePython,
+  judge = judgeLearning,
   staticDirectory,
 } = {}) {
   const battleQueue = new MatchmakingQueue(prisma);

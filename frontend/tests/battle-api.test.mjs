@@ -12,7 +12,7 @@ const dir = mkdtempSync(join(tmpdir(), "woc-battle-api-"));
 // One entry preserves the shared opaque-token module instance in the bundle.
 const entry = join(dir, "entry.ts");
 writeFileSync(entry, `export * from ${JSON.stringify(join(frontend, "src/lib/battle-api.ts"))};\nexport { ApiError, getToken, setToken } from ${JSON.stringify(join(frontend, "src/lib/api.ts"))};`);
-execFileSync(join(frontend, "node_modules/.bin/esbuild"), [entry, "--bundle", "--format=esm", "--platform=node", `--outfile=${join(dir, "client.mjs")}`, "--log-level=warning"], { stdio: "inherit" });
+execFileSync(fileURLToPath(import.meta.resolve("esbuild/bin/esbuild")), [entry, "--bundle", "--format=esm", "--platform=node", `--outfile=${join(dir, "client.mjs")}`, "--log-level=warning"], { stdio: "inherit" });
 const api = await import(pathToFileURL(join(dir, "client.mjs")).href);
 const originalFetch = globalThis.fetch;
 const originalTimeout = AbortSignal.timeout;

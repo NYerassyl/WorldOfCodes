@@ -1,6 +1,6 @@
 import { randomBytes, randomUUID } from 'node:crypto';
 import { AppError } from '../lib/errors.js';
-import { calculateElo } from './rating.js';
+import { rankForPoints, rankedDeltas } from './ranks.js';
 import { getJudgableProblem } from '../problems/service.js';
 import { judgePython } from '../problems/dockerJudge.js';
 
@@ -46,10 +46,11 @@ export async function createMatch(prisma, { userIds, type = 'RANKED', problemId 
   }
   const selectedProblemId = await getBattleProblem(prisma, problemId);
   return prisma.$transaction(async tx => {
-    if (type === 'RANKED') await Promise.all(userIds.map(id => ensureRating(tx, id)));
+    const ratings = await Promise.all(userIds.map(id => ensureRating(tx, id)));
+    const pointsAtStart = new Map(ratings.map(rating => [rating.userId, rating.points]));
     const match = await tx.match.create({ data: {
       type: 'RANKED', status: 'ACTIVE', problemId: selectedProblemId, startedAt: new Date(),
-      players: { create: userIds.map((userId, seat) => ({ userId, seat })) }
+      players: { create: userIds.map((userId, seat) => ({ userId, seat, ratingBefore: pointsAtStart.get(userId) })) }
     }, select: publicMatchSelect });
     return match;
   }, { isolationLevel: 'Serializable' });
@@ -130,20 +131,28 @@ export async function getMatchForUser(prisma, matchId, userId) {
   return match;
 }
 
+async function ratedPointsAtStart(tx, player) {
+  // Matches created before rating snapshots existed fall back to the live rating.
+  if (Number.isInteger(player.ratingBefore)) return player.ratingBefore;
+  return (await ensureRating(tx, player.userId)).points;
+}
+
 async function settleRankedMatch(tx, matchId, winnerId) {
   const match = await tx.match.findUnique({ where: { id: matchId }, include: { players: true } });
   if (!match || match.status !== 'ACTIVE' || match.type !== 'RANKED' || match.players.length !== 2) return false;
   const winner = match.players.find(p => p.userId === winnerId);
   const loser = match.players.find(p => p.userId !== winnerId);
   if (!winner || !loser) return false;
-  const [winnerRating, loserRating] = await Promise.all([ensureRating(tx, winner.userId), ensureRating(tx, loser.userId)]);
-  const { deltaA, deltaB } = calculateElo(winnerRating.points, loserRating.points, 1);
+  const [winnerBefore, loserBefore] = await Promise.all([
+    ratedPointsAtStart(tx, winner), ratedPointsAtStart(tx, loser)
+  ]);
+  const { winnerDelta, loserDelta } = rankedDeltas({ winnerPoints: winnerBefore, loserPoints: loserBefore });
   const claimed = await tx.match.updateMany({ where: { id: matchId, type: 'RANKED', status: 'ACTIVE' }, data: { status: 'COMPLETED', winnerId, completedAt: new Date() } });
   if (claimed.count !== 1) return false;
-  await tx.rating.update({ where: { userId: winner.userId }, data: { points: { increment: deltaA }, wins: { increment: 1 } } });
-  await tx.rating.update({ where: { userId: loser.userId }, data: { points: { increment: deltaB }, losses: { increment: 1 } } });
-  await tx.matchPlayer.update({ where: { matchId_userId: { matchId, userId: winner.userId } }, data: { ratingBefore: winnerRating.points, ratingDelta: deltaA } });
-  await tx.matchPlayer.update({ where: { matchId_userId: { matchId, userId: loser.userId } }, data: { ratingBefore: loserRating.points, ratingDelta: deltaB } });
+  await tx.rating.update({ where: { userId: winner.userId }, data: { points: { increment: winnerDelta }, wins: { increment: 1 } } });
+  await tx.rating.update({ where: { userId: loser.userId }, data: { points: { increment: loserDelta }, losses: { increment: 1 } } });
+  await tx.matchPlayer.update({ where: { matchId_userId: { matchId, userId: winner.userId } }, data: { ratingBefore: winnerBefore, ratingDelta: winnerDelta } });
+  await tx.matchPlayer.update({ where: { matchId_userId: { matchId, userId: loser.userId } }, data: { ratingBefore: loserBefore, ratingDelta: loserDelta } });
   return true;
 }
 
@@ -231,12 +240,16 @@ export async function getActiveMatchForUser(prisma, userId) {
 }
 
 export async function getLeaderboard(prisma, take = 20) {
-  return prisma.rating.findMany({ take: Math.min(Math.max(Number(take) || 20, 1), 100), orderBy: [{ points: 'desc' }, { updatedAt: 'asc' }],
+  const rows = await prisma.rating.findMany({ take: Math.min(Math.max(Number(take) || 20, 1), 100), orderBy: [{ points: 'desc' }, { updatedAt: 'asc' }],
     select: { points: true, wins: true, losses: true, draws: true, user: { select: { id: true, nickname: true, avatarUrl: true } } } });
+  return rows.map(row => ({ ...row, rank: rankForPoints(row.points).name }));
 }
 
 export async function getMyRating(prisma, userId) {
-  return prisma.rating.upsert({ where: { userId }, create: { userId }, update: {}, select: { points: true, wins: true, losses: true, draws: true } });
+  const rating = await prisma.rating.upsert({ where: { userId }, create: { userId }, update: {}, select: { points: true, wins: true, losses: true, draws: true } });
+  return { ...rating, rank: rankForPoints(rating.points).name };
 }
 
-export function newQueueTicket(userId) { return { userId, ticketId: randomUUID(), joinedAt: Date.now() }; }
+export function newQueueTicket(userId, rating = 1000) {
+  return { userId, ticketId: randomUUID(), joinedAt: Date.now(), rating };
+}

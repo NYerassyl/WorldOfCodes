@@ -2,16 +2,17 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { submitBattleSolution } from '../src/battle/service.js';
 
-function createSubmitPrisma({ type = 'RANKED', alreadyCompleted = false } = {}) {
+function createSubmitPrisma({ type = 'RANKED', alreadyCompleted = false,
+  ratings = { 'player-a': 1200, 'player-b': 1200 }, ratingBefore = {} } = {}) {
   const state = {
     matchStatus: alreadyCompleted ? 'COMPLETED' : 'ACTIVE',
     winnerId: alreadyCompleted ? 'player-b' : null,
-    ratings: { 'player-a': 1000, 'player-b': 1000 },
+    ratings: { ...ratings },
     ratingUpdates: [], playerUpdates: [], matchUpdates: 0, transactions: 0
   };
   const players = [
-    { userId: 'player-a', seat: 0, submittedAt: null },
-    { userId: 'player-b', seat: 1, submittedAt: null }
+    { userId: 'player-a', seat: 0, submittedAt: null, ratingBefore: ratingBefore['player-a'] ?? null },
+    { userId: 'player-b', seat: 1, submittedAt: null, ratingBefore: ratingBefore['player-b'] ?? null }
   ];
   const matchSnapshot = () => ({ id: 'match-1', type, status: state.matchStatus, problemId: 'problem-1', players });
   const prisma = {
@@ -61,7 +62,7 @@ function createSubmitPrisma({ type = 'RANKED', alreadyCompleted = false } = {}) 
   return prisma;
 }
 
-test('ranked accepted solution completes match and applies Elo exactly once', async () => {
+test('ranked accepted solution completes match and applies rank points exactly once', async () => {
   const prisma = createSubmitPrisma();
   const result = await submitBattleSolution(prisma, {
     matchId: 'match-1', userId: 'player-a', sourceCode: 'def solve(): return 1',
@@ -71,10 +72,34 @@ test('ranked accepted solution completes match and applies Elo exactly once', as
   assert.equal(result.winnerId, 'player-a');
   assert.equal(result.settled, true);
   assert.equal(prisma.state.matchStatus, 'COMPLETED');
-  assert.deepEqual(prisma.state.ratingUpdates.map(item => item.points), [16, -16]);
+  assert.deepEqual(prisma.state.ratingUpdates.map(item => item.points), [22, -16]);
   assert.equal(prisma.state.ratingUpdates[0].wins, 1);
   assert.equal(prisma.state.ratingUpdates[1].losses, 1);
   assert.equal(prisma.state.transactions, 1);
+});
+
+test('a Novice loser keeps every point while the winner still gains', async () => {
+  const prisma = createSubmitPrisma({ ratings: { 'player-a': 1000, 'player-b': 1000 } });
+  await submitBattleSolution(prisma, {
+    matchId: 'match-1', userId: 'player-a', sourceCode: 'def solve(): return 1',
+    judge: async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 })
+  });
+  assert.deepEqual(prisma.state.ratingUpdates.map(item => item.points), [24, 0]);
+  assert.deepEqual(prisma.state.ratings, { 'player-a': 1024, 'player-b': 1000 });
+  assert.equal(prisma.state.ratingUpdates[1].losses, 1);
+});
+
+test('settlement deltas come from the rank held when the match started', async () => {
+  const prisma = createSubmitPrisma({
+    ratings: { 'player-a': 1400, 'player-b': 1500 },
+    ratingBefore: { 'player-a': 1000, 'player-b': 1000 }
+  });
+  await submitBattleSolution(prisma, {
+    matchId: 'match-1', userId: 'player-a', sourceCode: 'def solve(): return 1',
+    judge: async () => ({ status: 'ACCEPTED', passedCases: 1, totalCases: 1 })
+  });
+  assert.deepEqual(prisma.state.ratingUpdates.map(item => item.points), [24, 0]);
+  assert.deepEqual(prisma.state.ratings, { 'player-a': 1424, 'player-b': 1500 });
 });
 
 test('friendly accepted solution completes match without touching Elo ratings', async () => {

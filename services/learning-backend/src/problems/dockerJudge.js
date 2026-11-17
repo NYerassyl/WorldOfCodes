@@ -6,9 +6,18 @@ import { join } from 'node:path';
 import { isDeepStrictEqual } from 'node:util';
 import { AppError } from '../lib/errors.js';
 
-const PYTHON_RUNNER = `import sys, json, runpy, contextlib, io
+const PYTHON_RUNNER = `import sys, json, runpy, contextlib, io, signal
+class ExecutionTimeout(BaseException):
+    pass
+execution_ms = None
+def deadline(signum, frame):
+    raise ExecutionTimeout()
 try:
     payload = json.loads(sys.stdin.readline())
+    execution_ms = payload.get('execution_ms')
+    if execution_ms is not None:
+        signal.signal(signal.SIGALRM, deadline)
+        signal.setitimer(signal.ITIMER_REAL, execution_ms / 1000)
     with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
         ns = runpy.run_path('/workspace/solution.py')
         fn = ns[payload['fn']]
@@ -16,11 +25,16 @@ try:
             raise TypeError('Expected a callable function')
         result = fn(*payload['args'])
     sys.stdout.write(json.dumps({'ok':True, 'value':result}, allow_nan=False))
+except ExecutionTimeout:
+    sys.stdout.write(json.dumps({'ok':False, 'timedOut':True}))
 except BaseException:
     sys.stdout.write(json.dumps({'ok':False}))
+finally:
+    if execution_ms is not None:
+        signal.setitimer(signal.ITIMER_REAL, 0)
 `;
 
-function runDockerOnce(directory, image, functionName, args, timeoutMs) {
+function runDockerOnce(directory, image, functionName, args, timeoutMs, executionTimeoutMs) {
   return new Promise((resolve, reject) => {
     const containerName = `woc-judge-${randomUUID()}`;
     const dockerArgs = [
@@ -42,15 +56,16 @@ function runDockerOnce(directory, image, functionName, args, timeoutMs) {
       }
       let payload;
       try { payload = JSON.parse(stdout); } catch { return resolve({ status: 'RUNTIME_ERROR' }); }
+      if (payload?.timedOut) return resolve({ status: 'TIME_LIMIT' });
       if (payload?.ok !== true) return resolve({ status: 'RUNTIME_ERROR' });
       return resolve({ status: 'EXECUTED', value: payload.value });
     });
     child.stdin.on('error', () => {});
-    child.stdin.end(JSON.stringify({ fn: functionName, args }) + '\n');
+    child.stdin.end(JSON.stringify({ fn: functionName, args, ...(executionTimeoutMs ? {execution_ms:executionTimeoutMs} : {}) }) + '\n');
   });
 }
 
-export async function judgePython({ sourceCode, functionName, cases, image = process.env.JUDGE_IMAGE || 'python:3.12-alpine', timeoutMs = 4000 }) {
+export async function judgePython({ sourceCode, functionName, cases, image = process.env.JUDGE_IMAGE || 'python:3.12-alpine', timeoutMs = 4000, executionTimeoutMs }) {
   if (!Array.isArray(cases) || !cases.length || cases.length > 40) {
     throw new AppError(503, 'JUDGE_MISCONFIGURED', 'Problem test cases not configured');
   }
@@ -64,7 +79,7 @@ export async function judgePython({ sourceCode, functionName, cases, image = pro
     for (const c of cases) {
       const args = JSON.parse(c.argsJson);
       const expected = JSON.parse(c.expectedJson);
-      const run = await runDockerOnce(directory, image, functionName, args, timeoutMs);
+      const run = await runDockerOnce(directory, image, functionName, args, timeoutMs, executionTimeoutMs);
       if (run.status !== 'EXECUTED') return { status: run.status, passedCases, totalCases: cases.length };
       if (!isDeepStrictEqual(run.value, expected)) return { status: 'WRONG_ANSWER', passedCases, totalCases: cases.length };
       passedCases++;
@@ -73,4 +88,18 @@ export async function judgePython({ sourceCode, functionName, cases, image = pro
   } finally {
     await rm(directory, { recursive: true, force: true });
   }
+}
+
+/** Editable lesson examples use the same isolated process and never award XP. */
+export async function runPythonExample({sourceCode,functionName='experiment',args=[] ,image=process.env.JUDGE_IMAGE||'python:3.12-alpine',timeoutMs=12000,executionTimeoutMs=2000}) {
+  if(typeof sourceCode!=='string'||sourceCode.length>20000||!Array.isArray(args)||JSON.stringify(args).length>8000)
+    throw new AppError(400,'INVALID_INPUT','Example code or arguments are too large');
+  if(!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(functionName))throw new AppError(503,'JUDGE_MISCONFIGURED','Invalid example function name');
+  const directory=await mkdtemp(join(tmpdir(),'woc-example-'));
+  try {
+    await writeFile(join(directory,'solution.py'),sourceCode,{encoding:'utf8',mode:0o644});
+    await chmod(directory,0o755);
+    const result=await runDockerOnce(directory,image,functionName,args,timeoutMs,executionTimeoutMs);
+    return result.status==='EXECUTED'?{status:'EXECUTED',value:result.value}:{status:result.status};
+  } finally { await rm(directory,{recursive:true,force:true}); }
 }
