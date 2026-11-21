@@ -35,7 +35,7 @@ def test_round_trip_required_claims_and_unique_jti():
     assert a["iss"] == ISSUER and a["aud"] == AUDIENCE
     assert a["exp"] - a["iat"] == 3600
     assert a["jti"] != b["jti"]
-    assert a["exp"] == int(exp.timestamp())
+    assert a["exp"] == int(expiry.replace(tzinfo=__import__("datetime").timezone.utc).timestamp())
     assert hash_token(token) != token and len(hash_token(token)) == 64
 
 
