@@ -35,6 +35,7 @@ export async function proxyFastApiAuth(req, res, {
       // Express's existing express.json() has already enforced REQUEST_BODY_LIMIT.
       body: JSON.stringify(req.body ?? {}),
       signal: AbortSignal.timeout(authTimeoutMs),
+      redirect: 'error',
     });
   } catch { throw failure(); }
 
@@ -50,8 +51,16 @@ export async function proxyFastApiAuth(req, res, {
     if (upstream.ok) {
       if (typeof payload.token !== 'string' || !payload.token.includes('.')
         || !payload.user || typeof payload.user.id !== 'string') throw failure();
-    } else if (!payload.error || typeof payload.error.code !== 'string'
-      || typeof payload.error.message !== 'string') throw failure();
+    } else {
+      // FastAPI's default Pydantic 422 response is {"detail":[...]}.
+      // DomainError responses use {"error":{"code":...,"message":...}}.
+      // Both are canonical JSON errors; never turn validation into a false 503.
+      const domainError = payload.error
+        && typeof payload.error.code === 'string'
+        && typeof payload.error.message === 'string';
+      const validationError = upstream.status === 422 && Array.isArray(payload.detail);
+      if (!domainError && !validationError) throw failure();
+    }
   } catch { throw failure(); }
   return res.status(upstream.status).json(payload);
 }

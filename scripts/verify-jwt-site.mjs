@@ -75,7 +75,7 @@ const sockets=[];
 try{
   const firstName=slug(), secondName=slug();
   async function register(name){
-    const email=name+'@example.invalid';
+    const email=name+'@example.com';
     const result=expectStatus(await call(BASE,'/auth/register',{method:'POST',body:{
       email,nickname:name,password:'SecurePassword123!'
     }}),201);
@@ -106,7 +106,7 @@ try{
   pass('Express login also proxies FastAPI and yields a new JWT');
 
   // Existing Node-scrypt account (not created by FastAPI) can log in unchanged.
-  const legacyName=slug(), legacyEmail=legacyName+'@example.invalid';
+  const legacyName=slug(), legacyEmail=legacyName+'@example.com';
   const legacyUser=await prisma.user.create({data:{
     email:legacyEmail,nickname:legacyName,normalizedNickname:legacyName,
     passwordHash:await hashPassword('LegacyPass123!')

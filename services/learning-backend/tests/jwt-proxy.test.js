@@ -87,3 +87,20 @@ test('auth proxy retains Express request size limit and auth rate limiter',async
     assert.equal(three.status,429);
   }finally{await close(s.s);}
 });
+
+
+test('Express forwards FastAPI native Pydantic 422 detail without rewriting status to 503',async()=>{
+  const upstream=await serve((_req,res)=>{
+    res.writeHead(422,{'content-type':'application/json'});
+    res.end(JSON.stringify({detail:[{type:'value_error',loc:['body','email'],msg:'Invalid email'}]}));
+  });
+  const app=await serve(createApp({prisma:fakePrisma,staticDirectory:'/missing',
+    config:readConfig({FASTAPI_INTERNAL_URL:upstream.url,AUTH_RATE_LIMIT:'100'})}));
+  try{
+    const response=await fetch(app.url+'/api/auth/register',{method:'POST',
+      headers:{'content-type':'application/json'},body:JSON.stringify({email:'not-email'})});
+    assert.equal(response.status,422);
+    const body=await response.json();
+    assert.equal(body.detail[0].loc[1],'email');
+  }finally{await close(app.s);await close(upstream.s);}
+});
