@@ -2,8 +2,9 @@
 
 This service uses the same PostgreSQL `public` schema and Prisma string IDs as
 Express. There is no classroom MemoryStore or integer account registration.
-Register/login once, then use the returned Bearer token in `/docs` → Authorize.
-The same token works in the site and FastAPI; logout/revocation is shared.
+FastAPI issues JWT for the existing Prisma users and sessions. Legacy opaque tokens
+remain valid until expiry. The unchanged website still issues opaque tokens and
+cannot accept JWTs until GPT 1 separately integrates Express/Socket.IO.
 
 Run Express on port 4001 and FastAPI on port 8000 after Prisma migrations/seed,
 then the existing profile Alembic migration. `DATABASE_URL` and
@@ -30,11 +31,11 @@ python -m alembic upgrade head
 python -m uvicorn main:app --host 127.0.0.1 --port 8000
 ```
 
-Express remains the canonical password/session/profile/judge/reward service.
-FastAPI exposes those typed operations through a bounded HTTP adapter and uses
+Prisma remains the canonical account/session *database*. FastAPI now handles
+registration, login, logout and JWT verification. Express still owns the live
+website login route until GPT 1's separate reverse-proxy change. FastAPI uses
 SQLAlchemy for canonical profile/history reads, authorized content/progress CRUD,
-credentials and comments. Neither service forwards learning calls back to
-FastAPI; only comments/activity flow Express → FastAPI. Service outages return
+credentials and comments. Learning/judge requests still use the canonical Express service. Service outages return
 503 rather than falling back to local accounts or invented judge results.
 
 `GET /api/users/{id}` is a public ID lookup, with no email/password/coins.
@@ -161,3 +162,69 @@ to check idempotency). The new `schema-recreation` job independently
 exercises the same order **once on an empty PostgreSQL instance**.
 The content/session business logic is unchanged: this check does not
 duplicate logout or session-revocation testing.
+
+## Assignment 7 — FastAPI JWT auth for the existing website
+
+There is **one** Prisma-owned `User` and `AuthSession` in shared PostgreSQL.
+No new tables or migrations: Prisma owns table migrations, Alembic still owns
+only the read-only `woc_profile_activity` view and revision tracking.
+
+**Server environment (never commit a real secret):**
+- `JWT_SECRET`: required, at least 32 UTF-8 bytes; missing/short secret
+  yields **503 JWT_NOT_CONFIGURED**, not a fallback key.
+- `JWT_ACCESS_TTL_SECONDS`: optional positive integer, default **3600**.
+- Existing `DATABASE_URL` and `FASTAPI_DATABASE_URL` must refer to the
+  same Prisma PostgreSQL public database; `EXPRESS_INTERNAL_URL` remains
+  the URL for non-auth bridge requests.
+
+**Endpoints and unchanged frontend contract:**
+
+```http
+POST /api/auth/register
+Content-Type: application/json
+{"email":"learner@example.com","nickname":"learner","password":"StrongPassword123!"}
+201 {"token":"<JWT>","user":{...same existing privateUser fields...}}
+
+POST /api/auth/login
+Content-Type: application/json
+{"email":"learner@example.com","password":"StrongPassword123!"}
+200 {"token":"<JWT>","user":{...same existing privateUser fields...}}
+
+POST /api/auth/logout
+Authorization: Bearer <JWT>
+204 No Content
+
+GET /api/users/me
+Authorization: Bearer <JWT>
+200 { ...same privateUser fields, "completedLessons": integer }
+```
+
+Deprecated `POST /api/users` is still a registration alias. Pydantic invalid
+input → 422; duplicate email/nickname (including races) → 409; invalid
+credentials/absent, forged, expired or revoked tokens → 401.
+
+JWT uses **HS256 only**, `iss=worldofcodes-auth`, `aud=worldofcodes-api`,
+required `sub` (canonical string User ID), `iat`, `exp`, `jti`.
+The token's **SHA-256** hash is stored in existing
+`AuthSession.tokenHash`; `AuthSession.expiresAt` matches the JWT expiry.
+Both JWT signature/claims and an active matching DB session/user are required.
+Logout sets `revokedAt` on that exact session. Legacy opaque sessions without
+dots remain accepted until expiry; malformed/invalid JWTs **never** downgrade
+to opaque verification. Original salted Node `scrypt$16384$8$1$` password
+hashes are verified without requiring existing users to re-register.
+
+**Integration not done in this PR:** the website calls Express on port 4001;
+GPT 1 must proxy its three auth endpoints to FastAPI, teach Express HTTP and
+Socket.IO to validate JWT + AuthSession, and return a structured 503 if FastAPI
+is unavailable. `PATCH /api/users/me` and forwarded judge/progress routes
+still go through Express; JWT requests to those routes require the agreed
+Express update. Do not roll out JWT to the site until that acceptance passes.
+See `docs/ASSIGNMENT7_JWT_FASTAPI_GPT2.md`.
+
+**Tests:** `python -m pytest -q services/fastapi-backend/tests` from repository
+root. Unit JWT tests need no database; PostgreSQL integration tests require
+an explicit `SHARED_DATABASE_TEST_URL` matching the real local `*_test`
+database. The dedicated GitHub Actions JWT workflow provisions PostgreSQL 17,
+applies the unchanged 11 Prisma migrations/seed and Alembic profile view, then
+runs both JWT and existing FastAPI/Node regression tests. Do not run it on
+production or a populated shared database.

@@ -1,5 +1,5 @@
 from typing import Annotated, Literal
-from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator, model_validator
 
 Identifier = Annotated[str, Field(min_length=1, max_length=120, pattern=r'^[A-Za-z0-9_-]+$')]
 
@@ -7,12 +7,12 @@ class Input(BaseModel):
     model_config = ConfigDict(extra='forbid')
 
 class Register(Input):
-    email: str = Field(min_length=3, max_length=254)
+    email: EmailStr = Field(max_length=254)
     nickname: str = Field(pattern=r'^[a-z]{3,24}$')
     password: str = Field(min_length=8, max_length=128)
 
 class Login(Input):
-    email: str = Field(min_length=3, max_length=254)
+    email: EmailStr = Field(max_length=254)
     password: str = Field(min_length=1, max_length=128)
 
 class ProfilePatch(Input):

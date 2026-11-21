@@ -15,8 +15,6 @@ def upstream(monkeypatch):
     return calls
 
 @pytest.mark.parametrize('path,payload,upstream_path',[
-    ('/api/auth/register',{'email':'one@example.com','nickname':'player','password':'valid-password'},'/api/auth/register'),
-    ('/api/auth/login',{'email':'one@example.com','password':'valid-password'},'/api/auth/login'),
     ('/api/problems/algo-two-sum/submit',{'code':'def solve(): return 1'},'/api/problems/algo-two-sum/submit'),
     ('/api/problems/algo-two-sum/submissions',{'code':'def solve(): return 1'},'/api/problems/algo-two-sum/submit'),
     ('/api/trace/exercises/trace-1-01/submit',{'answer':'hello'},'/api/trace/exercises/trace-1-01/attempts'),
@@ -41,7 +39,7 @@ def test_extra_actor_and_reward_fields_rejected(client,upstream):
         assert result.status_code==422
     assert upstream==[]
 
-def test_bridge_fails_closed_and_does_not_register_locally(client,monkeypatch):
+def test_bridge_fails_closed_for_unavailable_canonical_learning_service(client,monkeypatch):
     monkeypatch.setenv('EXPRESS_INTERNAL_URL','http://127.0.0.1:1')
-    result=client.post('/api/auth/register',json={'email':'one@example.com','nickname':'player','password':'valid-password'})
+    result=client.get('/api/learning/courses')
     assert result.status_code==503 and result.json()['error']['code']=='CANONICAL_SERVICE_UNAVAILABLE'

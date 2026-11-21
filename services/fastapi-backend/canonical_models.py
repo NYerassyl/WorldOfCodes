@@ -11,6 +11,12 @@ class Player(Base):
     __tablename__='User'
     id: Mapped[str] = mapped_column(primary_key=True)
     nickname: Mapped[str]
+    email: Mapped[str]
+    passwordHash: Mapped[str]
+    normalizedNickname: Mapped[str]
+    nicknameChanges: Mapped[int]
+    renamedAt: Mapped[datetime | None] = mapped_column(DateTime)
+    updatedAt: Mapped[datetime] = mapped_column(DateTime)
     displayName: Mapped[str | None]
     bio: Mapped[str]
     avatarUrl: Mapped[str | None]
@@ -47,3 +53,13 @@ class Problem(Base):
     isPublished: Mapped[bool]
     createdById: Mapped[str | None] = mapped_column(ForeignKey('User.id',ondelete='SET NULL'))
     author: Mapped[Player | None] = relationship(back_populates='authored_problems')
+
+class AuthSession(Base):
+    """Mapping of the existing Prisma session table; never created by Alembic."""
+    __tablename__ = "AuthSession"
+    id: Mapped[str] = mapped_column(primary_key=True)
+    userId: Mapped[str] = mapped_column(ForeignKey("User.id", ondelete="CASCADE"))
+    tokenHash: Mapped[str]
+    expiresAt: Mapped[datetime] = mapped_column(DateTime)
+    revokedAt: Mapped[datetime | None] = mapped_column(DateTime)
+    createdAt: Mapped[datetime] = mapped_column(DateTime)

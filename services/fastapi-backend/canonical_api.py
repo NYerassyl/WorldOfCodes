@@ -2,13 +2,14 @@
 from typing import Annotated, Literal
 from urllib.parse import quote
 
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Query, Response
 from sqlalchemy import select, text
 from canonical_bridge import Token, forward
 from canonical_models import Lesson, Player, Problem
 from canonical_schemas import Register, Login, ProfilePatch, Code, Example, TraceGuess, Complete, LessonCreate, LessonPatch, ProblemCreate, ProblemPatch
 import canonical_services as services
-from site_auth import PlayerId, SiteSession
+from site_auth import PlayerId, SiteSession, LogoutSession
+import auth_service
 from errors import DomainError
 
 router=APIRouter(prefix='/api')
@@ -16,18 +17,21 @@ def key(value):return quote(value,safe='')
 
 @router.post('/auth/register',tags=['accounts'],status_code=201)
 @router.post('/users',tags=['accounts'],status_code=201,deprecated=True)
-def register(payload:Register):
-    """Create one canonical Prisma account and return its normal site session."""
-    return forward('POST','/api/auth/register',payload=payload.model_dump())
+def register(payload:Register,session:SiteSession):
+    """Register one site user in the existing Prisma User table; issue a JWT."""
+    return auth_service.register(session,payload)
 
 @router.post('/auth/login',tags=['accounts'])
-def login(payload:Login):return forward('POST','/api/auth/login',payload=payload.model_dump())
+def login(payload:Login,session:SiteSession):return auth_service.login(session,payload)
 
 @router.post('/auth/logout',tags=['accounts'],status_code=204)
-def logout(token:Token):return forward('POST','/api/auth/logout',token=token)
+def logout(session:SiteSession,identity:LogoutSession):
+    auth_service.logout(session,identity)
+    return Response(status_code=204)
 
 @router.get('/users/me',tags=['accounts'])
-def me(token:Token):return forward('GET','/api/users/me',token=token)
+def me(session:SiteSession,actor:PlayerId):
+    return auth_service.current_profile(session,actor)
 
 @router.patch('/users/me',tags=['accounts'])
 def edit_me(payload:ProfilePatch,token:Token):return forward('PATCH','/api/users/me',token=token,payload=payload.model_dump(exclude_unset=True))
