@@ -22,6 +22,17 @@ export async function proxyFastApiAuth(req, res, {
     const base = new URL(fastapiOrigin);
     if (!['http:', 'https:'].includes(base.protocol) || base.username || base.password
       || base.pathname !== '/' || base.search || base.hash) throw failure();
+    // Refuse a local self-proxy misconfiguration before issuing a request.
+    // Use the real server socket, never the client-controlled Host header.
+    const localPort = req.socket?.localPort;
+    const localAddress = req.socket?.localAddress;
+    const upstreamPort = Number(base.port || (base.protocol === 'https:' ? 443 : 80));
+    const localHostnames = new Set(['localhost', '127.0.0.1', '0.0.0.0', '::1', '[::1]', '::', '[::]']);
+    if (Number.isInteger(localPort) && localPort === upstreamPort &&
+      (base.hostname === localAddress ||
+        (localHostnames.has(base.hostname) && localHostnames.has(localAddress)))) {
+      throw failure();
+    }
     url = new URL('/api/auth/' + route, base);
   } catch { throw failure(); }
   const headers = { 'content-type': 'application/json', accept: 'application/json' };

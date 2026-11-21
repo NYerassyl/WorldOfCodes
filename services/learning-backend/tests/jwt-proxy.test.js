@@ -88,3 +88,13 @@ test('rejects malformed FastAPI successful response and refuses redirect',async(
     }finally{await close(upstream.s);}
   }
 });
+
+test('misconfigured FastAPI origin cannot loop back into the Express listener',async()=>{
+  const req=request({body:{email:'test@example.com'}});
+  req.socket={localAddress:'127.0.0.1',localPort:4001};
+  for(const origin of ['http://127.0.0.1:4001','http://localhost:4001']){
+    await assert.rejects(proxyFastApiAuth(req,response(),{
+      fastapiOrigin:origin,route:'register'
+    }),e=>e.status===503&&e.code==='CANONICAL_AUTH_UNAVAILABLE');
+  }
+});
