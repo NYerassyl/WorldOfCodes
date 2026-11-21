@@ -18,7 +18,7 @@ export function makeRequireAuth(prisma) {
     req.auth = auth; next();
   });
 }
-export function createAuthRouter(prisma, { fastapiOrigin = process.env.FASTAPI_INTERNAL_URL, authTimeoutMs = 8000 } = {}) {
+export function createAuthRouter(prisma, { fastapiOrigin = process.env.FASTAPI_INTERNAL_URL || 'http://127.0.0.1:8000', authTimeoutMs = 8000 } = {}) {
   const router=Router(); const auth=makeRequireAuth(prisma);
   router.use(socialRouter(prisma,auth));
   router.use(createChatRouter(prisma,auth));
