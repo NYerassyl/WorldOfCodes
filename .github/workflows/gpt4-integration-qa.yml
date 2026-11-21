@@ -102,11 +102,12 @@ jobs:
         run: npm test
       - name: Build production frontend
         run: npm run build
-      - name: Run real PostgreSQL and Docker Judge integration suite
+      - name: Configure and mask a disposable shared JWT secret
         run: |
-          docker pull python:3.12-alpine
-          npm run test:integration
-      - name: Start Express and verify REST plus Socket.IO transport
+          JWT_VALUE="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$JWT_VALUE"
+          echo "JWT_SECRET=$JWT_VALUE" >> "$GITHUB_ENV"
+      - name: Start FastAPI before Express registration integration tests
         run: |
           python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 > /tmp/woc-fastapi-integrated.log 2>&1 &
           echo $! > /tmp/woc-fastapi-integrated.pid
@@ -115,6 +116,12 @@ jobs:
             sleep 1
           done
           grep -q '"status":"ok"' /tmp/woc-fastapi-integrated-health.json
+      - name: Run real PostgreSQL and Docker Judge integration suite
+        run: |
+          docker pull python:3.12-alpine
+          npm run test:integration
+      - name: Start Express and verify REST plus Socket.IO transport
+        run: |
           node --env-file-if-exists=.env server/index.js > /tmp/woc-express.log 2>&1 &
           echo $! > /tmp/woc-express.pid
           for i in $(seq 1 40); do

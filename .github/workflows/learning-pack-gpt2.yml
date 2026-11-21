@@ -68,8 +68,25 @@ jobs:
         run: |
           docker pull python:3.12-alpine
           docker pull postgres:17
+      - name: Configure and mask a disposable shared JWT secret
+        run: |
+          JWT_VALUE="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$JWT_VALUE"
+          echo "JWT_SECRET=$JWT_VALUE" >> "$GITHUB_ENV"
       - name: Execute all authored references and SQL fixtures, examples, permissions and saved progress
-        run: node --test --test-concurrency=1 services/learning-backend/integration/learning-pack.integration.test.js
+        run: |
+          python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 > /tmp/woc-learning-pack-fastapi.log 2>&1 &
+          fastapi_pid=$!
+          trap 'kill "$fastapi_pid" 2>/dev/null || true' EXIT
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-learning-fastapi-ready.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-learning-fastapi-ready.json
+          node --test --test-concurrency=1 services/learning-backend/integration/learning-pack.integration.test.js
+          kill "$fastapi_pid" 2>/dev/null || true
+          wait "$fastapi_pid" 2>/dev/null || true
+          trap - EXIT
       - name: Browser acceptance for five levels, editable SQL, canonical profile and reopened lessons
         run: python scripts/verify-learning-browser.py
       - name: Upload browser evidence

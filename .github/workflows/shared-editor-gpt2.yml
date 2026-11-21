@@ -56,6 +56,11 @@ jobs:
         run: |
           npm test
           npm run build
+      - name: Configure and mask a disposable shared JWT secret
+        run: |
+          JWT_VALUE="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$JWT_VALUE"
+          echo "JWT_SECRET=$JWT_VALUE" >> "$GITHUB_ENV"
       - name: Real-page editor and Copy acceptance
         run: python scripts/verify-editor-browser.py
       - name: Upload keyboard screenshots and logs
