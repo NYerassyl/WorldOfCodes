@@ -91,6 +91,7 @@ function SignedOut() {
 
   return (
     <>
+      {error && <div className="result error" role="alert">{error}</div>}
       <div className="account-tabs" role="group" aria-label="Account access">
         <button
           type="button"

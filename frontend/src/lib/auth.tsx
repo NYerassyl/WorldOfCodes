@@ -61,7 +61,7 @@ export function Provider({ children }: { children: ReactNode }) {
       if (caught instanceof ApiError && caught.status === 401) {
         setToken(null);
         setUser(null);
-        setError(null);
+        setError("Your session has expired or was revoked. Please sign in again.");
         setStatus("anonymous");
         return;
       }

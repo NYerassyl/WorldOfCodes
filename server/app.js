@@ -109,7 +109,7 @@ export function createApp({
       maxQueued: config.judgeQueueLimit,
     });
   api.get("/health", (_req, res) => res.json({ status: "ok" }));
-  api.use(createAuthRouter(prisma));
+  api.use(createAuthRouter(prisma, { fastapiOrigin: config.fastapiInternalUrl, authTimeoutMs: config.authProxyTimeoutMs }));
   api.use(createLearningRouter(prisma, auth, { runExample: queuedJudge }));
   api.use(createProblemsRouter(prisma, auth, { judge: queuedJudge }));
   api.use(createCopyRouter(prisma, auth));

@@ -7,7 +7,7 @@ const app = express();
 app.disable('x-powered-by');
 app.use(express.json({limit:'32kb'}));
 const auth = makeRequireAuth(prisma);
-app.use('/api',createAuthRouter(prisma));
+app.use('/api',createAuthRouter(prisma, { fastapiOrigin: process.env.FASTAPI_INTERNAL_URL }));
 app.use('/api',createLearningRouter(prisma,auth));
 app.use('/api',createProblemsRouter(prisma,auth));
 app.use('/api',createCopyRouter(prisma,auth));

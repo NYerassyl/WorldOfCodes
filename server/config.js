@@ -18,6 +18,8 @@ export function readConfig(env = process.env) {
       .filter(Boolean),
     trustProxyHops: intSetting(env.TRUST_PROXY_HOPS, 0, 0, 5),
     bodyLimit: env.REQUEST_BODY_LIMIT || "32kb",
+    fastapiInternalUrl: env.FASTAPI_INTERNAL_URL || "http://127.0.0.1:8000",
+    authProxyTimeoutMs: intSetting(env.AUTH_PROXY_TIMEOUT_MS, 8000, 100, 30000),
     authLimit: intSetting(env.AUTH_RATE_LIMIT, 20),
     authWindow: intSetting(env.AUTH_WINDOW_MS, 900000),
     submissionLimit: intSetting(env.SUBMISSION_RATE_LIMIT, 30),
