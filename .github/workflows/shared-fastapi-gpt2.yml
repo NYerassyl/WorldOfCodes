@@ -70,6 +70,11 @@ jobs:
         run: |
           docker pull python:3.12-alpine
           docker pull postgres:17
+      - name: Generate and mask disposable JWT secret for FastAPI Swagger acceptance
+        run: |
+          JWT_VALUE="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$JWT_VALUE"
+          echo "JWT_SECRET=$JWT_VALUE" >> "$GITHUB_ENV"
       - name: Real Swagger, two accounts, cross-runtime rewards and server restarts
         run: python scripts/verify-shared-fastapi.py
       - name: Comments acceptance on the unified runtime
