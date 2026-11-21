@@ -6,6 +6,7 @@ import { randomBytes, createHash } from 'node:crypto';
 import { PrismaClient } from '../server/prisma.js';
 import { hashPassword } from '../services/learning-backend/src/lib/security.js';
 import { SignJWT } from 'jose';
+import WebSocket from 'ws';
 
 const dbUrl=new URL(process.env.DATABASE_URL??'http://missing');
 assert.ok(['localhost','127.0.0.1'].includes(dbUrl.hostname)&&dbUrl.pathname.endsWith('_test'));
@@ -30,7 +31,9 @@ function expectStatus(value,status){assert.equal(value.status,status,JSON.string
 class SocketConnection {
   constructor(token){this.token=token;this.queue=[];this.pending=[];this.socket=null;}
   async connect({allowError=false}={}){
-    const socket=new WebSocket('ws://127.0.0.1:4001/socket.io/?EIO=4&transport=websocket');
+    const socket=new WebSocket('ws://127.0.0.1:4001/socket.io/?EIO=4&transport=websocket', {
+      headers:{ Origin:'http://127.0.0.1:5173' },
+    });
     this.socket=socket;
     socket.addEventListener('message',event=>{
       const value=String(event.data);

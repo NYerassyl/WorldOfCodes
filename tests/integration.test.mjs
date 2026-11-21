@@ -97,7 +97,7 @@ test(
             method: "POST",
             auth: null,
             body: {
-              email: `integration-${suffix}@example.test`,
+              email: `integration-${suffix}@example.com`,
               nickname: `it${suffix}`,
               password: "LongTestPassword_123",
             },
@@ -115,7 +115,7 @@ test(
             method: "POST",
             auth: null,
             body: {
-              email: `second-${suffix}@example.test`,
+              email: `second-${suffix}@example.com`,
               nickname: `second${suffix}`,
               password: "LongTestPassword_123",
             },
