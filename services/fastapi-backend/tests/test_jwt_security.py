@@ -1,4 +1,5 @@
 """JWT crypto and original Node-compatible password format (no database required)."""
+import base64
 import os
 import secrets
 import time
@@ -59,7 +60,11 @@ def test_invalid_claims_are_401(alter):
 def test_tampered_signature_and_algorithm_confusion_rejected():
     token, _ = issue_access_token(str(uuid4()))
     first, middle, last = token.split(".")
-    corrupt = last[:-1] + ("A" if last[-1] != "A" else "B")
+    signature = bytearray(base64.urlsafe_b64decode(last + "=" * (-len(last) % 4)))
+    assert signature
+    signature[0] ^= 0x01  # Guaranteed binary change, not Base64URL padding ambiguity.
+    corrupt = base64.urlsafe_b64encode(signature).rstrip(b"=").decode("ascii")
+    assert corrupt != last
     raises_401(first + "." + middle + "." + corrupt)
     payload = jwt.decode(token, os.environ["JWT_SECRET"], algorithms=["HS256"],
                          issuer=ISSUER, audience=AUDIENCE)

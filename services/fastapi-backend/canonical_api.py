@@ -8,7 +8,7 @@ from canonical_bridge import Token, forward
 from canonical_models import Lesson, Player, Problem
 from canonical_schemas import Register, Login, ProfilePatch, Code, Example, TraceGuess, Complete, LessonCreate, LessonPatch, ProblemCreate, ProblemPatch
 import canonical_services as services
-from site_auth import PlayerId, SiteSession, AuthenticatedSession
+from site_auth import PlayerId, SiteSession, LogoutSession
 import auth_service
 from errors import DomainError
 
@@ -25,7 +25,7 @@ def register(payload:Register,session:SiteSession):
 def login(payload:Login,session:SiteSession):return auth_service.login(session,payload)
 
 @router.post('/auth/logout',tags=['accounts'],status_code=204)
-def logout(session:SiteSession,identity:AuthenticatedSession):
+def logout(session:SiteSession,identity:LogoutSession):
     auth_service.logout(session,identity)
     return Response(status_code=204)
 

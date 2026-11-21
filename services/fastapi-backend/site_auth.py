@@ -28,13 +28,20 @@ class SessionIdentity:
     token_kind: str
 
 
-def current_session(
-    session: SiteSession,
-    credentials: Annotated[
-        HTTPAuthorizationCredentials | None,
-        Depends(HTTPBearer(auto_error=False))
-    ],
+BearerCredentials = Annotated[
+    HTTPAuthorizationCredentials | None,
+    Depends(HTTPBearer(auto_error=False)),
+]
+
+
+def _resolve_session(
+    session: Session,
+    credentials: HTTPAuthorizationCredentials | None,
+    *,
+    lock_mode: str,
 ) -> SessionIdentity:
+    # Internal constant only; never interpolate client-supplied SQL.
+    assert lock_mode in ("SHARE", "UPDATE")
     token = credentials.credentials if credentials and credentials.scheme.lower() == "bearer" else ""
     if not token or len(token) > 8192:
         raise DomainError(401, "UNAUTHORIZED", "Valid Bearer session required.")
@@ -51,21 +58,41 @@ def current_session(
 
     # Both variants are registered/revocable in the same Prisma AuthSession.
     # Join User to fail closed if a deleted account somehow has a session.
-    # The lock orders a protected mutation against a concurrent logout.
-    row = session.execute(text("""
+    # Ordinary protected calls take a shared row lock so logout cannot revoke
+    # the session before their transaction finishes. Logout instead takes the
+    # exclusive lock up front, avoiding SHARE -> UPDATE lock-upgrade deadlocks
+    # when two requests attempt to revoke the same token simultaneously.
+    row = session.execute(text(f"""
         SELECT s.id, s."userId" FROM "AuthSession" AS s
         JOIN "User" AS u ON u.id=s."userId"
         WHERE s."tokenHash"=:digest AND s."revokedAt" IS NULL
           AND s."expiresAt" > timezone('UTC', CURRENT_TIMESTAMP)
           AND (CAST(:user_id AS TEXT) IS NULL OR s."userId"=:user_id)
-        FOR SHARE OF s
+        FOR {lock_mode} OF s
     """), {"digest": hash_token(token), "user_id": user_id}).mappings().first()
     if row is None:
         raise DomainError(401, "UNAUTHORIZED", "Invalid, expired or revoked session.")
     return SessionIdentity(user_id=row["userId"], session_id=row["id"], token_kind=kind)
 
 
+def current_session(
+    session: SiteSession,
+    credentials: BearerCredentials,
+) -> SessionIdentity:
+    return _resolve_session(session, credentials, lock_mode="SHARE")
+
+
+def current_logout_session(
+    session: SiteSession,
+    credentials: BearerCredentials,
+) -> SessionIdentity:
+    # Acquire the exclusive lock before the logout service updates revokedAt.
+    # A second concurrent logout waits, then sees a revoked row and returns 401.
+    return _resolve_session(session, credentials, lock_mode="UPDATE")
+
+
 AuthenticatedSession = Annotated[SessionIdentity, Depends(current_session)]
+LogoutSession = Annotated[SessionIdentity, Depends(current_logout_session)]
 
 
 def authenticated_player(identity: AuthenticatedSession) -> str:

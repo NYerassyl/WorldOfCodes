@@ -3,6 +3,7 @@
 Never touches a shared database: requires explicit SHARED_DATABASE_TEST_URL
 pointing to localhost and a database whose name ends with _test.
 """
+import base64
 import hashlib
 import os
 from pathlib import Path
@@ -11,7 +12,10 @@ import shutil
 import subprocess
 import time
 from concurrent.futures import ThreadPoolExecutor
+from threading import Event, Lock
 from uuid import uuid4
+
+import auth_service
 
 import jwt
 import pytest
@@ -132,7 +136,12 @@ def test_protected_jwt_tampering_expiry_issuer_audience_missing_user_and_logout(
     assert client.get(url).status_code == 401
     assert client.get(url, headers=auth(token)).status_code == 200
     raw_header, raw_claims, sig = token.split(".")
-    invalid_sig = raw_header + "." + raw_claims + "." + ("x" if sig[0] != "x" else "y") + sig[1:]
+    sig_bytes = bytearray(base64.urlsafe_b64decode(sig + "=" * (-len(sig) % 4)))
+    assert sig_bytes
+    sig_bytes[0] ^= 0x01
+    broken = base64.urlsafe_b64encode(sig_bytes).rstrip(b"=").decode("ascii")
+    assert broken != sig
+    invalid_sig = raw_header + "." + raw_claims + "." + broken
     assert client.get(url, headers=auth(invalid_sig)).status_code == 401
     original = jwt.decode(token, os.environ["JWT_SECRET"],
                           algorithms=["HS256"], issuer=ISSUER, audience=AUDIENCE)
@@ -241,3 +250,70 @@ def test_existing_node_scrypt_account_can_login_without_reregistering(client, ac
     assert result.status_code == 200
     assert result.json()["user"]["id"] == uid
     assert client.get("/api/users/me", headers=auth(result.json()["token"])).status_code == 200
+
+
+def test_two_concurrent_logout_requests_serialize_without_deadlock_or_500(client, accounts, monkeypatch):
+    """Hold the first transaction's lock while the second logout attempts it.
+
+    With the previous FOR SHARE dependency both requests entered logout(),
+    then deadlocked while upgrading SHARE to UPDATE. FOR UPDATE at
+    authentication time serializes them: one 204, then one 401.
+    """
+    created, _, _ = new_account(client, accounts)
+    token = created["token"]
+    first_has_lock = Event()
+    release_first = Event()
+    second_started = Event()
+    second_reached_service = Event()
+    guard = Lock()
+    entered = 0
+    original_logout = auth_service.logout
+
+    def monitored_logout(session, identity):
+        nonlocal entered
+        with guard:
+            entered += 1
+            number = entered
+        if number == 1:
+            # This is after current_logout_session acquired FOR UPDATE.
+            first_has_lock.set()
+            assert release_first.wait(timeout=8), "First logout was not released"
+        else:
+            second_reached_service.set()
+        return original_logout(session, identity)
+
+    monkeypatch.setattr(auth_service, "logout", monitored_logout)
+
+    def submit(started=None):
+        with TestClient(app) as isolated_client:
+            if started is not None:
+                started.set()
+            return isolated_client.post("/api/auth/logout", headers=auth(token)).status_code
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        first = pool.submit(submit)
+        try:
+            assert first_has_lock.wait(timeout=8), "First logout did not acquire its lock"
+            second = pool.submit(submit, second_started)
+            assert second_started.wait(timeout=8), "Second request did not start"
+            # Leave the first lock held long enough for the other request to
+            # try authenticating. It must NOT reach logout() under FOR UPDATE.
+            assert not second_reached_service.wait(timeout=0.35), (
+                "Second logout reached UPDATE before the first transaction released its lock"
+            )
+        finally:
+            release_first.set()
+        statuses = [first.result(timeout=12), second.result(timeout=12)]
+
+    assert sorted(statuses) == [204, 401], statuses
+    assert entered == 1
+    assert client.get("/api/users/me", headers=auth(token)).status_code == 401
+    with engine().connect() as db:
+        count = db.scalar(text('''
+            SELECT count(*) FROM "AuthSession"
+            WHERE "userId"=:user AND "tokenHash"=:digest AND "revokedAt" IS NOT NULL
+        '''), {
+            "user": created["user"]["id"],
+            "digest": hashlib.sha256(token.encode()).hexdigest(),
+        })
+    assert count == 1  # Exactly one persisted session was revoked.
