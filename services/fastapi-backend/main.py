@@ -9,10 +9,11 @@ from site_auth import SiteSession
 
 app=FastAPI(title='WorldOfCodes Shared Learning API',version='3.0.0',description='''
 Uses the site's canonical Prisma PostgreSQL accounts, string IDs and AuthSession.
-Register/login once through /api/auth, then use **Authorize → Bearer token**.
+Register/login through FastAPI using canonical Prisma users and signed JWT.
+Existing opaque sessions remain valid until expiry. **Authorize → Bearer token**.
 Site and FastAPI share Submission, progress, comments and first-completion rewards.
 
-Account/judge operations call the existing Express service (EXPRESS_INTERNAL_URL);
+Judge and some profile operations call existing Express (EXPRESS_INTERNAL_URL);
 SQLAlchemy owns direct shared reads, authorized content CRUD and comment writes.
 No fallback accounts, integer X-User-Id authentication or mutable in-memory data.
 Content authoring requires FASTAPI_CONTENT_ADMIN_IDS; ordinary players cannot mint rewards.

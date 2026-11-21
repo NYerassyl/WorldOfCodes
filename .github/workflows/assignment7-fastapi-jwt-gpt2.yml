@@ -1,0 +1,61 @@
+name: Assignment 7 FastAPI JWT against canonical Prisma PostgreSQL
+on:
+  push:
+    branches:
+      - feat/assignment7-jwt-gpt2
+  pull_request:
+    paths:
+      - 'services/fastapi-backend/**'
+      - '.github/workflows/assignment7-fastapi-jwt-gpt2.yml'
+      - 'docs/ASSIGNMENT7_JWT_FASTAPI_GPT2.md'
+permissions:
+  contents: read
+jobs:
+  jwt-postgresql:
+    name: JWT HTTP tests and real shared Prisma database
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: jwt_ci
+          POSTGRES_PASSWORD: jwt_ci_only
+          POSTGRES_DB: worldofcodes_jwt_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U jwt_ci -d worldofcodes_jwt_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://jwt_ci:jwt_ci_only@127.0.0.1:5432/worldofcodes_jwt_test?schema=public
+      FASTAPI_DATABASE_URL: postgresql+psycopg://jwt_ci:jwt_ci_only@127.0.0.1:5432/worldofcodes_jwt_test
+      SHARED_DATABASE_TEST_URL: postgresql://jwt_ci:jwt_ci_only@127.0.0.1:5432/worldofcodes_jwt_test
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate disposable JWT secret only within the CI environment
+        run: python -c 'import secrets; print("JWT_SECRET="+secrets.token_urlsafe(48))' >> "$GITHUB_ENV"
+      - name: Install dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          python -m pip install -r services/fastapi-backend/requirements.txt
+      - name: Apply only existing Prisma migrations and seed
+        run: |
+          npm run db:validate
+          npm run db:generate
+          npm run db:migrate
+          npm run db:seed
+      - name: Apply existing Alembic read-only profile view
+        working-directory: services/fastapi-backend
+        run: |
+          python -m alembic upgrade head
+          python -m alembic current
+      - name: Full FastAPI pytest suite including real isolated PostgreSQL JWT tests
+        run: python -m pytest -q services/fastapi-backend/tests
+      - name: Existing Node regression suite
+        run: npm test
