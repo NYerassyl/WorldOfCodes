@@ -1,0 +1,116 @@
+name: Assignment 7 site JWT — FastAPI Express Socket.IO and UI
+on:
+  push:
+    branches: [feat/assignment7-jwt-site-integration-gpt2]
+  pull_request:
+    paths:
+      - 'server/**'
+      - 'services/learning-backend/**'
+      - 'frontend/**'
+      - 'scripts/verify-jwt-site.mjs'
+      - 'scripts/verify-shared-fastapi.py'
+      - '.github/workflows/assignment7-jwt-site-gpt2.yml'
+      - 'package-lock.json'
+      - 'package.json'
+permissions:
+  contents: read
+jobs:
+  jwt-site:
+    name: Real PostgreSQL + Express + FastAPI + Socket.IO JWT
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: site_jwt_ci
+          POSTGRES_PASSWORD: site_jwt_ci_only
+          POSTGRES_DB: worldofcodes_site_jwt_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U site_jwt_ci -d worldofcodes_site_jwt_test"
+          --health-interval 5s --health-timeout 5s --health-retries 12
+    env:
+      DATABASE_URL: postgresql://site_jwt_ci:site_jwt_ci_only@127.0.0.1:5432/worldofcodes_site_jwt_test?schema=public
+      FASTAPI_DATABASE_URL: postgresql+psycopg://site_jwt_ci:site_jwt_ci_only@127.0.0.1:5432/worldofcodes_site_jwt_test
+      SHARED_DATABASE_TEST_URL: postgresql://site_jwt_ci:site_jwt_ci_only@127.0.0.1:5432/worldofcodes_site_jwt_test
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
+      EXPRESS_INTERNAL_URL: http://127.0.0.1:4001
+      PORT: 4001
+      HOST: 127.0.0.1
+      CORS_ORIGINS: http://127.0.0.1:5173,http://localhost:5173
+      AUTH_RATE_LIMIT: 100
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Generate and mask an ephemeral JWT secret (never printed)
+        run: |
+          SECRET="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$SECRET"
+          echo "JWT_SECRET=$SECRET" >> "$GITHUB_ENV"
+      - name: Install locked Node and FastAPI dependencies
+        run: |
+          npm ci --ignore-scripts --no-audit --no-fund
+          python -m pip install -r services/fastapi-backend/requirements.txt
+      - name: Migrate existing Prisma tables, seed and apply Alembic view
+        run: |
+          npm run db:validate
+          npm run db:generate
+          npm run db:migrate
+          npm run db:seed
+          (cd services/fastapi-backend && python -m alembic upgrade head)
+      - name: Run all FastAPI and Node regression tests and frontend production build
+        run: |
+          python -m pytest -q services/fastapi-backend/tests
+          npm test
+          npm run build
+      - name: Start ONE FastAPI and ONE Express HTTP + Socket.IO server
+        run: |
+          python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 > /tmp/woc-site-jwt-fastapi.log 2>&1 &
+          echo $! > /tmp/woc-site-jwt-fastapi.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-site-fast-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-site-fast-health.json
+          node server/index.js > /tmp/woc-site-jwt-express.log 2>&1 &
+          echo $! > /tmp/woc-site-jwt-express.pid
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:4001/api/health -o /tmp/woc-site-express-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-site-express-health.json
+      - name: Actual two-account JWT, REST, FastAPI, friendly Socket.IO, recovery and logout
+        run: node scripts/verify-jwt-site.mjs
+      - name: FastAPI outage must give explicit 503 without opaque fallback
+        run: |
+          kill "$(cat /tmp/woc-site-jwt-fastapi.pid)"
+          for i in $(seq 1 40); do
+            if ! kill -0 "$(cat /tmp/woc-site-jwt-fastapi.pid)" 2>/dev/null; then break; fi
+            sleep 0.2
+          done
+          code=$(curl -sS --max-time 12 -o /tmp/woc-site-auth-unavailable.json -w '%{http_code}' \
+            -H 'Content-Type: application/json' -d '{"email":"test@example.com","password":"password123","nickname":"outage"}' \
+            http://127.0.0.1:4001/api/auth/register)
+          test "$code" = "503"
+          python - <<'PY'
+          import json
+          with open('/tmp/woc-site-auth-unavailable.json',encoding='utf-8') as f:
+              result=json.load(f)
+          assert result["error"]["code"]=="CANONICAL_AUTH_UNAVAILABLE"
+          print("PASS: FastAPI outage -> Express 503 CANONICAL_AUTH_UNAVAILABLE")
+          PY
+      - name: Upload sanitized server logs when verification fails
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: site-jwt-failure-logs
+          path: |
+            /tmp/woc-site-jwt-fastapi.log
+            /tmp/woc-site-jwt-express.log
+          if-no-files-found: ignore

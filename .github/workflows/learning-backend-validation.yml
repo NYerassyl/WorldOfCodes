@@ -70,6 +70,8 @@ jobs:
     env:
       DATABASE_URL: postgresql://woc_ci:woc_ci_only@127.0.0.1:5432/worldofcodes_integration_test?schema=public
       JUDGE_IMAGE: python:3.12-alpine
+      FASTAPI_DATABASE_URL: postgresql+psycopg://woc_ci:woc_ci_only@127.0.0.1:5432/worldofcodes_integration_test
+      FASTAPI_INTERNAL_URL: http://127.0.0.1:8000
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -91,5 +93,24 @@ jobs:
         run: node prisma/seed.js
       - name: Pull trusted Python Docker image for isolated judge
         run: docker pull python:3.12-alpine
+      - name: Configure and mask a disposable shared JWT secret
+        run: |
+          JWT_VALUE="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$JWT_VALUE"
+          echo "JWT_SECRET=$JWT_VALUE" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Run canonical FastAPI on the same isolated PostgreSQL database
+        working-directory: .
+        run: |
+          python -m pip install -r services/fastapi-backend/requirements.txt
+          (cd services/fastapi-backend && python -m alembic upgrade head)
+          python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 > /tmp/woc-learning-backend-fastapi.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-learning-backend-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-learning-backend-health.json
       - name: Run real PostgreSQL + Docker Judge integration tests
         run: npm run test:integration

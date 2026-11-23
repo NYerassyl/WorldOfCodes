@@ -87,23 +87,20 @@ def verify():
                     modal.locator('button.btn-done').click()
                 suffix=uuid4().hex.translate(str.maketrans('0123456789','abcdefghij'))[:14]
                 registration={'email':suffix+'@example.com','nickname':'owner'+suffix,'password':'shared-password-123'}
-                # The new FastAPI issuer returns JWT. Before GPT 1 integrates
-                # Express JWT verification, use an old-style Express login for
-                # the *same* Prisma User to exercise existing cross-runtime flows.
-                fast_a=docs('POST','/api/auth/register',201,registration)
+                # JWT issued by FastAPI must work unchanged in Express and Socket.IO.
+                a=docs('POST','/api/auth/register',201,registration)
                 docs('POST','/api/auth/register',409,registration)
                 docs('POST','/api/auth/register',422,{**registration,'password':'short'})
                 docs('POST','/api/auth/login',401,{'email':registration['email'],'password':'wrong'})
                 second_registration={'email':'b'+registration['email'],'nickname':'guest'+suffix,'password':'shared-password-123'}
-                fast_b=docs('POST','/api/auth/register',201,second_registration)
-                uid=fast_a['user']['id'];bid=fast_b['user']['id']
-                assert call('GET','/api/users/me',token=fast_a['token'])['id']==uid
-                assert call('GET','/api/users/me',token=fast_b['token'])['id']==bid
-                # Password hashes written by Python are compatible with Express.
-                a=call('POST','/api/auth/login',data={'email':registration['email'],'password':registration['password']},origin=EXPRESS)
-                b=call('POST','/api/auth/login',data={'email':second_registration['email'],'password':second_registration['password']},origin=EXPRESS)
-                assert a['user']['id']==uid and b['user']['id']==bid
-                token=a['token'];bt=b['token']
+                b=docs('POST','/api/auth/register',201,second_registration)
+                uid=a['user']['id'];bid=b['user']['id'];token=a['token'];bt=b['token']
+                assert token.count('.')==2 and bt.count('.')==2
+                assert call('GET','/api/users/me',token=token)['id']==uid
+                assert call('GET','/api/users/me',token=bt)['id']==bid
+                # Express login is now the FastAPI proxy, and returns a NEW JWT.
+                login_a=call('POST','/api/auth/login',data={'email':registration['email'],'password':registration['password']},origin=EXPRESS)
+                assert login_a['user']['id']==uid and login_a['token'].count('.')==2
                 assert isinstance(uid,str) and call('GET','/api/users/me',token=token,origin=EXPRESS)['id']==uid
                 authorize(token)
                 docs('PATCH','/api/users/me',data={'bio':'Saved through canonical Swagger','displayName':'Swagger learner'})

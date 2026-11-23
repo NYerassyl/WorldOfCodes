@@ -75,7 +75,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     });
     await t.test('register/login, private profile and authorization',async()=>{
       const register=await request('/auth/register',{method:'POST',auth:null,data:{
-        email:'first-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'first'+suffix
+        email:'first-'+suffix+'@example.com',password:'StrongTestPassword_123',nickname:'first'+suffix
       }});
       assert.equal(register.status,201);
       token=register.body.token;user=register.body.user;
@@ -87,7 +87,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const me=await request('/users/me');
       assert.equal(me.status,200);assert.equal(me.body.id,user.id);assert.equal(me.body.coins,0);
       const second=await request('/auth/register',{method:'POST',auth:null,data:{
-        email:'second-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:'second'+suffix
+        email:'second-'+suffix+'@example.com',password:'StrongTestPassword_123',nickname:'second'+suffix
       }});
       assert.equal(second.status,201);
       assert.equal((await request('/users/me',{method:'PATCH',data:{userId:second.body.user.id,nickname:'attacker'}})).status,400);
@@ -146,7 +146,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     await t.test('chat inbox keeps legacy history, continues one conversation and isolates third accounts',async()=>{
       const register=async(name)=>{
         const response=await request('/auth/register',{method:'POST',auth:null,data:{
-          email:name+'-'+suffix+'@example.test',password:'StrongTestPassword_123',nickname:name+suffix
+          email:name+'-'+suffix+'@example.com',password:'StrongTestPassword_123',nickname:name+suffix
         }});
         assert.equal(response.status,201,JSON.stringify(response.body));
         return response.body;
@@ -228,7 +228,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
     });
     await t.test('concurrent ranked ACCEPTED submissions settle once and update both rank ratings once', async () => {
       const rival = await prisma.user.create({ data: {
-        email: 'battle-rival-' + suffix + '@example.test',
+        email: 'battle-rival-' + suffix + '@example.com',
         passwordHash: 'integration-test-hash',
         nickname: 'rival' + suffix,
         normalizedNickname: ('rival' + suffix).toLowerCase()
@@ -278,7 +278,7 @@ test('isolated PostgreSQL migrations, HTTP Auth, learning rewards and real Docke
       const makePlayer = async label => {
         const nickname = 'rank' + label + suffix;
         return prisma.user.create({ data: {
-          email: 'rank-' + label + '-' + suffix + '@example.test',
+          email: 'rank-' + label + '-' + suffix + '@example.com',
           passwordHash: 'integration-test-hash',
           nickname, normalizedNickname: nickname
         } });

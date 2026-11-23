@@ -1,16 +1,11 @@
-import { hashSessionToken } from "../services/learning-backend/src/lib/security.js";
-// GPT 3: use with io.use() and revalidate before every protected event.
+import { resolveAuthSession } from "../services/learning-backend/src/auth/session.js";
+
+// Reuse the exact same signed-JWT + Prisma AuthSession validator as HTTP and
+// live battle Socket.IO. No independent opaque-only verifier is permitted.
 export async function resolveSession(prisma, token) {
-  if (typeof token !== "string" || !/^[A-Za-z0-9_-]{32,128}$/.test(token))
-    return null;
-  const session = await prisma.authSession.findUnique({
-    where: { tokenHash: hashSessionToken(token) },
-    include: { user: true },
-  });
-  if (!session || session.revokedAt || session.expiresAt <= new Date())
-    return null;
-  return { userId: session.userId, sessionId: session.id, user: session.user };
+  return resolveAuthSession(prisma, token, { includeUser: true });
 }
+
 export function createSocketAuth(prisma, { origins = [] } = {}) {
   return async (socket, next) => {
     try {

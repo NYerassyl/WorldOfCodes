@@ -58,6 +58,24 @@ jobs:
         run: node --test server/*.test.js
       - name: Run all learning-backend unit tests
         run: node --test services/learning-backend/tests/*.test.js
+      - name: Configure and mask a disposable shared JWT secret
+        run: |
+          JWT_VALUE="$(python -c 'import secrets; print(secrets.token_urlsafe(48))')"
+          echo "::add-mask::$JWT_VALUE"
+          echo "JWT_SECRET=$JWT_VALUE" >> "$GITHUB_ENV"
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Start canonical FastAPI auth on the same isolated database
+        run: |
+          python -m pip install -r services/fastapi-backend/requirements.txt
+          (cd services/fastapi-backend && python -m alembic upgrade head)
+          python -m uvicorn main:app --app-dir services/fastapi-backend --host 127.0.0.1 --port 8000 > /tmp/woc-trace-fastapi.log 2>&1 &
+          for i in $(seq 1 40); do
+            if curl -fsS http://127.0.0.1:8000/api/health -o /tmp/woc-trace-health.json; then break; fi
+            sleep 1
+          done
+          grep -q '"status":"ok"' /tmp/woc-trace-health.json
       - name: Real Bearer attempt against a fresh PostgreSQL database
         run: node tests/trace-bearer-postgres.mjs
       - name: Seed original course and exercises without replacing user data
