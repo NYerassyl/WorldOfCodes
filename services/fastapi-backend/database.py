@@ -9,19 +9,30 @@ from errors import DomainError
 
 
 def database_url():
-    shared = os.environ.get("FASTAPI_DATABASE_URL") or os.environ.get("DATABASE_URL")
+    shared = (
+        os.environ.get("FASTAPI_DATABASE_URL")
+        or os.environ.get("POSTGRES_URL")
+        or os.environ.get("DATABASE_URL")
+    )
     if not shared:
-        raise ValueError("Set DATABASE_URL or FASTAPI_DATABASE_URL to the shared Prisma database")
+        raise ValueError(
+            "Set FASTAPI_DATABASE_URL, POSTGRES_URL or DATABASE_URL to the shared Prisma database"
+        )
     url = make_url(shared)
-    if url.get_backend_name() != "postgresql":
+    if url.get_backend_name() not in {"postgres", "postgresql"}:
         raise ValueError("The shared site database must be PostgreSQL")
     if url.query.get("schema", "public") != "public":
         raise ValueError("Site APIs currently require the public Prisma schema")
     prisma_value = os.environ.get("DATABASE_URL")
     if prisma_value:
         prisma = make_url(prisma_value)
-        target = lambda u: (u.host, u.port or 5432, u.database, u.query.get("schema", "public"))
-        if target(prisma) != target(url):
+        target = lambda u: (
+            u.host,
+            u.port or 5432,
+            u.database,
+            u.query.get("schema", "public"),
+        )
+        if prisma.get_backend_name() in {"postgres", "postgresql"} and target(prisma) != target(url):
             raise ValueError("DATABASE_URL and FASTAPI_DATABASE_URL must identify the same database and public schema")
     return url.set(drivername="postgresql+psycopg").difference_update_query(["schema"])
 
