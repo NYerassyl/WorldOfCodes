@@ -37,6 +37,15 @@ export function socketCors(origins = []) {
   return origins.length ? { origin: origins } : { origin: false };
 }
 
+function isSameHostOrigin(origin, host) {
+  if (!origin || !host) return !origin;
+  try {
+    return new URL(origin).host === host;
+  } catch {
+    return false;
+  }
+}
+
 export function createApp({
   prisma,
   config = readConfig(),
@@ -56,11 +65,16 @@ export function createApp({
     if (req.path.startsWith("/api")) res.set("Cache-Control", "no-store");
     next();
   });
-  app.use(
-    "/api",
+  app.use("/api", (req, res, next) =>
     cors({
       origin(origin, done) {
-        if (!origin || config.origins.includes(origin)) return done(null, true);
+        if (
+          !origin ||
+          isSameHostOrigin(origin, req.get("host")) ||
+          config.origins.includes(origin)
+        ) {
+          return done(null, true);
+        }
         done(
           new AppError(403, "ORIGIN_NOT_ALLOWED", "This origin is not allowed"),
         );
@@ -69,7 +83,7 @@ export function createApp({
       allowedHeaders: ["Content-Type", "Authorization"],
       credentials: false,
       maxAge: 600,
-    }),
+    })(req, res, next),
   );
   const limiter = (limit, windowMs, code) =>
     rateLimit({

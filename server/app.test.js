@@ -160,6 +160,11 @@ test("CORS headers are only sent for configured origins", async () => {
     corsOrigins: ["http://localhost:5180"],
   });
   await withServer(app, async (base) => {
+    const sameHost = await fetch(`${base}/api/does-not-exist`, {
+      headers: { origin: base },
+    });
+    assert.equal(sameHost.headers.get("access-control-allow-origin"), base);
+
     const allowed = await fetch(`${base}/api/does-not-exist`, {
       headers: { origin: "http://localhost:5180" },
     });
